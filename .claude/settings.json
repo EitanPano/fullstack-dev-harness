@@ -1,6 +1,7 @@
 {
-  "$comment": "Guardrail wiring. Claude Code only reads hook and permission config from this file — a hook script in .claude/hooks/ that is not listed here never runs. See AGENTS.md.",
-  "$comment2": "Approves the figma server from .mcp.json by name rather than using enableAllProjectMcpServers, so adding a server to .mcp.json is still a deliberate act. Without this, agents dev-loop.js spawns headlessly would see the server as 'pending approval' and silently run with no Figma tools.",
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "$comment": "Guardrail wiring. Claude Code only reads hook and permission config from this file — a hook script in .claude/hooks/ that is not listed here never runs. See AGENTS.md. Hooks use exec form (node + args: no shell, cwd-independent through ${CLAUDE_PROJECT_DIR}) with onFailure: block, so a hook that crashes, times out or cannot start blocks the call instead of letting it through. Run `bun run hooks:test` after any change here or under .claude/hooks/.",
+  "$comment2": "Approves the figma and linear servers from .mcp.json by name rather than using enableAllProjectMcpServers, so adding a server to .mcp.json is still a deliberate act. Headless sub-agent runs cannot answer the approval prompt and would otherwise silently run without those tools.",
   "enabledMcpjsonServers": ["figma", "linear"],
   "permissions": {
     "deny": [
@@ -21,25 +22,34 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-secret-file-access.js"
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/block-secret-file-access.mjs"],
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-destructive-bash.js"
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/block-destructive-bash.mjs"],
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       },
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/enforce-agent-boundaries.js"
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce-agent-boundaries.mjs"],
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       }

@@ -1,0 +1,1669 @@
+{
+  "_about": [
+    "Guardrail hook payload matrix. One entry = one PreToolUse payload fed to one hook; the test asserts the exit code.",
+    "Fields: name, hook (destructive|secret|boundary), expect (\"block\" -> exit 2, \"allow\" -> exit 0, or {win32, default}),",
+    "tool_name + tool_input (payload body) or raw (verbatim stdin), agent_type (payload field Claude Code sets inside a subagent),",
+    "env (extra environment; \"\" unsets), cwd (payload.cwd, default {{root}}), deferred (reason this case is skipped until a later phase), source.",
+    "Placeholders {{root}}, {{root-upper}} and {{home}} are replaced at run time. Remove a case's `deferred` when the hook is expected to satisfy it."
+  ],
+  "cases": [
+    {
+      "name": "d01-control-rm-rf",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "rm -rf x"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d02-rm-fr",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "rm -fr x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d03-rm-r-f",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "rm -r -f x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d04-rm-long-flags",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "rm --recursive --force x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d05-rm-rfv",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "rm -rfv x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d06-sudo-rm-rf",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "sudo rm -rf /"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d07-sh-c-rm-rf",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "sh -c \"rm -rf x\""
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d08-rm-escaped",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "r\\m -rf x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d09-ps-remove-item",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "Remove-Item -Recurse -Force x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d10-ps-ri-alias",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ri -r -fo x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d11-cmd-rd",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "rd /s /q x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d12-cmd-del",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "del /f /s /q x"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d13-git-push-f",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git push -f origin main"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d14-git-push-force-with-lease",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git push --force-with-lease origin feat/x"
+      },
+      "source": "audit 2026-10-20 02-security.md; decided 2026-10-20 (Eitan): agents never force-push, lease or not"
+    },
+    {
+      "name": "d15-git-push-plus-ref",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git push origin +main"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d16-git-push-delete",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git push origin --delete main"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d17-git-branch-D",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git branch -D main"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d18-git-clean-fdx",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git clean -fdx"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d19-git-checkout-dot",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git checkout -- ."
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d20-git-restore-dot",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git restore ."
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d21-control-git-reset-hard",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git reset --hard"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d22-git-reset-hard-origin",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git reset --hard origin/main"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d23-git-stash-clear",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git stash clear"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d24-control-drop-table",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "psql -c \"DROP TABLE x\""
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d25-drop-table-lower",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "psql -c \"drop table x\""
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d26-drop-schema-cascade",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "psql -c \"DROP SCHEMA public CASCADE\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d27-truncate",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "psql -c \"TRUNCATE TABLE x\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d28-control-delete-from-bare",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "DELETE FROM x"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d29-delete-from-quoted",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "psql -c \"DELETE FROM x\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d30-delete-where-1-1",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "psql -c \"delete from x where 1=1\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d31-delete-multiline",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "DELETE FROM x\n;"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d32-delete-then-select",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "psql -c \"DELETE FROM x; SELECT 1\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d33-prisma-migrate-reset",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "npx prisma migrate reset --force"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d34-drizzle-drop",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "npx drizzle-kit drop"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d35-control-supabase-reset",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "supabase db reset"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d36-mongo-dropdatabase",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "mongosh --eval \"db.dropDatabase()\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d37-redis-flushall",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "redis-cli FLUSHALL"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d38-docker-prune",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker system prune -af --volumes"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d39-redirect-truncate",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo > src/index.ts"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d40-colon-truncate",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": ": > frontend/src/app/page.tsx"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d41-find-delete",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "find . -name '*.ts' -delete"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d42-rimraf",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "rimraf dist"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d43-npx-rimraf-dot",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "npx rimraf ."
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d44-shred",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "shred -u secrets.txt"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d45-fp-commit-message",
+      "hook": "destructive",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git commit -m \"docs: remove rm -rf usage from README\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d46-fp-grep-docs",
+      "hook": "destructive",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -rn \"rm -rf\" .claude/"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d47-fp-echo-drop-table",
+      "hook": "destructive",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"never DROP TABLE in prod\" >> .doc/architecture.md"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d48-fp-node-test-hook",
+      "hook": "destructive",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "node --test .claude/hooks/ # asserts rm -rf is blocked"
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "d49-fp-hard-reset-wording",
+      "hook": "destructive",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git log --grep=\"git reset --hard\""
+      },
+      "deferred": "phase-1 #5 tokenised destructive matcher",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s01-control-read-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": ".env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s02-read-env-local",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": ".env.local"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s03-read-env-production",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "frontend/.env.production"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s04-read-env-staging",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": ".env.staging"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s05-read-env-test",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": ".env.test"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s06-read-env-development-local",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": ".env.development.local"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s07-read-env-example-must-pass",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": ".env.example"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s08-read-envrc",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": ".envrc"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s09-read-secrets-json",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "secrets.json"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s10-read-secrets-yaml",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "config/secrets.yaml"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s11-read-credentials-json",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "config/credentials.json"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s12-read-id-rsa",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "{{home}}/.ssh/id_rsa"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s13-read-pem",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "certs/server.pem"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s14-read-npmrc",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "{{home}}/.npmrc"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s15-read-aws-credentials",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "{{home}}/.aws/credentials"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s16-read-env-absolute",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "{{root}}/.env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s17-read-env-dotslash",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "./.env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s18-read-env-backslash",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "frontend\\.env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s19-edit-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": ".env",
+        "old_string": "a",
+        "new_string": "b"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s20-write-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "backend/.env",
+        "content": "X=1"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s21-control-cat-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat .env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s22-cat-redirect",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat < .env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s23-cat-glob",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat .en*"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s24-cat-home-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat \"$HOME/.env\""
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s25-cat-subst",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat $(echo .en)v"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s26-cp-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cp .env /tmp/x"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s27-type-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "type .env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s28-get-content-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "Get-Content .env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s29-source-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "set -a; source .env; set +a; env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s30-printenv",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "printenv"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s31-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "env | sort"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s32-set",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "set"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s33-node-dump-process-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "node -e \"console.log(process.env)\""
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s34-node-dotenv-preload",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "node -r dotenv/config -e \"console.log(process.env.LINEAR_API_KEY)\""
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s35-node-env-file-flag",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "node --env-file=.env -e \"console.log(process.env.LINEAR_API_KEY)\""
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s36-bun-env-autoload",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "bun -e \"console.log(Bun.env.LINEAR_API_KEY)\""
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s37-bun-print",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "bun --print \"process.env.LINEAR_API_KEY\""
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s38-bun-run-script",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "bun run scripts/print-config.ts"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s39-fp-echo-process-env",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo process.env"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s40-fp-grep-process-env-src",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -rn \"process.env\" frontend/src"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s41-fp-grep-import-meta-env",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -rn import.meta.env frontend/src"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s42-fp-commit-env-example",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git commit -m \"docs: update .env.example\""
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s43-fp-ls-la",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls -la"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s44-fp-bun-add-dotenv",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "bun add dotenv"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s45-fp-read-env-schema-ts",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Read",
+      "tool_input": {
+        "file_path": "frontend/src/config/env.ts"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s46-fp-write-env-example",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "backend/.env.example",
+        "content": "PORT=3001"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s47-fp-cp-env-example",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cp .env.example .env.local"
+      },
+      "deferred": "phase-1 #5 secret name list and env-dump detection",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s48-fp-node-env-var-single",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "node -e \"console.log(process.env.NODE_ENV)\""
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s49-grep-tool-path-dot",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Grep",
+      "tool_input": {
+        "pattern": "LINEAR_API_KEY=",
+        "path": ".",
+        "output_mode": "content"
+      },
+      "deferred": "phase-1 #5 inspect every path-like field (Grep path/glob, MCP paths[])",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s50-grep-tool-glob-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Grep",
+      "tool_input": {
+        "pattern": "KEY",
+        "glob": ".env*",
+        "output_mode": "content"
+      },
+      "deferred": "phase-1 #5 inspect every path-like field (Grep path/glob, MCP paths[])",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s51-grep-tool-path-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Grep",
+      "tool_input": {
+        "pattern": "KEY",
+        "path": ".env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s52-glob-tool-env",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "Glob",
+      "tool_input": {
+        "pattern": "**/.env*"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s53-mcp-read-multiple",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "mcp__filesystem__read_multiple_files",
+      "tool_input": {
+        "paths": [
+          ".env",
+          "README.md"
+        ]
+      },
+      "deferred": "phase-1 #5 inspect every path-like field (Grep path/glob, MCP paths[])",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "s54-mcp-read-file-path",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "mcp__filesystem__read_file",
+      "tool_input": {
+        "path": ".env"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b01-control-fe-backend",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "backend/x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b02-fe-traversal-relative",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "frontend/../backend/x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b03-fe-traversal-absolute",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "{{root}}/frontend/../backend/x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b04-fe-traversal-backslash",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "frontend\\..\\backend\\x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b05-fe-dotslash-allowed",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "./frontend/src/x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b06-fe-uppercase-relative",
+      "hook": "boundary",
+      "expect": {
+        "win32": "allow",
+        "default": "block"
+      },
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "FRONTEND/src/x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b07-fe-uppercase-absolute",
+      "hook": "boundary",
+      "expect": {
+        "win32": "allow",
+        "default": "block"
+      },
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "{{root-upper}}/frontend/src/x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b08-fe-other-report",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": ".orchestrate/qa-report.md",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b09-fe-prefix-collision",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": ".orchestrate/api-contract.yaml.bak",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b10-fe-doc",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": ".doc/product-definition.md",
+        "old_string": "a",
+        "new_string": "b"
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b11-fe-settings-json",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": ".claude/settings.json",
+        "old_string": "a",
+        "new_string": "b"
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b12-fe-notebook-edit",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "NotebookEdit",
+      "tool_input": {
+        "notebook_path": "backend/x.ipynb",
+        "new_source": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b13-fe-bash-redirect",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo 'export const x = 1' > backend/y.ts"
+      },
+      "agent_type": "frontend",
+      "deferred": "phase-1 #6 bash write channel",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b14-fe-bash-sed-settings",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "sed -i 's/enforce-agent-boundaries/noop/' .claude/settings.json"
+      },
+      "agent_type": "frontend",
+      "deferred": "phase-1 #6 bash write channel",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b15-fe-escape-abs",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "{{home}}/x.ts",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b16-fe-empty-path",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "",
+        "content": ""
+      },
+      "agent_type": "frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b17-qa-traversal",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "frontend/tests/../src/a.ts",
+        "old_string": "a",
+        "new_string": "b"
+      },
+      "agent_type": "qa",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b18-qa-feature-source",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "frontend/src/a.ts",
+        "old_string": "a",
+        "new_string": "b"
+      },
+      "agent_type": "qa",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b19-qa-root-tests",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "tests/x.test.ts",
+        "content": ""
+      },
+      "agent_type": "qa",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b20-qa-e2e-dir-mismatch",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "frontend/e2e/x.spec.ts",
+        "content": ""
+      },
+      "agent_type": "qa",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b21-be-frontend-types",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "frontend/src/types/x.ts",
+        "old_string": "a",
+        "new_string": "b"
+      },
+      "agent_type": "backend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b22-be-package-json-root",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": {
+        "file_path": "package.json",
+        "old_string": "a",
+        "new_string": "b"
+      },
+      "agent_type": "backend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b23-unknown-role-orchestrator",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": ".plan/003-x.md",
+        "content": ""
+      },
+      "agent_type": "orchestrator",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b24-role-case-Frontend",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "backend/x.ts",
+        "content": ""
+      },
+      "agent_type": "Frontend",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "b25-role-typo",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "backend/x.ts",
+        "content": ""
+      },
+      "agent_type": "fronted",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "x01-destructive-malformed-json",
+      "hook": "destructive",
+      "expect": "block",
+      "raw": "{not json",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "x02-secret-malformed-json",
+      "hook": "secret",
+      "expect": "block",
+      "raw": "{not json",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "x03-boundary-malformed-json",
+      "hook": "boundary",
+      "expect": "block",
+      "raw": "{not json",
+      "env": {
+        "AGENT_ROLE": "frontend"
+      },
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "x04-destructive-empty-stdin",
+      "hook": "destructive",
+      "expect": "block",
+      "raw": "",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "x05-secret-missing-tool-input",
+      "hook": "secret",
+      "expect": "block",
+      "raw": "{\"tool_name\":\"Bash\"}",
+      "source": "audit 2026-10-20 02-security.md"
+    },
+    {
+      "name": "z01-secret-paramless-tool",
+      "hook": "secret",
+      "expect": "allow",
+      "tool_name": "ListAgents",
+      "tool_input": {},
+      "source": "plan 001 review focus 1"
+    },
+    {
+      "name": "z02-destructive-empty-command",
+      "hook": "destructive",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": ""
+      },
+      "source": "plan 001"
+    },
+    {
+      "name": "m01-agent-type-fe-writes-backend",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "backend/x.ts", "content": "" },
+      "agent_type": "frontend",
+      "source": "audit MECH-01: the role arrives as agent_type, no env var involved"
+    },
+    {
+      "name": "m02-subdir-cwd-allowed-path",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "{{root}}/frontend/src/a.ts", "content": "" },
+      "agent_type": "frontend",
+      "cwd": "{{root}}/.claude",
+      "source": "audit MECH-03: root comes from CLAUDE_PROJECT_DIR, not payload.cwd"
+    },
+    {
+      "name": "m03-env-role-fallback",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "backend/x.ts", "content": "" },
+      "env": { "AGENT_ROLE": "frontend" },
+      "source": "plan 001: AGENT_ROLE still works for a headless driver"
+    },
+    {
+      "name": "m04-empty-agent-type-is-interactive",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": { "file_path": ".claude/settings.json", "content": "" },
+      "agent_type": "",
+      "source": "plan 001 review focus 2: docs say agent_type may be an empty string outside a subagent"
+    },
+    {
+      "name": "m05-no-role-is-interactive",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "backend/x.ts", "content": "" },
+      "source": "audit keep: the main session is unrestricted by this hook"
+    },
+    {
+      "name": "m06-no-project-dir-falls-back-to-payload-cwd",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "{{root}}/frontend/src/a.ts", "content": "" },
+      "agent_type": "frontend",
+      "env": { "CLAUDE_PROJECT_DIR": "" },
+      "cwd": "{{root}}",
+      "source": "plan 001 review focus 3: without CLAUDE_PROJECT_DIR the root is payload.cwd, never the hook's own cwd"
+    },
+    {
+      "name": "m07-agent-type-wins-over-env",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Edit",
+      "tool_input": { "file_path": "frontend/src/a.ts", "old_string": "a", "new_string": "b" },
+      "agent_type": "qa",
+      "env": { "AGENT_ROLE": "frontend" },
+      "source": "plan 001: agent_type takes precedence over AGENT_ROLE"
+    },
+    {
+      "name": "m08-no-path-field-blocks",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "content": "" },
+      "agent_type": "frontend",
+      "source": "audit SEC-07: a write the hook cannot locate is blocked"
+    },
+    {
+      "name": "c01-fe-leading-space-root-traversal",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": " /../frontend/x.md", "content": "" },
+      "agent_type": "frontend",
+      "source": "review C1: Claude Code trims the path and writes to <drive>:/frontend/x.md; the hook must not resolve ' ' as a directory"
+    },
+    {
+      "name": "c02-fe-tilde-traversal",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "~/../frontend/x.md", "content": "" },
+      "agent_type": "frontend",
+      "source": "review C1: Claude Code expands ~ to the home directory"
+    },
+    {
+      "name": "c03-fe-msys-drive-form",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "/c/../frontend/x.md", "content": "" },
+      "agent_type": "frontend",
+      "source": "review C1: on Windows Claude Code rewrites /c/ to C:\\; elsewhere it is an absolute path outside the repo"
+    },
+    {
+      "name": "c04-fe-relative-resolves-against-session-cwd",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "frontend/x.ts", "content": "" },
+      "agent_type": "frontend",
+      "cwd": "{{root}}/backend",
+      "source": "review C1: the file tools resolve relative paths against the session cwd (payload.cwd), which a Bash cd moves"
+    },
+    {
+      "name": "c05-fe-trailing-whitespace",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "frontend/x.ts ", "content": "" },
+      "agent_type": "frontend",
+      "source": "review C1: non-canonical spelling is refused rather than reinterpreted"
+    },
+    {
+      "name": "c06-fe-other-drive",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "Z:/frontend/x.ts", "content": "" },
+      "agent_type": "frontend",
+      "source": "plan 001 review focus 4: another drive is outside every lane and must not throw"
+    },
+    {
+      "name": "c07-fe-unc-path",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "//srv/share/frontend/x.ts", "content": "" },
+      "agent_type": "frontend",
+      "source": "plan 001 review focus 4: a UNC path is outside every lane"
+    },
+    {
+      "name": "p01-proto-role-blocks-cleanly",
+      "hook": "boundary",
+      "expect": "block",
+      "tool_name": "Write",
+      "tool_input": { "file_path": "frontend/x.ts", "content": "" },
+      "agent_type": "__proto__",
+      "source": "review M3: a prototype-named role must be refused as unknown, not by crashing"
+    },
+    {
+      "name": "r01-boundary-not-invoked-for-bash",
+      "hook": "boundary",
+      "expect": "allow",
+      "tool_name": "Bash",
+      "tool_input": { "command": "echo 'export const x = 1' > frontend/x.ts" },
+      "agent_type": "frontend",
+      "source": "review I2: the boundary hook is wired for Edit|Write|MultiEdit|NotebookEdit only; the Bash write channel is Phase 1 #6"
+    },
+    {
+      "name": "i01-destructive-env-prefix-no-leak",
+      "hook": "destructive",
+      "expect": "block",
+      "tool_name": "Bash",
+      "tool_input": { "command": "PGPASSWORD=hunter2 psql -c \"DROP TABLE x\"" },
+      "forbid_in_stderr": ["hunter2"],
+      "source": "review I3: the block message must not echo a NAME=value prefix"
+    },
+    {
+      "name": "t01-secret-leading-space-env-local",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": { "file_path": " .env.local" },
+      "source": "review C1: Claude Code trims the path before opening the file"
+    },
+    {
+      "name": "t02-secret-tab-env",
+      "hook": "secret",
+      "expect": "block",
+      "tool_name": "Read",
+      "tool_input": { "file_path": "\t.env" },
+      "source": "review C1: Claude Code trims the path before opening the file"
+    }
+  ]
+}
