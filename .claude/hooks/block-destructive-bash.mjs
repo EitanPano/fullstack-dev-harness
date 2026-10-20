@@ -11,7 +11,7 @@
 // /\.env\b/ rule here: it also matches `process.env`, `import.meta.env` and `$env:`, which
 // blocked ordinary commands.
 //
-// Known gap, tracked as deferred cases in __tests__/cases.json: one spelling per intent.
+// Known gap: one spelling per intent.
 // Phase 1 of the harness upgrade replaces this list with a tokenised intent matcher.
 import { allow, block, readPayload } from './lib/guardrail.mjs'
 

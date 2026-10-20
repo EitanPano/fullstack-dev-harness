@@ -18,8 +18,6 @@
 - Claude Code sends a sub-agent's `name` as `agent_type` in every hook payload;
   `.claude/hooks/enforce-agent-boundaries.mjs` keys its write lanes on it (`AGENT_ROLE` in
   the environment is an override for a headless driver). A role with no lane is blocked.
-- Run `bun run hooks:test` after changing anything under `.claude/hooks/` or the hook
-  block in `.claude/settings.json`.
 
 ## Repository Layout
 

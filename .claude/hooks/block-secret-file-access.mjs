@@ -13,7 +13,7 @@
 //   mention env files. Scanning content made the hook unable to edit itself.
 // - `.env.example` is deliberately allowed: it is committed template content.
 //
-// Known gaps, tracked as deferred cases in __tests__/cases.json (Phase 1): only `.env`,
+// Known gaps (Phase 1): only `.env`,
 // `.env.local`, `.env.development` and `.env.production` are matched; other secret file
 // names and env-dump commands (`printenv`, `console.log(process.env)`) are not; Grep's
 // `path`/`glob` and MCP `paths[]` arrays are not inspected.
