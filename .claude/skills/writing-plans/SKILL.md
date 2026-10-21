@@ -30,11 +30,14 @@ Status: draft | active | done | superseded | blocked
 Owner:
 Last updated: YYYY-MM-DD
 Branch: feat/<slug>
+Base: <commit>   (the commit the branch was created from; the dev loop passes it)
 Stages: backend, frontend, qa   (omit backend for a stack:frontend task, frontend for a stack:backend task)
 ```
 
 New plans start as `Status: draft`. Only the human flips a plan to `active`, by editing
 the file. The review stage runs once after the implementation stages and is not listed.
+Every stage reads the task's change as `git diff <Base>`: on a branch that already carries
+earlier committed tasks, `git diff main` would show those too.
 
 ## Required sections
 

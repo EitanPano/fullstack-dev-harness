@@ -45,7 +45,8 @@ planned and reviewed like any other, delivers:
    `Executor` type a repository accepts: the client or a transaction.
 5. Every `api/*/repository.ts` rewritten against it (`user`, `module` and any product
    module), and `services/session.ts`, which keeps its own queries because it has no
-   repository. Signatures stay; bodies change. Each module's `model.ts` when the engine
+   repository. A product scaffolded with `--auth none` (Auth: none) has neither `user`
+   nor `services/session.ts`. Signatures stay; bodies change. Each module's `model.ts` when the engine
    defines models in code.
 6. `infra/<engine>.ts` added to `dependencies` in `infra/dependency.ts`, replacing
    `memory`. Keep `memory` in the list only while `services/cache.ts` still runs on it, that

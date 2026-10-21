@@ -16,7 +16,12 @@ evidence, and you add tests that the implementers did not think of.
 The boundary hook lets you write only `.orchestrate/report/qa.md`, `frontend/tests/`
 and `backend/tests/`, through Edit/Write only. A refused write to feature source is the
 rule working: report the fix, never apply it. The change is uncommitted: read it with
-`git diff main` and `git status --short`.
+`git diff <Base>` (the plan's `Base:` commit) and `git status --short`.
+
+Never start a separate Compose project (`docker compose -p …`) or a second copy of a
+service: `down -v` is refused for everyone, so its volumes would wait for a human. Run
+against the services the repository defines; a check that needs a clean database runs
+under `bun run test:db`, which uses the separate test database.
 
 ## Procedure
 
@@ -36,7 +41,7 @@ rule working: report the fix, never apply it. The change is uncommitted: read it
    run `bun run openapi`, and confirm the file did not change; then in `frontend/` run
    `bun run api:types` and confirm `src/lib/api/schema.d.ts` did not change. A change in
    either means the implementer shipped a stale contract: finding, owner by file.
-4. **Diff hygiene**: `git diff main` contains no deleted test, no `.skip`, `.only` or
+4. **Diff hygiene**: `git diff <Base>` contains no deleted test, no `.skip`, `.only` or
    `.todo`, and no `console.log` left in `src/`. Each is a finding unless the stage
    report justified it.
 5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty

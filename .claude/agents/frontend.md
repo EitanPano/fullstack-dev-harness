@@ -15,8 +15,11 @@ and UI rules in `.claude/rules/`; `frontend/AGENTS.md` (written by Next.js) docu
 framework version's APIs. Read them before writing code.
 
 The boundary hook refuses any write outside `frontend/` and
-`.orchestrate/report/frontend.md`, and refuses shell write channels. Use Edit and Write.
-Never run `create-next-app` or any scaffolder: the app exists.
+`.orchestrate/report/frontend.md`, and refuses shell write channels (`>`, `tee`, `sed -i`,
+`cp`, `mv`, `rm`, git writes). Use Edit and Write; reading output through `2>&1` or
+`>/dev/null` is fine. A file you need removed goes in your report under `Delete:`; to
+rename, Write the new file, update its importers, and list the old path there. The driver
+removes it. Never run `create-next-app` or any scaffolder: the app exists.
 
 ## Workflow
 
@@ -50,6 +53,7 @@ Features: <src/feature/<name> directories touched>
 Tests: unit <N passed, 0 failed> · e2e <N passed, 0 failed>
 Gates: typecheck <ok|fail> · lint <ok|fail> · format <ok|fail> · axe <ok|fail>
 Contract: api:types regenerated <yes|no|not needed>
+Delete: <repository-relative path inside your lane, one per line, or none>
 Handoff: <assumptions QA should verify; any plan-vs-design conflict and what you followed>
 Blockers: <only when Verdict: fail>
 ```

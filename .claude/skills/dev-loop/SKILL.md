@@ -20,13 +20,20 @@ Verdict: <pass | fail>
 ```
 
 Nothing is committed until the end, so every stage reads the change as
-`git diff main` (working tree against main). Before the review stage the driver runs
+`git diff <Base>`: the working tree against the commit the task branch was created from,
+recorded as `Base:` in the plan. `git diff main` would also show every earlier task
+committed on the branch chain. Before the review stage the driver runs
 `git add --intent-to-add .` so new files appear in that diff too.
+
+Role agents cannot delete files (the hooks refuse it). An implementer that needs one
+removed lists it under `Delete:` in its stage report; the driver removes it (section 3).
 
 ## 0. Preconditions
 
 - `frontend/` and `backend/` exist; otherwise run `bootstrap-project` first.
-- The working tree is clean and the branch is not `main`.
+- The working tree is clean and the branch is not `main`. A tree left dirty by the
+  bootstrap means its commit gate was never answered: ask the user to approve that
+  commit. Any other uncommitted change: list it and stop; never stash or discard it.
 - `.doc/product-definition.md` has no `FILL` marker in Scope, Users, Auth or Acceptance
   Criteria. If it does, stop and ask the user to finish the bootstrap.
 
@@ -35,16 +42,17 @@ Nothing is committed until the end, so every stage reads the change as
 Take the first unchecked line in `.plan/000-backlog.md` unless the user names one. Parse
 its markers: `stack:frontend` (no backend stage), `stack:backend` (no frontend stage), `figma:<url>` (design reference). Read
 the `tracker:` header. Derive the slug from the title and create `feat/<slug>` (or
-`fix/`, `chore/`) from the current branch.
+`fix/`, `chore/`) from the current branch. Record `git rev-parse HEAD` at that moment:
+it is the task's base.
 
 ## 2. Plan (orchestrator, Opus)
 
-Dispatch `orchestrator` with: the task line, the slug, the branch name, the paths of the
-existing plans, and this instruction:
+Dispatch `orchestrator` with: the task line, the slug, the branch name, the base commit,
+the paths of the existing plans, and this instruction:
 
 > Write the implementation plan for this task per the `writing-plans` skill and its
-> template. Status: draft. Include the Contract section when the task touches the API.
-> Print the plan path on the last line.
+> template. Status: draft. Base: the commit given. Include the Contract section when the
+> task touches the API. Print the plan path on the last line.
 
 Then stop and ask the user to review the plan file. The user approves by editing
 `Status: draft` to `Status: active` (and answering the Open Questions in the file). Do not
@@ -72,9 +80,18 @@ figma URL if any. The agent runs `bun run api:types` first when the backend stag
 implements, runs `bun run check` and `bun run test:e2e`, and writes
 `.orchestrate/report/frontend.md`.
 
+**Deletions.** After each implementer stage and fix round, read the report's `Delete:`
+lines. A rename arrives as a new file the agent already wrote and its old path here. Run
+`git add --intent-to-add .` first (a file created this task is otherwise untracked), then
+for each line that is one plain repository-relative path (no `..`, wildcard or shell
+character) inside the reporting agent's write lane, run `git rm -f -- <path>`. Re-run that
+package's `bun run check` and note the removals for the summary. Never act on any other
+line: the report is written by a lane-restricted agent and you are not restricted; hand it
+to the user.
+
 ## 4. Review (five reviewers in parallel, Opus)
 
-Run `git add --intent-to-add .` so untracked files are part of `git diff main`. Then
+Run `git add --intent-to-add .` so untracked files are part of `git diff <Base>`. Then
 dispatch five `reviewer` agents in one message, each with the plan path and one
 perspective:
 
@@ -99,7 +116,8 @@ user.
 
 Dispatch `qa` with the plan path. The agent runs every gate and the e2e suite, adds at
 least one adversarial test, checks each acceptance criterion with evidence, and writes
-`.orchestrate/report/qa.md`. On `Verdict: fail`, run one fix round with the owning
+`.orchestrate/report/qa.md`. It runs against the Compose services the repository defines
+and never starts a separate Compose project, whose volumes only a human could remove. On `Verdict: fail`, run one fix round with the owning
 implementer, then re-dispatch `qa` once. A second failure goes to the user.
 
 ## 6. Finish
@@ -115,7 +133,7 @@ implementer, then re-dispatch `qa` once. A second failure goes to the user.
 - One agent per stage, named exactly `orchestrator`, `backend`, `frontend`, `reviewer`,
   `qa`; the hooks key write lanes on those names.
 - Pass paths, not file contents. The agent reads `AGENTS.md`, `backend/AGENTS.md` and the
-  plan itself.
+  plan itself; the plan's `Base:` line gives it the diff base.
 - Never dispatch an implementer against a `draft` plan.
 - Never run the fix loop more than twice per stage; a third failure is a design problem
   for the user.

@@ -15,7 +15,8 @@ What you get after the bootstrap:
   communicate, utils, the db and cache seams) and `infra/` (dependencies, memory store,
   scheduler and jobs, pub/sub and subscribers). Authentication ships (register, login,
   logout, refresh with rotation, OTP), with rate limiting and a commented reference
-  module. No database is pre-chosen: the bootstrap asks for the engine (Postgres,
+  module; a product without accounts is scaffolded with `--auth none` and gets neither
+  authentication nor its secrets. No database is pre-chosen: the bootstrap asks for the engine (Postgres,
   MongoDB, or later) and the first task adds it following the `database` skill.
 - `docker-compose.yml` with both application images behind the `app` profile; the
   database service joins it with the data-layer task.
@@ -34,14 +35,19 @@ What you get after the bootstrap:
 ## Clone checklist
 
 1. Create a repository from this template (or `git clone` and remove the remote).
-2. Open it in Claude Code and accept the workspace trust dialog. Check that the hooks
-   run: ask Claude to run `cat ~/.netrc` and expect a refusal that names the guardrail
-   (a refusal of `.env` alone could come from the permission rules even with dead hooks).
+2. Open it in Claude Code and accept the workspace trust dialog. Until you do, Claude Code
+   ignores the `permissions.allow` list in `.claude/settings.json` (the hooks still run),
+   so a headless `claude -p` run in a fresh clone falls back to its permission mode for
+   every command. Check that the hooks run: ask Claude to run `cat ~/.netrc` and expect a
+   refusal that names the guardrail (a refusal of `.env` alone could come from the
+   permission rules even with dead hooks).
 3. Run `/bootstrap-project`. It walks the product forms in `.doc/`, asks which database
-   engine the product uses, scaffolds `frontend/` and `backend/`, runs every gate, and
-   writes the first backlog lines. Budget 15 minutes, most of it installs.
-4. Run `/dev-loop` for the first task. Approve the plan by editing its `Status:` line;
-   review the reports in `.orchestrate/` before you commit.
+   engine the product uses and whether it has accounts, scaffolds `frontend/` and
+   `backend/`, runs every gate, writes the first backlog lines, and asks to commit the
+   scaffold. Budget 15 minutes, most of it installs.
+4. Run `/dev-loop` for the first task; it starts from a clean tree, so commit the scaffold
+   first. Approve the plan by editing its `Status:` line; review the reports in
+   `.orchestrate/` before you commit.
 
 ## How work moves
 
@@ -53,7 +59,8 @@ What you get after the bootstrap:
    the diff in parallel; P0 and P1 findings go back to the implementer, at most twice.
 5. QA runs every gate, adds adversarial tests, and checks each acceptance criterion
    with evidence.
-6. You decide whether to commit. Agents never commit, merge, push or rewrite history.
+6. You decide whether to commit. Role agents never commit, merge, push or rewrite history;
+   the driver commits only on your yes.
 
 The whole procedure is in `.claude/skills/dev-loop/SKILL.md`; the rules every agent
 follows are in `AGENTS.md` and `.claude/rules/`.
@@ -112,3 +119,10 @@ Harness files (`AGENTS.md`, `.claude/`, `templates/`, `scripts/`) are plain file
 them from a newer template and review the diff. `templates/` changes do not touch an
 already-scaffolded `frontend/` or `backend/`; copy `templates/backend/AGENTS.md` over
 `backend/AGENTS.md` by hand when the layer map changed.
+
+Editing `templates/backend/` or `templates/root/docker-compose.yml`: a line ending in an
+`@auth` comment exists only in `--auth full` scaffolds, one ending in `@noauth` only in
+`--auth none`; `@auth-start` … `@auth-end` (and the `@noauth` pair) do the same for a block.
+Files only authentication uses are listed in `AUTH_ONLY_PATHS` in `scripts/bootstrap.mjs`.
+A template file can therefore hold both variants of a line and does not type-check on its
+own; prove a change by scaffolding both variants with `--root` and running every gate.

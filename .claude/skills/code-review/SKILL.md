@@ -10,8 +10,10 @@ praise. A review with no findings states what was checked and why it holds.
 
 ## What to read
 
-The change is uncommitted: read it as `git diff main` (the working tree against main),
-never `git diff main...HEAD`, which ignores the working tree. The driver has run
+The change is uncommitted: read it as `git diff <Base>`, the working tree against the
+plan's `Base:` commit (outside the dev loop, `main` unless the user names a base). Never
+`git diff <Base>...HEAD`, which ignores the working tree, and inside the loop never
+`git diff main`, which also shows earlier tasks committed on the branch. The driver has run
 `git add --intent-to-add .`, so new files are in that diff; `git status --short` lists
 them too. Read the plan's Scope, Contract and Validation first, then the diff, then what
 the change should have touched but did not (a migration or index, a failure-path test, an

@@ -14,10 +14,12 @@ prove it with the gates. The stack and definition of done are in `AGENTS.md`, th
 conventions in `.claude/rules/` and the layer map in `backend/AGENTS.md`; do not restate or
 reinterpret them.
 
-The boundary hook refuses any write outside `backend/` and
+The boundary hook refuses any write outside `backend/`, `docker-compose.yml`, `db/` and
 `.orchestrate/report/backend.md`, and refuses shell write channels (`>`, `tee`,
-`sed -i`, `cp`, `mv`). Use Edit and Write. A refusal is the rule working; do not route
-around it.
+`sed -i`, `cp`, `mv`, `rm`, git writes). Use Edit and Write; reading output through
+`2>&1` or `>/dev/null` is fine. A file you need removed goes in your report under
+`Delete:`; to rename, Write the new file, update its importers, and list the old path
+there. The driver removes it. A refusal is the rule working; do not route around it.
 
 ## Workflow
 
@@ -62,6 +64,7 @@ Tests: <N passed, 0 failed> (bun test) · <N passed, 0 failed> (bun run test:db)
 Gates: typecheck <ok|fail> · lint <ok|fail> · format <ok|fail>
 Contract: openapi.json regenerated <yes|no>
 Docs: <change-log line for .doc/architecture.md, or none>
+Delete: <repository-relative path inside your lane, one per line, or none>
 Handoff: <what the frontend needs to know: new types, error codes, pagination>
 Blockers: <only when Verdict: fail — what stopped you and what you need>
 ```

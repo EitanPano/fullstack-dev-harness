@@ -379,7 +379,10 @@ export async function login({ input }: { input: Credentials }): Promise<AuthSess
 The template ships authentication (`api/auth/`, `api/user/`): register, login, logout,
 refresh with rotation and reuse detection, and OTP by email and phone. A product starts from
 it; `.doc/architecture.md` (Auth) states the model and `backend/AGENTS.md` (Authentication)
-says where its rules live.
+says where its rules live. When that section says Auth: none, the product was scaffolded
+with `--auth none`: no `middleware/auth.ts`, no caller and no roles exist, every endpoint is
+public, and the `requireAuth`/`requireCaller` parts of the examples in this skill do not
+apply until a plan adds accounts.
 
 Declaring a protected endpoint, in `route.ts`:
 

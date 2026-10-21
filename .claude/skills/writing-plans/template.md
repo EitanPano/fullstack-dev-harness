@@ -4,6 +4,7 @@ Status: draft
 Owner:
 Last updated: YYYY-MM-DD
 Branch: feat/<slug>
+Base: <commit the branch was created from>
 Stages: backend, frontend, qa
 
 ## Goal

@@ -21,16 +21,31 @@ The Data store question is the `database` skill's: Postgres, MongoDB, or decide 
 plus the client library. The harness ships no database; the answer decides the first
 backlog task, not the scaffold.
 
+The Auth question decides the scaffold: a product with no accounts (Auth: none) is
+scaffolded with `--auth none`; any other answer keeps the template's authentication
+(`--auth full`). For `none`, replace the whole body of `.doc/architecture.md` Auth (the
+shipped default and the roles marker describe code that will not exist) with:
+
+```
+- Auth: none. The product has no accounts and every endpoint is public. Adding accounts is
+  a planned change; the harness's `--auth full` scaffold is the reference.
+- Client model: the Next.js server is the backend's client (no browser fetch). CORS is off
+  unless `CORS_ORIGINS` is set. Rate limits key on the client address, so the frontend
+  forwards `X-Forwarded-For` and the backend runs with `TRUST_PROXY` set.
+```
+
 Stop when the "Ready to plan" checklist in the product definition is satisfied. Do not
 start the scaffold while a marker remains in a section the checklist names.
 
 ## 2. Scaffold
 
 ```bash
-node scripts/bootstrap.mjs --name <project-name>
+node scripts/bootstrap.mjs --name <project-name> --auth <full|none>
 ```
 
-The script refuses to run twice. It creates `frontend/` (pinned `create-next-app` plus the
+The script refuses to run twice. `--auth none` leaves out authentication: the `auth` and
+`user` modules, sessions, JWT, OTP, cookies, their jobs, subscribers, tests and secrets;
+the reference module's endpoints are public. It creates `frontend/` (pinned `create-next-app` plus the
 `templates/frontend` overlay), `backend/` (from `templates/backend`), `docker-compose.yml`
 and `.editorconfig`, installs dependencies, generates `backend/openapi.json` and
 `frontend/src/lib/api/schema.d.ts`, and formats both packages.
@@ -47,12 +62,13 @@ Every command must exit 0. If one fails, fix the cause (not the gate), re-run it
 tell the user what was wrong. A failing gate on a fresh scaffold is a harness bug: say so
 explicitly and record it in the final message so it can be fixed in `templates/`.
 
-A fresh backend has: health, authentication (register, login, logout, refresh, OTP), the
-`user` module, the commented reference module `api/module/` + `models/module/` (delete both
-and its line in `config/routes.ts` if unwanted), the memory store (nothing survives a
-restart until the data-layer task), the scheduler and the bus. In production the secrets
-`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `OTP_SECRET` and `ENCRYPTION_KEY` must be set;
-development runs with defaults and warns.
+A fresh backend has: health, the commented reference module `api/module/` +
+`models/module/` (delete both and its line in `config/routes.ts` if unwanted), the memory
+store (nothing survives a restart until the data-layer task), the scheduler and the bus.
+With `--auth full` it also has authentication (register, login, logout, refresh, OTP) and
+the `user` module, and production needs `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` and
+`OTP_SECRET`. `ENCRYPTION_KEY` is needed in production either way; development runs with
+defaults and warns.
 
 Then start both servers once and open `http://localhost:3000`: the home page must show
 the API version pill, which proves the typed client reaches the backend.
@@ -70,10 +86,12 @@ says what that task delivers). The next line is the first in-scope capability fr
 product definition. Set `tracker:` in the backlog header to `linear` or `none` as the user
 prefers.
 
-## 5. Branch and hand over
+## 5. Branch, commit gate and hand over
 
-Create `chore/bootstrap` (never commit on `main`), summarise what exists, and point the
-user to `/dev-loop` for the first task. Do not commit; the user decides when.
+Create `chore/bootstrap` (never commit on `main`) and summarise what exists. Then ask the
+user whether to commit the scaffold as `chore(bootstrap): scaffold <project-name>`; the dev
+loop starts only from a clean tree, so the first task waits for this commit. Commit only on
+their yes, then point them to `/dev-loop` for the first task.
 
 ## What this skill never does
 
