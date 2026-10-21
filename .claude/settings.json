@@ -1,18 +1,45 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "$comment": "Guardrail wiring. Claude Code only reads hook and permission config from this file — a hook script in .claude/hooks/ that is not listed here never runs. See AGENTS.md. Hooks use exec form (node + args: no shell, cwd-independent through ${CLAUDE_PROJECT_DIR}) with onFailure: block, so a hook that crashes, times out or cannot start blocks the call instead of letting it through.",
-  "$comment2": "Approves the figma and linear servers from .mcp.json by name rather than using enableAllProjectMcpServers, so adding a server to .mcp.json is still a deliberate act. Headless sub-agent runs cannot answer the approval prompt and would otherwise silently run without those tools.",
-  "enabledMcpjsonServers": ["figma", "linear"],
+  "$comment": "Guardrail wiring. Claude Code only reads hook and permission config from this file; a hook script in .claude/hooks/ that is not listed here never runs. See AGENTS.md. Hooks use exec form (node + args: no shell, cwd-independent through ${CLAUDE_PROJECT_DIR}) with onFailure: block, so a hook that crashes, times out or cannot start blocks the call instead of letting it through. permissions.deny is a second, prefix-matched layer that Claude Code evaluates regardless of what the hooks return; the hooks see whole command strings and catch what a prefix cannot. MCP servers are not pre-approved: add a .mcp.json and approve it once, deliberately.",
   "permissions": {
+    "allow": [
+      "Bash(bun install*)",
+      "Bash(bun run *)",
+      "Bash(bun test*)",
+      "Bash(bun x *)",
+      "Bash(bunx *)",
+      "Bash(node scripts/bootstrap.mjs*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add --intent-to-add*)",
+      "Bash(docker compose up -d *)",
+      "Bash(docker compose ps*)"
+    ],
     "deny": [
-      "Read(./.env)",
-      "Read(./frontend/.env)",
-      "Read(./backend/.env)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.development)",
+      "Read(**/.env.production)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/id_rsa)",
+      "Read(**/id_ed25519)",
+      "Read(~/.aws/**)",
+      "Read(~/.ssh/**)",
+      "Read(~/.npmrc)",
       "Bash(rm -rf *)",
       "Bash(git push --force*)",
+      "Bash(git push -f*)",
       "Bash(git reset --hard*)",
       "Bash(*DROP TABLE*)",
-      "Bash(*DROP DATABASE*)"
+      "Bash(*DROP DATABASE*)",
+      "PowerShell(Remove-Item -Recurse*)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f*)",
+      "PowerShell(git reset --hard*)",
+      "PowerShell(*DROP TABLE*)",
+      "PowerShell(*DROP DATABASE*)"
     ]
   },
   "hooks": {
@@ -42,7 +69,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",

@@ -1,43 +1,100 @@
 #!/usr/bin/env node
 // PreToolUse guardrail on every tool (the `*` matcher is deliberate): hard-blocks access to
-// env/secret files whichever tool names them in a path field or a shell command — Read,
-// Edit, Write, NotebookEdit, Bash, and any MCP tool with a `path` field. `permissions.deny`
-// covers only the tool+pattern pairs listed there and cannot look inside a Bash command
-// string; this hook inspects the target of every call, so `cat .env`, Read(.env) and
-// `grep KEY backend/.env` are all caught the same way.
+// secret files whichever tool names them in a path field or a shell command — Read, Edit,
+// Write, NotebookEdit, Bash, PowerShell, and any MCP tool with a path field — and blocks
+// commands that dump the environment. `permissions.deny` covers only the tool+pattern
+// pairs listed there and cannot look inside a command string; this hook inspects the
+// target of every call.
 //
 // What is inspected, and what is not on purpose:
-// - Fields that NAME a target (file_path, path, notebook_path), trimmed the way the file
-//   tools trim them, and the shell `command`.
-// - Not a Write's `content`: setup docs, .env.example templates and this file legitimately
-//   mention env files. Scanning content made the hook unable to edit itself.
-// - `.env.example` is deliberately allowed: it is committed template content.
-//
-// Known gaps (Phase 1): only `.env`,
-// `.env.local`, `.env.development` and `.env.production` are matched; other secret file
-// names and env-dump commands (`printenv`, `console.log(process.env)`) are not; Grep's
-// `path`/`glob` and MCP `paths[]` arrays are not inspected.
-import { allow, block, readPayload } from './lib/guardrail.mjs'
+// - Fields that NAME a target (file_path, path, notebook_path, paths[], file_paths[]),
+//   trimmed the way the file tools trim them, and every token of a shell `command`.
+// - Not a Write's `content` and not a Grep `pattern`: docs, templates and searches
+//   legitimately mention env files. Scanning content made the hook unable to edit itself.
+// - Secret names are matched as file names (an extension or a dot-file), so a directory or
+//   word called `secret` is not one. `.env.example`, `.env.sample` and `.env.template` are
+//   committed template content and are allowed.
+import { allow, block, programName, readPayload, segmentTokens, shellSegments } from './lib/guardrail.mjs'
 
-const SECRET_FILE_PATTERN = /(^|[\/\\])\.env(\.local|\.development|\.production)?(?![\w.-])/i
-const SECRET_IN_COMMAND_PATTERN = /(^|[\s"'=/\\])[\w./\\-]*\.env(\.local|\.development|\.production)?(?![\w.-])/i
+// File names that hold credentials.
+const SECRET_NAME = [
+  /^\.env(\..+)?$/i, // .env, .env.local, .env.production, …
+  /\.(pem|key|p12|pfx|jks|keystore|kdbx|tfstate)$/i,
+  /^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/i,
+  /^(\.npmrc|\.netrc|\.pgpass|\.git-credentials|\.htpasswd|kubeconfig)$/i,
+  /^(credentials|secrets?)\.(json|ya?ml|toml|env|txt|properties|ini)$/i,
+  /service[-_]?account.*\.json$/i
+]
+const SECRET_NAME_ALLOWED = /^\.env\.(example|sample|template)$/i
+// Directories that only ever hold credentials.
+const SECRET_DIR = /(^|[\/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker)([\/\\]|$)/i
 
 const PATH_FIELDS = ['file_path', 'path', 'notebook_path']
+const PATH_LIST_FIELDS = ['paths', 'file_paths']
+const INLINE_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node'])
+const INLINE_FLAG = /^(-e|-p|--eval|--print)$/
 
 const payload = await readPayload()
 const toolInput = payload.tool_input
+const tool = payload.tool_name ?? 'tool'
 
-const blockedPath = PATH_FIELDS
-  .map(field => toolInput[field])
-  .find(value => typeof value === 'string' && SECRET_FILE_PATTERN.test(value.trim()))
+const namedPaths = [
+  ...PATH_FIELDS.map(field => toolInput[field]),
+  ...PATH_LIST_FIELDS.flatMap(field => (Array.isArray(toolInput[field]) ? toolInput[field] : []))
+].filter(value => typeof value === 'string')
+
+const blockedPath = namedPaths.find(value => isSecretPath(value.trim()))
+if (blockedPath !== undefined) {
+  block(`blocked ${tool} call touching a secret file: ${blockedPath}. Use .env.example instead.`)
+}
 
 const command = typeof toolInput.command === 'string' ? toolInput.command : ''
-const blockedCommand = SECRET_IN_COMMAND_PATTERN.test(command)
-
-if (blockedPath || blockedCommand) {
-  const tool = payload.tool_name ?? 'tool'
-  const where = blockedPath ? `: ${blockedPath}` : ' named in the command'
-  block(`blocked ${tool} call touching an env/secret file${where}. Use .env.example instead.`)
+if (/\[(System\.)?Environment\]::GetEnvironmentVariables?\b/i.test(command)) {
+  block(`blocked ${tool} call that dumps the environment (GetEnvironmentVariables). Read one variable by name instead.`)
+}
+for (const segment of shellSegments(command)) {
+  // `env` and `printenv` alone dump everything; checked before wrapper stripping, which
+  // would otherwise remove a bare `env` as the wrapper form `env NAME=value cmd`.
+  if (/^(printenv|env)(\s+-\w+)*$/i.test(segment)) {
+    block(`blocked ${tool} call that dumps the environment (${segment.split(/\s/)[0]}). Read one variable by name instead.`)
+  }
+  const tokens = segmentTokens(segment)
+  if (tokens.length === 0) continue
+  if (tokens.some(token => isSecretPath(stripRedirect(token)))) {
+    block(`blocked ${tool} call naming a secret file in the command. Use .env.example instead.`)
+  }
+  const dump = envDump(programName(tokens[0]), tokens.slice(1), segment)
+  if (dump !== null) block(`blocked ${tool} call that dumps the environment (${dump}). Read one variable by name instead.`)
 }
 
 allow()
+
+function isSecretPath(value) {
+  if (value === '' || value === '-') return false
+  if (SECRET_DIR.test(value)) return true
+  let base = value.split(/[\\/]/).pop() ?? ''
+  // A glob such as `.env*` or `backend/.env.*` names every env file.
+  if (/[*?]/.test(base)) base = base.replace(/[*?].*$/, '')
+  if (base === '') return false
+  if (SECRET_NAME_ALLOWED.test(base)) return false
+  if (/^\.env/i.test(base)) return true
+  return SECRET_NAME.some(pattern => pattern.test(base))
+}
+
+function stripRedirect(token) {
+  return token.replace(/^[<>]+/, '')
+}
+
+function envDump(program, args, segment) {
+  if (program === 'printenv' && args.length === 0) return 'printenv'
+  if (program === 'env' && args.length === 0) return 'env'
+  if (program === 'set' && args.length === 0) return 'set'
+  if (program === 'export' && (args.length === 0 || args.every(arg => arg === '-p'))) return 'export -p'
+  if (program === 'declare' && args.length > 0 && args.every(arg => /^-[px]+$/.test(arg))) return 'declare -x'
+  if (['get-childitem', 'gci', 'ls', 'dir', 'get-item', 'gi'].includes(program) && args.some(arg => /^env:\\?\*?$/i.test(arg))) return 'Get-ChildItem Env:'
+  // A whole-object dump of process.env / Bun.env in inline code (reading one key is fine).
+  if (INLINE_RUNTIMES.has(program) && args.some(arg => INLINE_FLAG.test(arg)) && /\b(process|Bun|Deno)\.env\b(?!\s*[.[])/.test(segment)) {
+    return 'process.env dump'
+  }
+  return null
+}
