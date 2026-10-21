@@ -1,11 +1,23 @@
 # Glossary
 
-## Purpose
-- Define canonical domain terms and approved short forms used across code, API routes, docs, and plans.
+Canonical domain terms and their approved short forms. Code, routes, tables, plans and
+docs use these words and no synonyms. Add a term here before using it anywhere else.
 
 ## Core Terms
 
-## Naming Alignment
-- Keep this glossary aligned with naming decisions in `../.claude/rules/naming.md`.
-- If a new domain term is introduced, add it here before broad usage.
-- Avoid synonyms for existing terms unless explicitly approved and documented here.
+| Term | Meaning | Used as |
+| --- | --- | --- |
+| session | A refresh-token record: hashed token, rotation state, expiry | table `session`, model `session` |
+| caller | The authenticated principal on a request: `{ id, role, sessionId }` | `res.locals.caller` |
+| OTP | A six-digit one-time code sent to a target; valid 10 min, 5 attempts | module `auth` |
+| target | An email or phone a message or OTP is sent to: `{ type, value }` | OTP endpoints, `models/user/type.ts` (`ContactTarget`); the communicate layer calls the address `to` |
+| module (reference) | The shipped CRUD module `api/module/` that a developer copies | `api/module/`, `models/module/` |
+| <!-- FILL: term --> | <!-- FILL: one-line definition --> | <!-- FILL: table `x`, route `/api/x`, module `x` --> |
+
+## Rules
+
+- One word per concept. If two candidates exist, pick one here and never use the other.
+- Singular everywhere: the term names one thing; collections are implied by context.
+- Prefer the short canonical form (`org`, not `organization`) and record the long form in
+  the Meaning column.
+- Keep this file aligned with `.claude/rules/naming.md`.

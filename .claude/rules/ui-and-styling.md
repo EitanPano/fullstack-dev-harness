@@ -1,17 +1,12 @@
-# UI and Styling
+# UI and styling
 
-## Libraries
-- `sonner` for toast messages — keep them concise and action-oriented.
-- `lucide-react` for icons — reuse the same icon name for the same concept
-  across features.
+Applies to `frontend/` and `templates/frontend/`.
 
-## Styling engine
-`frontend/` is styled with **Tailwind CSS v4** (via `@tailwindcss/postcss`),
-with a single `globals.css`. Use utility classes. Do not add new `.css` files
-and do not use inline styles.
-
-## Design tokens
-- Prefer CSS variables for colors, spacing, sizing, and other shared tokens.
-- Declare tokens in `:root` in `globals.css` and expose them to utilities via
-  `@theme inline`.
-- Use nested CSS only where it improves scoping and readability.
+- Tailwind utility classes only. No new `.css` files beyond `globals.css`, no inline
+  styles.
+- Design tokens are CSS variables declared in `:root` in `globals.css` and exposed to
+  utilities through `@theme inline`.
+- `sonner` for toasts, concise and action-oriented. `lucide-react` for icons, the same icon
+  for the same concept everywhere.
+- Semantic HTML, labelled controls, keyboard reachability, and `loading.tsx` plus
+  `error.tsx` for every new route segment.
