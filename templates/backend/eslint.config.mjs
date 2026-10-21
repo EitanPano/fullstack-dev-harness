@@ -18,7 +18,8 @@ import tseslint from 'typescript-eslint'
 // imports a route.ts. Cross-module imports are the regex blocks below.
 // Not enforced (review): a vendor SDK package is imported only by its services/<vendor>.ts;
 // a route holds no logic beyond mounting, validating, one controller call and the response;
-// a controller forwards the caller; a cross-module flow is not atomic; which module has a
+// a controller forwards the caller; a cross-module flow is not atomic; which module has a // @auth
+// a cross-module flow is not atomic; which module has a // @noauth
 // service.ts.
 // src() turns a trailing `.ts` into `.{ts,mts}`, so every single-file pattern ends in a brace
 // and is recognised as a glob on Windows (a pattern with a single `*` or `!(…)` and no brace
@@ -45,7 +46,8 @@ const everythingBut = (...keep) =>
     .map(([, v]) => v)
 
 // "All of services/ except …": top-level files, then directories, then single files inside a
-// kept directory (`inside: { security: ['cookies'] }`). Unlisted files and directories are in.
+// kept directory (`inside: { security: ['cookies'] }`). Unlisted files and directories are in. // @auth
+// kept directory (`inside: { <directory>: ['<file>'] }`). Unlisted files and directories are in. // @noauth
 const servicesExcept = ({ files = [], dirs = [], inside = {} } = {}) => {
   const skipDirs = [...dirs, ...Object.keys(inside)]
   return [
@@ -258,12 +260,14 @@ const layering = [
     target: moduleFile('route'),
     from: [
       moduleFile('{service,repository,model}'),
-      ...servicesExcept({ dirs: ['utils'], inside: { security: ['cookies'] } }),
+      ...servicesExcept({ dirs: ['utils'], inside: { security: ['cookies'] } }), // @auth
+      ...servicesExcept({ dirs: ['utils'] }), // @noauth
       ...infraExcept({ files: ['dependency'] }),
       configExcept('constants'),
     ],
     message:
-      'a route adapts HTTP to its controller: it imports its controller and schema, middleware/, services/utils/, services/security/cookies.ts, models/, config/constants.ts and infra/dependency.ts types only',
+      'a route adapts HTTP to its controller: it imports its controller and schema, middleware/, services/utils/, services/security/cookies.ts, models/, config/constants.ts and infra/dependency.ts types only', // @auth
+      'a route adapts HTTP to its controller: it imports its controller and schema, middleware/, services/utils/, models/, config/constants.ts and infra/dependency.ts types only', // @noauth
   },
   {
     target: moduleFile('controller'),
@@ -340,9 +344,11 @@ const layering = [
   },
   {
     target: infraExcept({ dirs: ['jobs', 'subscribers', 'scripts'] }),
-    from: servicesExcept({ files: ['logger', 'db', 'cache', 'session', 'event'], dirs: ['utils'] }),
+    from: servicesExcept({ files: ['logger', 'db', 'cache', 'session', 'event'], dirs: ['utils'] }), // @auth
+    from: servicesExcept({ files: ['logger', 'db', 'cache', 'event'], dirs: ['utils'] }), // @noauth
     message:
-      'infra/ outside jobs/, subscribers/ and scripts/ imports services/logger.ts, db.ts, cache.ts, session.ts, event.ts and services/utils/ only',
+      'infra/ outside jobs/, subscribers/ and scripts/ imports services/logger.ts, db.ts, cache.ts, session.ts, event.ts and services/utils/ only', // @auth
+      'infra/ outside jobs/, subscribers/ and scripts/ imports services/logger.ts, db.ts, cache.ts, event.ts and services/utils/ only', // @noauth
   },
 
   // Entry points

@@ -34,7 +34,8 @@ export function createConsoleProvider(
         targetType: TARGET_TYPE[channel],
       })
       // In development the full message is printed through the sink, bypassing the logger and its
-      // redaction on purpose, so a developer can finish an OTP flow by hand. Test and production
+      // redaction on purpose, so a developer can finish an OTP flow by hand. Test and production // @auth
+      // redaction on purpose, so a developer can read a message without a provider. Test and production // @noauth
       // print no body: the logger line above is all there is.
       if (development) {
         const fields = [

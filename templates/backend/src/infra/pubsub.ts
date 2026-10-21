@@ -5,7 +5,7 @@
 // their failures. The `PubSub` type is what a Redis adapter implements later (the cache task).
 import { log, type Logger } from '../services/logger'
 import type { Resource } from './dependency'
-import { sendWelcome } from './subscribers/send-welcome'
+import { sendWelcome } from './subscribers/send-welcome' // @auth
 
 export type Handler = (payload: unknown) => Promise<void> | void
 
@@ -106,10 +106,18 @@ export function createPubSub({
   }
 }
 
+// @auth-start
 // One line per subscriber, imported from `./subscribers/`. The list is a function resolved at
 // `connect()` because of the import cycle (pubsub -> send-welcome -> user controller -> user
 // service -> services/event -> pubsub): an array literal here would read `sendWelcome` at load,
 // before it is initialized, whenever a subscriber file is the first module imported.
-const subscribers = (): readonly SubscriberEntry[] => [sendWelcome]
+// @auth-end
+// @noauth-start
+// One line per subscriber, imported from `./subscribers/`. The list is a function resolved at
+// `connect()`, not at load: a subscriber that publishes creates an import cycle through
+// services/event, and an array literal would read its binding before it is initialized.
+// @noauth-end
+const subscribers = (): readonly SubscriberEntry[] => [sendWelcome] // @auth
+const subscribers = (): readonly SubscriberEntry[] => [] // @noauth
 
 export const pubsub: PubSubResource = createPubSub({ subscribers })

@@ -6,7 +6,7 @@ import { Cron } from 'croner'
 import { env } from '../config/env'
 import { log, type Logger } from '../services/logger'
 import type { Resource } from './dependency'
-import { sessionCleanup } from './jobs/session-cleanup'
+import { sessionCleanup } from './jobs/session-cleanup' // @auth
 
 export type Job = { name: string; schedule: string; run(): Promise<void> }
 
@@ -78,6 +78,7 @@ export function createScheduler({
 
 // One line per job, imported from `./jobs/`. A function, like the bus's list, so no binding is
 // read at module load.
-const jobs = (): readonly Job[] => [sessionCleanup]
+const jobs = (): readonly Job[] => [sessionCleanup] // @auth
+const jobs = (): readonly Job[] => [] // @noauth
 
 export const scheduler: SchedulerResource = createScheduler({ jobs, enabled: env.JOBS_ENABLED })

@@ -11,7 +11,8 @@ import { parseDuration } from '../services/utils/time'
 export type RateLimitOptions = {
   name: string
   limit: number
-  // A duration string, e.g. RATE_LIMITS.loginPerIp.window.
+  // A duration string, e.g. RATE_LIMITS.loginPerIp.window. // @auth
+  // A duration string, e.g. RATE_LIMITS.createPostPerIp.window. // @noauth
   window: string
   // The subject being limited; undefined skips the limit (validation rejects the request anyway).
   key: (req: Request) => string | undefined

@@ -2,7 +2,8 @@ import { memory } from '../infra/memory'
 
 // The seam: typed, JSON-encoded helpers over the key-value store. The cache task rewrites
 // this file over `infra/redis.ts` and gives `infra/pubsub.ts` its Redis adapter;
-// `middleware/rate-limit.ts` and `services/security/otp.ts` are its first users, and
+// `middleware/rate-limit.ts` and `services/security/otp.ts` are its first users, and // @auth
+// `middleware/rate-limit.ts` is its first user, and // @noauth
 // repositories may use it for cache-aside.
 export async function get<T>(key: string): Promise<T | undefined> {
   const raw = await memory.get(key)

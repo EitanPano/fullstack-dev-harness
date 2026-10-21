@@ -84,7 +84,8 @@ export function registerModule(registry: OpenAPIRegistry) {
     request: { body: jsonBody(CreateModuleBody) },
     responses: {
       201: jsonResponse('The created module', PublicModule),
-      ...errorResponses(400, 401, 500),
+      ...errorResponses(400, 401, 500), // @auth
+      ...errorResponses(400, 500), // @noauth
     },
   })
   registry.registerPath({
@@ -95,18 +96,21 @@ export function registerModule(registry: OpenAPIRegistry) {
     request: { params: ModuleIdParams, body: jsonBody(UpdateModuleBody) },
     responses: {
       200: jsonResponse('The updated module', PublicModule),
-      ...errorResponses(400, 401, 404, 500),
+      ...errorResponses(400, 401, 404, 500), // @auth
+      ...errorResponses(400, 404, 500), // @noauth
     },
   })
   registry.registerPath({
     method: 'delete',
     path: '/api/module/{id}',
     tags: ['module'],
-    summary: 'Delete a module (admin only)',
+    summary: 'Delete a module (admin only)', // @auth
+    summary: 'Delete a module', // @noauth
     request: { params: ModuleIdParams },
     responses: {
       204: { description: 'Deleted' },
-      ...errorResponses(400, 401, 403, 404, 500),
+      ...errorResponses(400, 401, 403, 404, 500), // @auth
+      ...errorResponses(400, 404, 500), // @noauth
     },
   })
 }

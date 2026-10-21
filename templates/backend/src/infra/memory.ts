@@ -51,7 +51,8 @@ export function createMemoryStore({
 
   let timer: ReturnType<typeof setInterval> | undefined
 
-  // Lazy expiry alone lets a key that is never read live forever; rate-limit and OTP keys are
+  // Lazy expiry alone lets a key that is never read live forever; rate-limit and OTP keys are // @auth
+  // Lazy expiry alone lets a key that is never read live forever; rate-limit keys are // @noauth
   // written once per client and mostly never read again, so they would be the first to pile up.
   function sweep(): number {
     const now = Date.now()

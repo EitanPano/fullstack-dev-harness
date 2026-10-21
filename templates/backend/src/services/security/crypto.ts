@@ -1,6 +1,13 @@
+// @auth-start
 // crypto.ts belongs: the stateless cryptographic primitives the auth flow composes (password
 // hashing, HMAC, SHA-256, random tokens, authenticated encryption). It does not belong: token
 // signing (jwt.ts), cookies (cookies.ts) or anything that stores or reads state.
+// @auth-end
+// @noauth-start
+// crypto.ts belongs: the stateless cryptographic primitives (password hashing, HMAC, SHA-256,
+// random tokens, authenticated encryption). It does not belong: anything that stores or reads
+// state.
+// @noauth-end
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import { env } from '../../config/env'
 
@@ -23,10 +30,12 @@ export function sha256(text: string): string {
 export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url')
 }
+// @auth-start
 
 // The user module verifies an unknown email against this hash so a login for a missing account
 // costs the same time as one for a real account; timing then does not reveal which emails exist.
 export const DUMMY_HASH: string = Bun.password.hashSync(randomToken(), { algorithm: 'argon2id' })
+// @auth-end
 
 const KEY = Buffer.from(env.ENCRYPTION_KEY, 'base64')
 const IV_BYTES = 12

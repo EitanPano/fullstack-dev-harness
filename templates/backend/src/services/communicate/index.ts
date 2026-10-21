@@ -38,7 +38,8 @@ function resolve(channel: Channel): Provider {
   const name = names[channel]
   const provider = resolvers[channel](name)
   // The console provider delivers nothing: in production that is a misconfiguration worth a
-  // line at boot, not a silent loss of every OTP and welcome message.
+  // line at boot, not a silent loss of every OTP and welcome message. // @auth
+  // line at boot, not a silent loss of every message. // @noauth
   if (name === 'console' && env.NODE_ENV === 'production') {
     log.warn('console provider in production: messages are not delivered', { channel })
   }
@@ -65,7 +66,8 @@ export function registerProvider(channel: Channel, provider: Provider): void {
 
 // A provider failure is logged by name only and surfaces as upstream_unavailable. The vendor's
 // error message and object stay out of the log and the response: a vendor error can echo the
-// request payload, which for an OTP message is the code.
+// request payload, which for an OTP message is the code. // @auth
+// request payload, which can include a one-time code. // @noauth
 export async function send(message: Message): Promise<void> {
   const provider = providers.get(message.channel) ?? resolve(message.channel)
   try {

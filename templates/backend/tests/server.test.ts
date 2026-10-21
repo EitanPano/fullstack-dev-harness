@@ -4,8 +4,13 @@ import request from 'supertest'
 import { env } from '../src/config/env'
 import { app } from '../src/server'
 
+// @auth-start
 // Oversize bodies (413) are covered in error-handler.test.ts; cookie parsing has no probe
 // route on `app` and is covered by the auth tests.
+// @auth-end
+// @noauth-start
+// Oversize bodies (413) are covered in error-handler.test.ts.
+// @noauth-end
 describe('server assembly', () => {
   it('does not advertise the framework', async () => {
     const res = await request(app).get('/api/health')

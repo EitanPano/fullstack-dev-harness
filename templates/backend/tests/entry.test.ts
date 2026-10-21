@@ -37,18 +37,19 @@ describe('the entry', () => {
   }, 15_000)
 })
 
-const SECRET = 'a-production-secret-of-at-least-32-characters'
+const SECRET = 'a-production-secret-of-at-least-32-characters' // @auth
 const KEY = Buffer.alloc(32, 7).toString('base64')
 const productionSource = {
   NODE_ENV: 'production',
-  JWT_ACCESS_SECRET: `${SECRET}-1`,
-  JWT_REFRESH_SECRET: `${SECRET}-2`,
-  OTP_SECRET: `${SECRET}-3`,
+  JWT_ACCESS_SECRET: `${SECRET}-1`, // @auth
+  JWT_REFRESH_SECRET: `${SECRET}-2`, // @auth
+  OTP_SECRET: `${SECRET}-3`, // @auth
   ENCRYPTION_KEY: KEY,
 }
 
 // loadEnv takes an explicit source, so these cases never read the real environment.
 describe('loadEnv', () => {
+  // @auth-start
   it('names the missing secret in production', () => {
     const { JWT_ACCESS_SECRET: _omitted, ...source } = productionSource
 
@@ -58,6 +59,14 @@ describe('loadEnv', () => {
   it('rejects a too-short secret in production', () => {
     expect(() => loadEnv({ ...productionSource, OTP_SECRET: 'short' })).toThrow(/OTP_SECRET/)
   })
+  // @auth-end
+  // @noauth-start
+  it('names the missing secret in production', () => {
+    const { ENCRYPTION_KEY: _omitted, ...source } = productionSource
+
+    expect(() => loadEnv(source)).toThrow(/ENCRYPTION_KEY/)
+  })
+  // @noauth-end
 
   it('rejects an encryption key that is not 32 bytes in production', () => {
     const short = Buffer.alloc(16).toString('base64')
@@ -66,6 +75,7 @@ describe('loadEnv', () => {
   })
 
   it('refuses placeholder secrets in production, naming the variable', () => {
+    // @auth-start
     expect(() => loadEnv({ ...productionSource, OTP_SECRET: `change-me-${SECRET}` })).toThrow(
       /OTP_SECRET: is a placeholder/,
     )
@@ -78,6 +88,7 @@ describe('loadEnv', () => {
         JWT_REFRESH_SECRET: 'dev-only-refresh-secret-change-me-012345678',
       }),
     ).toThrow(/JWT_REFRESH_SECRET: is a placeholder/)
+    // @auth-end
     expect(() =>
       loadEnv({
         ...productionSource,
@@ -86,14 +97,17 @@ describe('loadEnv', () => {
     ).toThrow(/ENCRYPTION_KEY: is a placeholder/)
   })
 
+  // @auth-start
   it('refuses one value for both JWT secrets in production', () => {
     expect(() =>
       loadEnv({ ...productionSource, JWT_REFRESH_SECRET: productionSource.JWT_ACCESS_SECRET }),
     ).toThrow(/JWT_REFRESH_SECRET: must differ from JWT_ACCESS_SECRET/)
   })
+  // @auth-end
 
   it('does not apply the placeholder check outside production', () => {
-    expect(() => loadEnv({ OTP_SECRET: `change-me-${SECRET}` })).not.toThrow()
+    expect(() => loadEnv({ OTP_SECRET: `change-me-${SECRET}` })).not.toThrow() // @auth
+    expect(() => loadEnv({ ENCRYPTION_KEY: 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=' })).not.toThrow() // @noauth
   })
 
   it('requires MAIL_FROM when the mail provider is not console', () => {
@@ -105,29 +119,33 @@ describe('loadEnv', () => {
     const { env, defaultedSecrets } = loadEnv(productionSource)
 
     expect(defaultedSecrets).toEqual([])
-    expect(env.JWT_ACCESS_SECRET).toBe(`${SECRET}-1`)
+    expect(env.JWT_ACCESS_SECRET).toBe(`${SECRET}-1`) // @auth
+    expect(env.ENCRYPTION_KEY).toBe(KEY) // @noauth
   })
 
-  it('falls back to development defaults and names the four secrets', () => {
+  it('falls back to development defaults and names the four secrets', () => { // @auth
+  it('falls back to a development default and names the encryption key', () => { // @noauth
     const { env, defaultedSecrets } = loadEnv({})
 
     expect(defaultedSecrets).toEqual([
-      'JWT_ACCESS_SECRET',
-      'JWT_REFRESH_SECRET',
-      'OTP_SECRET',
+      'JWT_ACCESS_SECRET', // @auth
+      'JWT_REFRESH_SECRET', // @auth
+      'OTP_SECRET', // @auth
       'ENCRYPTION_KEY',
     ])
     expect(env.NODE_ENV).toBe('development')
     expect(env.PORT).toBe(4000)
-    expect(env.JWT_ACCESS_SECRET).not.toBe(env.JWT_REFRESH_SECRET)
+    expect(env.JWT_ACCESS_SECRET).not.toBe(env.JWT_REFRESH_SECRET) // @auth
     expect(Buffer.from(env.ENCRYPTION_KEY, 'base64')).toHaveLength(32)
   })
 
+  // @auth-start
   it('records only the secrets that fell back', () => {
     const { defaultedSecrets } = loadEnv({ OTP_SECRET: `${SECRET}-3` })
 
     expect(defaultedSecrets).toEqual(['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'ENCRYPTION_KEY'])
   })
+  // @auth-end
 
   it('parses TRUST_PROXY as a boolean, a number or a string', () => {
     expect(loadEnv({}).env.TRUST_PROXY).toBe(false)
@@ -150,11 +168,13 @@ describe('loadEnv', () => {
     expect(loadEnv({ CORS_ORIGINS: '   ' }).env.CORS_ORIGINS).toBeUndefined()
   })
 
+  // @auth-start
   it('treats a blank COOKIE_DOMAIN as unset', () => {
     expect(loadEnv({ COOKIE_DOMAIN: '' }).env.COOKIE_DOMAIN).toBeUndefined()
     expect(loadEnv({ COOKIE_DOMAIN: ' ' }).env.COOKIE_DOMAIN).toBeUndefined()
     expect(loadEnv({ COOKIE_DOMAIN: ' x ' }).env.COOKIE_DOMAIN).toBe('x')
   })
+  // @auth-end
 
   it('parses JOBS_ENABLED as a boolean, true by default', () => {
     expect(loadEnv({}).env.JOBS_ENABLED).toBe(true)

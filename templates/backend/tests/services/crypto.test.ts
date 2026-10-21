@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  DUMMY_HASH,
+  DUMMY_HASH, // @auth
   decrypt,
   encrypt,
   hashPassword,
@@ -20,12 +20,14 @@ describe('password hashing', () => {
   test('two hashes of one password differ', async () => {
     expect(await hashPassword('same')).not.toBe(await hashPassword('same'))
   })
+  // @auth-start
 
   test('DUMMY_HASH is a string no unrelated password matches', async () => {
     expect(typeof DUMMY_HASH).toBe('string')
     expect(DUMMY_HASH.startsWith('$argon2id$')).toBe(true)
     expect(await verifyPassword('unrelated-password', DUMMY_HASH)).toBe(false)
   })
+  // @auth-end
 })
 
 describe('hmac and sha256', () => {

@@ -6,7 +6,8 @@
 // types follow the schemas:
 //
 //   const createInput = { body: CreateModuleBody }
-//   moduleRoute.post('/', requireAuth, validate(createInput), async (_req, res) => {
+//   moduleRoute.post('/', requireAuth, validate(createInput), async (_req, res) => { // @auth
+//   moduleRoute.post('/', validate(createInput), async (_req, res) => { // @noauth
 //     const { body } = readInput(res, createInput)
 //   })
 //

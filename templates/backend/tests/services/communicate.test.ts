@@ -6,6 +6,7 @@ import {
   type Channel,
   type Message,
   type Provider,
+  type Rendered, // @noauth
 } from '../../src/services/communicate'
 import { createConsoleProvider } from '../../src/services/communicate/console'
 import { consoleMailProvider, resolveMailProvider } from '../../src/services/communicate/mail'
@@ -14,9 +15,9 @@ import {
   consoleWhatsappProvider,
   resolveWhatsappProvider,
 } from '../../src/services/communicate/whatsapp'
-import { otpTemplate } from '../../src/services/communicate/templates/otp'
-import { passwordResetTemplate } from '../../src/services/communicate/templates/password-reset'
-import { welcomeTemplate } from '../../src/services/communicate/templates/welcome'
+import { otpTemplate } from '../../src/services/communicate/templates/otp' // @auth
+import { passwordResetTemplate } from '../../src/services/communicate/templates/password-reset' // @auth
+import { welcomeTemplate } from '../../src/services/communicate/templates/welcome' // @auth
 import { createLogger } from '../../src/services/logger'
 
 type Lines = string[]
@@ -27,7 +28,8 @@ function capture(): { lines: Lines; sink: Pick<Console, 'info' | 'warn' | 'error
   return { lines, sink: { info: push, warn: push, error: push } }
 }
 
-const otp = otpTemplate({ code: '123456', purpose: 'login', ttlMinutes: 10 })
+const otp = otpTemplate({ code: '123456', purpose: 'login', ttlMinutes: 10 }) // @auth
+const sample: Rendered = { name: 'sample', subject: 'Sample', text: 'Your code is 123456.' } // @noauth
 
 afterEach(() => {
   resetProviders()
@@ -57,7 +59,8 @@ describe('console provider', () => {
         logger: createLogger({ quiet: false, sink: out.sink }),
       }),
     )
-    await send({ channel: 'mail', to: 'a@b.co', template: otp })
+    await send({ channel: 'mail', to: 'a@b.co', template: otp }) // @auth
+    await send({ channel: 'mail', to: 'a@b.co', template: sample }) // @noauth
     expect(out.lines).toHaveLength(1)
   })
 
@@ -69,8 +72,10 @@ describe('console provider', () => {
       sink: out.sink,
     })
     registerProvider('mail', provider)
-    await send({ channel: 'mail', to: 'a@b.co', template: otp })
-    expect(out.lines).toEqual(['message sent channel=mail template=otp targetType=email'])
+    await send({ channel: 'mail', to: 'a@b.co', template: otp }) // @auth
+    await send({ channel: 'mail', to: 'a@b.co', template: sample }) // @noauth
+    expect(out.lines).toEqual(['message sent channel=mail template=otp targetType=email']) // @auth
+    expect(out.lines).toEqual(['message sent channel=mail template=sample targetType=email']) // @noauth
   })
 
   test('sms and whatsapp log a phone target type', async () => {
@@ -81,8 +86,10 @@ describe('console provider', () => {
         logger: createLogger({ quiet: false, sink: out.sink }),
         sink: out.sink,
       })
-      await provider.send({ channel, to: '+15550100', template: otp })
-      expect(out.lines).toEqual([`message sent channel=${channel} template=otp targetType=phone`])
+      await provider.send({ channel, to: '+15550100', template: otp }) // @auth
+      await provider.send({ channel, to: '+15550100', template: sample }) // @noauth
+      expect(out.lines).toEqual([`message sent channel=${channel} template=otp targetType=phone`]) // @auth
+      expect(out.lines).toEqual([`message sent channel=${channel} template=sample targetType=phone`]) // @noauth
     }
   })
 
@@ -94,8 +101,10 @@ describe('console provider', () => {
       logger: createLogger({ quiet: false, sink: logged.sink }),
       sink: printed.sink,
     })
-    await provider.send({ channel: 'sms', to: '+15550100', template: otp })
-    expect(logged.lines).toEqual(['message sent channel=sms template=otp targetType=phone'])
+    await provider.send({ channel: 'sms', to: '+15550100', template: otp }) // @auth
+    await provider.send({ channel: 'sms', to: '+15550100', template: sample }) // @noauth
+    expect(logged.lines).toEqual(['message sent channel=sms template=otp targetType=phone']) // @auth
+    expect(logged.lines).toEqual(['message sent channel=sms template=sample targetType=phone']) // @noauth
     const text = printed.lines.join('\n')
     expect(text).toContain('123456')
     expect(text).toContain('+15550100')
@@ -109,7 +118,8 @@ describe('console provider', () => {
       sink: printed.sink,
       from: 'x@example.com',
     })
-    await provider.send({ channel: 'mail', to: 'a@b.co', template: otp })
+    await provider.send({ channel: 'mail', to: 'a@b.co', template: otp }) // @auth
+    await provider.send({ channel: 'mail', to: 'a@b.co', template: sample }) // @noauth
     expect(printed.lines[0]).toContain('from: x@example.com')
   })
 
@@ -120,7 +130,8 @@ describe('console provider', () => {
       logger: createLogger({ quiet: true, sink: capture().sink }),
       sink: printed.sink,
     })
-    await provider.send({ channel: 'sms', to: '+15550100', template: otp })
+    await provider.send({ channel: 'sms', to: '+15550100', template: otp }) // @auth
+    await provider.send({ channel: 'sms', to: '+15550100', template: sample }) // @noauth
     expect(printed.lines).toEqual([])
   })
 })
@@ -134,13 +145,15 @@ describe('env-selected fallback', () => {
       ['sms', '+15550100'],
       ['whatsapp', '+15550100'],
     ] as const) {
-      await send({ channel, to, template: otp })
+      await send({ channel, to, template: otp }) // @auth
+      await send({ channel, to, template: sample }) // @noauth
     }
   })
 
   test('a registration after a reset is honoured over the fallback', async () => {
     resetProviders()
-    await send({ channel: 'mail', to: 'a@b.co', template: otp })
+    await send({ channel: 'mail', to: 'a@b.co', template: otp }) // @auth
+    await send({ channel: 'mail', to: 'a@b.co', template: sample }) // @noauth
     const seen: Message[] = []
     registerProvider('mail', {
       send: (m) => {
@@ -148,7 +161,8 @@ describe('env-selected fallback', () => {
         return Promise.resolve()
       },
     })
-    await send({ channel: 'mail', to: 'a@b.co', template: otp })
+    await send({ channel: 'mail', to: 'a@b.co', template: otp }) // @auth
+    await send({ channel: 'mail', to: 'a@b.co', template: sample }) // @noauth
     expect(seen).toHaveLength(1)
   })
 
@@ -156,7 +170,8 @@ describe('env-selected fallback', () => {
     resetProviders({ sms: 'acme' })
     let failure: unknown
     try {
-      await send({ channel: 'sms', to: '+15550100', template: otp })
+      await send({ channel: 'sms', to: '+15550100', template: otp }) // @auth
+      await send({ channel: 'sms', to: '+15550100', template: sample }) // @noauth
     } catch (error) {
       failure = error
     }
@@ -174,7 +189,8 @@ describe('registerProvider', () => {
       },
     }
     registerProvider('mail', capturing)
-    const message: Message = { channel: 'mail', to: 'a@b.co', template: otp }
+    const message: Message = { channel: 'mail', to: 'a@b.co', template: otp } // @auth
+    const message: Message = { channel: 'mail', to: 'a@b.co', template: sample } // @noauth
     await send(message)
     expect(seen).toEqual([message])
   })
@@ -187,7 +203,8 @@ describe('registerProvider', () => {
         return Promise.resolve()
       },
     })
-    await send({ channel: 'sms', to: '+15550100', template: otp })
+    await send({ channel: 'sms', to: '+15550100', template: otp }) // @auth
+    await send({ channel: 'sms', to: '+15550100', template: sample }) // @noauth
     expect(seen).toEqual([])
   })
 
@@ -198,7 +215,8 @@ describe('registerProvider', () => {
     })
     let failure: unknown
     try {
-      await send({ channel, to: '+15550100', template: otp })
+      await send({ channel, to: '+15550100', template: otp }) // @auth
+      await send({ channel, to: '+15550100', template: sample }) // @noauth
     } catch (error) {
       failure = error
     }
@@ -220,16 +238,19 @@ describe('registerProvider', () => {
       send: () => Promise.reject(new VendorError('rejected body: your code is 987654')),
     })
     try {
-      await send({ channel: 'sms', to: '+15550100', template: otp }).catch(() => undefined)
+      await send({ channel: 'sms', to: '+15550100', template: otp }).catch(() => undefined) // @auth
+      await send({ channel: 'sms', to: '+15550100', template: sample }).catch(() => undefined) // @noauth
     } finally {
       spy.mockRestore()
     }
     expect(out.lines).toEqual([
-      'message delivery failed channel=sms template=otp reason=VendorError',
+      'message delivery failed channel=sms template=otp reason=VendorError', // @auth
+      'message delivery failed channel=sms template=sample reason=VendorError', // @noauth
     ])
   })
 })
 
+// @auth-start
 describe('templates', () => {
   test('otp names the code, the purpose and the expiry', () => {
     expect(otp.name).toBe('otp')
@@ -255,6 +276,7 @@ describe('templates', () => {
     expect(rendered.text).toContain('30 minutes')
   })
 })
+// @auth-end
 
 describe('provider resolution at boot', () => {
   const run = (env: Record<string, string>) =>
@@ -274,9 +296,9 @@ describe('provider resolution at boot', () => {
   test('the console provider in production warns once per channel', () => {
     const result = run({
       NODE_ENV: 'production',
-      JWT_ACCESS_SECRET: 'a'.repeat(40),
-      JWT_REFRESH_SECRET: 'b'.repeat(40),
-      OTP_SECRET: 'c'.repeat(40),
+      JWT_ACCESS_SECRET: 'a'.repeat(40), // @auth
+      JWT_REFRESH_SECRET: 'b'.repeat(40), // @auth
+      OTP_SECRET: 'c'.repeat(40), // @auth
       ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     })
 

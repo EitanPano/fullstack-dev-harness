@@ -6,12 +6,12 @@ import type { Router } from 'express'
 
 import { healthRoute } from '../api/health/route'
 import { registerHealth } from '../api/health/schema'
-import { authRoute } from '../api/auth/route'
-import { registerAuth } from '../api/auth/schema'
+import { authRoute } from '../api/auth/route' // @auth
+import { registerAuth } from '../api/auth/schema' // @auth
 import { moduleRoute } from '../api/module/route'
 import { registerModule } from '../api/module/schema'
-import { userRoute } from '../api/user/route'
-import { registerUser } from '../api/user/schema'
+import { userRoute } from '../api/user/route' // @auth
+import { registerUser } from '../api/user/schema' // @auth
 
 export type ApiModule = {
   path: `/${string}`
@@ -21,8 +21,8 @@ export type ApiModule = {
 
 export const modules: readonly ApiModule[] = [
   { path: '/health', route: healthRoute, register: registerHealth },
-  { path: '/auth', route: authRoute, register: registerAuth },
-  { path: '/user', route: userRoute, register: registerUser },
+  { path: '/auth', route: authRoute, register: registerAuth }, // @auth
+  { path: '/user', route: userRoute, register: registerUser }, // @auth
   { path: '/module', route: moduleRoute, register: registerModule },
 ]
 

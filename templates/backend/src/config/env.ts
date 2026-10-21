@@ -2,33 +2,43 @@ import { z } from 'zod'
 
 // The only file that reads process.env. Parsed once at startup; a missing or malformed
 // variable stops the process with a message naming it. A fresh clone runs with no env file
+// @auth-start
 // at all: every variable has a development default or is optional, except the four secrets
 // in production, which must be supplied (outside production they fall back to a plainly
 // fake default and `defaultedSecrets` names them so the entry can warn). A variable the
+// @auth-end
+// @noauth-start
+// at all: every variable has a development default or is optional, except the encryption
+// key in production, which must be supplied (outside production it falls back to a plainly
+// fake default and `defaultedSecrets` names it so the entry can warn). A variable the
+// @noauth-end
 // product adds (a database URL, a provider key) is declared here and in the example env file.
 const SECRET_NAMES = [
-  'JWT_ACCESS_SECRET',
-  'JWT_REFRESH_SECRET',
-  'OTP_SECRET',
+  'JWT_ACCESS_SECRET', // @auth
+  'JWT_REFRESH_SECRET', // @auth
+  'OTP_SECRET', // @auth
   'ENCRYPTION_KEY',
 ] as const
 type SecretName = (typeof SECRET_NAMES)[number]
 
 const DEVELOPMENT_DEFAULTS: Record<SecretName, string> = {
-  JWT_ACCESS_SECRET: 'dev-only-access-secret-change-me-0123456789',
-  JWT_REFRESH_SECRET: 'dev-only-refresh-secret-change-me-012345678',
-  OTP_SECRET: 'dev-only-otp-secret-change-me-0123456789abc',
+  JWT_ACCESS_SECRET: 'dev-only-access-secret-change-me-0123456789', // @auth
+  JWT_REFRESH_SECRET: 'dev-only-refresh-secret-change-me-012345678', // @auth
+  OTP_SECRET: 'dev-only-otp-secret-change-me-0123456789abc', // @auth
   // 32 bytes, base64.
   ENCRYPTION_KEY: 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
 }
 
-const BLANK_IS_UNSET = ['CORS_ORIGINS', 'COOKIE_DOMAIN', 'MAIL_FROM', 'TRUST_PROXY'] as const
+const BLANK_IS_UNSET = ['CORS_ORIGINS', 'COOKIE_DOMAIN', 'MAIL_FROM', 'TRUST_PROXY'] as const // @auth
+const BLANK_IS_UNSET = ['CORS_ORIGINS', 'MAIL_FROM', 'TRUST_PROXY'] as const // @noauth
 
+// @auth-start
 const MIN_SECRET_LENGTH = 32
 
 const secret = z
   .string()
   .min(MIN_SECRET_LENGTH, `must be at least ${String(MIN_SECRET_LENGTH)} characters`)
+// @auth-end
 
 const encryptionKey = z.string().refine((value) => Buffer.from(value, 'base64').length === 32, {
   message: 'must be base64 that decodes to 32 bytes',
@@ -65,11 +75,11 @@ const schema = z
               .map((origin) => origin.trim())
               .filter((origin) => origin !== ''),
       ),
-    JWT_ACCESS_SECRET: secret,
-    JWT_REFRESH_SECRET: secret,
-    OTP_SECRET: secret,
+    JWT_ACCESS_SECRET: secret, // @auth
+    JWT_REFRESH_SECRET: secret, // @auth
+    OTP_SECRET: secret, // @auth
     ENCRYPTION_KEY: encryptionKey,
-    COOKIE_DOMAIN: z.string().trim().min(1).optional(),
+    COOKIE_DOMAIN: z.string().trim().min(1).optional(), // @auth
     MAIL_PROVIDER: provider,
     SMS_PROVIDER: provider,
     WHATSAPP_PROVIDER: provider,
@@ -106,10 +116,12 @@ function placeholderProblems(source: Record<string, string | undefined>): string
       problems.push(`${name}: is a placeholder, set a real secret`)
     }
   }
+  // @auth-start
   const access = source.JWT_ACCESS_SECRET
   if (access !== undefined && access !== '' && access === source.JWT_REFRESH_SECRET) {
     problems.push('JWT_REFRESH_SECRET: must differ from JWT_ACCESS_SECRET')
   }
+  // @auth-end
   return problems
 }
 
