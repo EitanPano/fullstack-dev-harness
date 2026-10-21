@@ -40,7 +40,8 @@ import {
 
 // A lane ending in `/` is a directory prefix; anything else is one exact file.
 const WRITE_LANES = {
-  backend: ['backend/', '.orchestrate/report/backend.md'],
+  // The data-layer task (database skill) adds its Compose service and db/init.sql.
+  backend: ['backend/', 'docker-compose.yml', 'db/', '.orchestrate/report/backend.md'],
   frontend: ['frontend/', '.orchestrate/report/frontend.md'],
   // QA may add coverage but never feature source.
   qa: ['.orchestrate/report/qa.md', 'frontend/tests/', 'backend/tests/'],
@@ -70,8 +71,15 @@ const GIT_READ = new Set([
   'describe', 'fetch', 'remote', 'shortlog', 'cat-file', 'merge-base', 'name-rev', 'var', 'version', 'help'
 ])
 const GIT_LIST_FLAG = /^(-a|-r|-v|-vv|--list|--show-current|-l|--all|--contains|--merged|--no-merged)$/
+// Global options that may precede the subcommand. Any other one is refused, `-c` above all:
+// a config override such as core.pager or core.fsmonitor runs a command under a read.
+const GIT_GLOBAL_WITH_VALUE = new Set(['-C', '--git-dir', '--work-tree', '--namespace'])
+const GIT_GLOBAL_FLAG = /^(--no-pager|-P|--paginate|-p|--literal-pathspecs|--no-optional-locks|--(git-dir|work-tree|namespace)=.+)$/
+// A redirection's target ends at whitespace or a shell operator glued to it (`2>&1;`).
+// `>&N` duplicates a descriptor only when N stands alone: bash reads `>&1x` as a file name.
+const REDIRECT = /(?<![=<\-])(?:\d|&|\*)?>{1,2}\s*(?:&[\d-]+(?=[\s;|&()<>]|$)|[^\s;|&()<>]*)/g
 // Redirections that do not write a file.
-const HARMLESS_REDIRECT = /^(\d?>&\d|&>\s*\/dev\/null|\d?>\s*\/dev\/null|\d?>\s*\$null|\*>\s*\$null|>\s*nul)$/i
+const HARMLESS_REDIRECT = /^(\d?>&[\d-]+|(\d|&|\*)?>{1,2}\s*(\/dev\/null|\$null|nul))$/i
 
 // Windows file systems are case-insensitive, so FRONTEND/ is frontend/ there and nowhere else.
 const fold = process.platform === 'win32' ? value => value.toLowerCase() : value => value
@@ -120,7 +128,7 @@ allow()
 function shellWriteChannel(command) {
   // Redirections are checked on the unquoted text because `>` may be glued to its target;
   // `=>`, `->` and `<>` are not redirections.
-  const redirects = withoutQuotes(command).match(/(?<![=<\-])(?:\d|&|\*)?>{1,2}\s*\S*/g) ?? []
+  const redirects = withoutQuotes(command).match(REDIRECT) ?? []
   for (const redirect of redirects) {
     if (!HARMLESS_REDIRECT.test(redirect.trim())) return `redirect ${redirect.trim().split(/\s+/)[0]}`
   }
@@ -133,8 +141,11 @@ function shellWriteChannel(command) {
     if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
     if (INLINE_RUNTIMES.has(program) && args.some(arg => INLINE_FLAG.test(arg))) return `${program} inline code`
     if (program === 'git') {
-      const sub = (args[0] ?? '').toLowerCase()
-      const rest = args.slice(1)
+      const git = gitCommand(args)
+      if (git.option !== undefined) return `git ${git.option}`
+      const { sub, rest } = git
+      // `git diff --output=<file>` and `git log --output <file>` write despite a read subcommand.
+      if (rest.some(arg => /^--output(=|$)/.test(arg))) return `git ${sub} --output`
       const listOnly = rest.every(arg => GIT_LIST_FLAG.test(arg))
       const ok =
         GIT_READ.has(sub) ||
@@ -146,6 +157,18 @@ function shellWriteChannel(command) {
     }
   }
   return null
+}
+
+// Skips the global options before the subcommand; `option` names the first one not allowed.
+function gitCommand(args) {
+  let i = 0
+  while (i < args.length && args[i].startsWith('-')) {
+    if (args[i] === '--version' || args[i] === '--help') return { sub: 'version', rest: [] }
+    if (GIT_GLOBAL_WITH_VALUE.has(args[i])) i += 2
+    else if (GIT_GLOBAL_FLAG.test(args[i])) i += 1
+    else return { option: args[i] }
+  }
+  return { sub: (args[i] ?? '').toLowerCase(), rest: args.slice(i + 1) }
 }
 
 function firstString(...values) {
