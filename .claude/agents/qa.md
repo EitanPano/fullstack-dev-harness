@@ -21,28 +21,25 @@ rule working: report the fix, never apply it. The change is uncommitted: read it
 Never start a separate Compose project (`docker compose -p …`) or a second copy of a
 service: `down -v` is refused for everyone, so its volumes would wait for a human. Run
 against the services the repository defines; a check that needs a clean database runs
-under `bun run test:db`, which uses the separate test database.
+under `testDb`, which uses the separate test database.
 
 ## Procedure
 
 1. **Read**: the plan (`Validation`, `Contract`, `Stages`), the acceptance criteria,
    `.orchestrate/report/backend.md` and `frontend.md` (what was claimed), the five
    `.orchestrate/review/*.md` files (what was found).
-2. **Gates**, recorded verbatim, each in its own command:
-
-```bash
-(cd backend && bun run check)          # skip when the plan lists no backend stage
-(cd backend && bun run test:db)        # when backend/tests has a describeDb block; needs the compose database service (database skill)
-(cd frontend && bun run check)
-(cd frontend && bun run test:e2e)
-```
-
-3. **Contract freshness**: in `backend/`, note the size and first lines of `openapi.json`,
-   run `bun run openapi`, and confirm the file did not change; then in `frontend/` run
-   `bun run api:types` and confirm `src/lib/api/schema.d.ts` did not change. A change in
+2. **Gates**, recorded verbatim, each run from its package directory and read from
+   `.fullstack/catalog.yaml`, each in its own command:
+   - `check` for every package the plan's `Stages` list;
+   - `testDb` where the package's `AGENTS.md › Adding the data layer` names it and the task
+     added database-backed tests; it needs the Compose database service (`database` skill);
+   - `testE2e` where a package declares it.
+3. **Contract freshness**: run the server's `contract` command and confirm its committed
+   contract file (named in `backend/AGENTS.md`) did not change; then run the frontend's
+   `contract` command and confirm its generated types file did not change. A change in
    either means the implementer shipped a stale contract: finding, owner by file.
 4. **Diff hygiene**: `git diff <Base>` contains no deleted test, no `.skip`, `.only` or
-   `.todo`, and no `console.log` left in `src/`. Each is a finding unless the stage
+   `.todo`, and no debug output left in source. Each is a finding unless the stage
    report justified it.
 5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
    state, missing or malformed input, boundary sizes, repeated rapid submission, another
@@ -58,7 +55,7 @@ Stage: qa
 Task: <slug>
 Verdict: <pass | fail>
 
-Gates: backend check <ok|fail|n/a> · backend test:db <ok|fail|n/a> · frontend check <ok|fail> · e2e <N passed, M failed>
+Gates: backend check <ok|fail|n/a> · backend testDb <ok|fail|n/a> · frontend check <ok|fail> · testE2e <N passed, M failed>
 Contract: fresh <yes|no>
 Diff hygiene: <clean | findings below>
 Adversarial tests added: <file: test name, one per line>

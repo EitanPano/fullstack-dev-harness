@@ -56,8 +56,9 @@ frontend agent consumes the generated types.
 - Repository-relative paths only.
 - Name files to create or change per package, following the layout in `AGENTS.md` and
   `backend/AGENTS.md`
-  (`backend/src/api/<name>/…`, `backend/src/models/<name>/…`, `frontend/src/feature/<name>/…`). A plan that puts
-  logic in `app/` or a fetch call in `ui/` is wrong.
+  (`backend/src/api/<name>/…`, `backend/src/models/<name>/…`,
+  `frontend/src/feature/<name>/…`). A plan that puts logic in the routing layer, a fetch call
+  in a UI component, or a query in a route handler is wrong.
 - Every `Validation` item has the form `- V01 — <statement> — proof: <test name | command>`.
   QA runs the list as its checklist; "the code looks right" is not a proof.
 - Every `Open Questions` item ends with `Recommended: <answer>`.

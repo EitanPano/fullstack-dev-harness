@@ -1,13 +1,14 @@
 ---
 name: bootstrap-project
-description: Turn a fresh clone of this harness into a running full-stack project. Use when frontend/ or backend/ does not exist yet, when the user asks to "start the project", "set up the app", "create the full-stack project" or "bootstrap", or when .doc/ still holds FILL markers. Walks the product forms, asks which database engine the product uses, runs scripts/bootstrap.mjs, verifies every gate, and writes the first backlog line.
+description: Turn a fresh clone of this harness into a running full-stack project. Use when .fullstack/catalog.yaml does not exist yet, when the user asks to "start the project", "set up the app", "create the full-stack project" or "bootstrap", or when .doc/ still holds FILL markers. Walks the product forms, picks a stack from the template catalog, asks the flags and capabilities its templates declare, runs scripts/bootstrap.mjs, verifies every gate, and writes the first backlog line.
 ---
 
 # Bootstrap a project
 
-Runs once per project, in the interactive session (no role agent). Everything the
-scaffold decides (framework, layout, configs) is fixed by `AGENTS.md` and `templates/`;
-this skill supplies the product, the database decision, and proves the result works.
+Runs once per project, in the interactive session (no role agent). The harness owns no
+templates: `catalog.lock` pins a release of the template catalog, and the bootstrap runs
+that catalog's generator. This skill supplies the product, the stack choice and the
+database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24+, git.
 
 ## 1. Decide the product with the user
 
@@ -17,19 +18,20 @@ their words; suggest a default only when they ask. Do the same for `.doc/archite
 (Data store, Data Model, API versioning, Auth, External Dependencies, Deployment) and
 `.doc/glossary.md` (one row per entity named in the scope).
 
-The Data store question is the `database` skill's: Postgres, MongoDB, or decide later,
-plus the client library. The harness ships no database; the answer decides the first
-backlog task, not the scaffold.
+The Data store question is the `database` skill's: engine, client library, or decide
+later. Record the answer as given (the engine the user names, or "decide later", plus the
+client library); whether the server template lists a provider is a separate fact, settled
+in section 2.
 
-The Auth question decides the scaffold: a product with no accounts (Auth: none) is
-scaffolded with `--auth none`; any other answer keeps the template's authentication
-(`--auth full`). For `none`, replace the whole body of `.doc/architecture.md` Auth (the
-shipped default and the roles marker describe code that will not exist) with:
+The Auth question decides a flag: a product with no accounts (Auth: none) is scaffolded
+with `--flag auth=false`; any other answer keeps the server template's authentication (its
+`auth` flag on, the default). For `none`, replace the whole body of `.doc/architecture.md`
+Auth (the shipped default and the roles marker describe code that will not exist) with:
 
 ```
 - Auth: none. The product has no accounts and every endpoint is public. Adding accounts is
-  a planned change; the harness's `--auth full` scaffold is the reference.
-- Client model: the Next.js server is the backend's client (no browser fetch). CORS is off
+  a planned change; a scaffold with the `auth` flag on is the reference.
+- Client model: the frontend's server is the backend's client (no browser fetch). CORS is off
   unless `CORS_ORIGINS` is set. Rate limits key on the client address, so the frontend
   forwards `X-Forwarded-For` and the backend runs with `TRUST_PROXY` set.
 ```
@@ -37,65 +39,81 @@ shipped default and the roles marker describe code that will not exist) with:
 Stop when the "Ready to plan" checklist in the product definition is satisfied. Do not
 start the scaffold while a marker remains in a section the checklist names.
 
-## 2. Scaffold
+## 2. Choose the stack
 
 ```bash
-node scripts/bootstrap.mjs --name <project-name> --auth <full|none>
+node scripts/bootstrap.mjs --fetch
 ```
 
-The script refuses to run twice. `--auth none` leaves out authentication: the `auth` and
-`user` modules, sessions, JWT, OTP, cookies, their jobs, subscribers, tests and secrets;
-the reference module's endpoints are public. It creates `frontend/` (pinned `create-next-app` plus the
-`templates/frontend` overlay), `backend/` (from `templates/backend`), `docker-compose.yml`
-and `.editorconfig`, installs dependencies, generates `backend/openapi.json` and
-`frontend/src/lib/api/schema.d.ts`, and formats both packages.
+It prints `catalog: <path>` and then `index.yaml`. Present the `stacks:` entries (id and
+summary) and ask which one. For the chosen stack, Read `<catalog>/stacks/<id>/stack.yaml`
+(its `packages:` list: a `template` path and a `dir` each) and each package's
+`<catalog>/<template path>/template.yaml`. Ask every flag the templates declare (show its
+`summary` and `default`) and every capability that lists providers. Map the answers to
+`--flag <name>=<true|false>` and `--capability <kind>=<provider>`. Ask the database
+provider here when the template lists one (`capabilities.database.providers`): pass
+`--capability database=<id>`, and the data-layer backlog line is then NOT written, because
+the generator wired the engine.
 
-## 3. Verify, in this order
+These three files are the only things this skill reads under the catalog path. Never Glob,
+Grep, list or explore the catalog cache and never dispatch an Explore agent into it; it is
+outside the working tree on purpose.
+
+## 3. Scaffold
 
 ```bash
-cd backend && bun run check
-cd ../frontend && bun run check
-bun x playwright install chromium && bun run test:e2e
+node scripts/bootstrap.mjs --stack <id> --name <project-name> [--flag k=v]… [--capability k=v]…
 ```
 
-Every command must exit 0. If one fails, fix the cause (not the gate), re-run it, and
-tell the user what was wrong. A failing gate on a fresh scaffold is a harness bug: say so
-explicitly and record it in the final message so it can be fixed in `templates/`.
+It creates the packages the stack lists, under the directories the stack names; a merged
+`docker-compose.yml` and `.gitignore`; `.editorconfig` when absent; and
+`.fullstack/catalog.yaml`, the provenance file (per package: template, version, flags,
+commands and ports). It installs each package and runs its `contract` and `format`
+commands. It refuses to run twice. A failure before the move leaves nothing to clean: the
+generator stages the output and moves it into place all or nothing (a failed move is rolled back).
 
-A fresh backend has: health, the commented reference module `api/module/` +
-`models/module/` (delete both and its line in `config/routes.ts` if unwanted), the memory
-store (nothing survives a restart until the data-layer task), the scheduler and the bus.
-With `--auth full` it also has authentication (register, login, logout, refresh, OTP) and
-the `user` module, and production needs `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` and
-`OTP_SECRET`. `ENCRYPTION_KEY` is needed in production either way; development runs with
-defaults and warns.
+## 4. Verify, in this order
 
-Then start both servers once and open `http://localhost:3000`: the home page must show
-the API version pill, which proves the typed client reaches the backend.
+Open `.fullstack/catalog.yaml`. For each package, run its `check` command from the package
+directory. For a package that declares `testE2e`, first run the browser install its
+`AGENTS.md › Tests` names, then `testE2e`. Every command must exit 0. If one fails, fix the
+cause (not the gate), re-run it, and tell the user what was wrong. A failing gate on a fresh
+scaffold is a catalog bug: say so explicitly, name the template and version from the
+provenance file, and record it in the final message.
 
-```bash
-cd backend && bun run dev      # port 4000
-cd frontend && bun run dev     # port 3000
-```
+Then start each package's `dev` command and open the frontend's `http.health` path on its
+`http.port`: the page must reach the server (for `frontend/next`, the API version pill
+proves the typed client reaches it).
 
-## 4. First backlog lines
+A fresh server package has: health, the commented reference module, the in-memory store
+(nothing survives a restart until the data-layer task), and authentication when the `auth`
+flag is on. Production secrets are listed in the package's `.env.example`; development runs
+with defaults and warns.
 
-Follow the grammar at the top of `.plan/000-backlog.md`. When an engine was chosen, the
-first line is `- [ ] add the <engine> data layer | stack:backend` (the `database` skill
-says what that task delivers). The next line is the first in-scope capability from the
-product definition. Set `tracker:` in the backlog header to `linear` or `none` as the user
-prefers.
+## 5. First backlog lines
 
-## 5. Branch, commit gate and hand over
+Follow the grammar at the top of `.plan/000-backlog.md`. When no database provider was
+passed at generation, the first line is `- [ ] add the <engine> data layer | stack:backend`
+for a named engine, or `- [ ] add the data layer | stack:backend` when the answer was
+"decide later" (the `database` skill says what that task delivers). The next line is the
+first in-scope capability from the product definition. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
+`Stack` row of the components table in `.doc/architecture.md` from `.fullstack/catalog.yaml`:
+the stack id and, per package, its directory, template and version.
+
+## 6. Branch, commit gate and hand over
 
 Create `chore/bootstrap` (never commit on `main`) and summarise what exists. Then ask the
-user whether to commit the scaffold as `chore(bootstrap): scaffold <project-name>`; the dev
-loop starts only from a clean tree, so the first task waits for this commit. Commit only on
-their yes, then point them to `/dev-loop` for the first task.
+user whether to commit the scaffold as `chore(bootstrap): scaffold <project-name>`,
+including `.fullstack/catalog.yaml`; the dev loop starts only from a clean tree, so the
+first task waits for this commit. Commit only on their yes, then point them to `/dev-loop`
+for the first task.
 
 ## What this skill never does
 
-- Run any scaffolder inside an existing `frontend/` or `backend/`.
-- Edit `templates/`, `scripts/` or `.claude/`; those are harness files.
+- Run any scaffolder inside an existing package.
+- Browse the catalog cache.
+- Edit `scripts/`, `.claude/`, `catalog.lock` or other harness files.
 - Create a real env file; secrets stay in the shell environment.
-- Install a database client or start a database service; that is the data-layer task.
+- Install a database client or start a database service. The exception: a provider chosen
+  at generation was wired by the generator, and its Compose service is started with
+  `docker compose up -d <service>`.

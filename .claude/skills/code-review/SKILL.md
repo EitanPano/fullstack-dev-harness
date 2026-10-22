@@ -17,7 +17,7 @@ plan's `Base:` commit (outside the dev loop, `main` unless the user names a base
 `git add --intent-to-add .`, so new files are in that diff; `git status --short` lists
 them too. Read the plan's Scope, Contract and Validation first, then the diff, then what
 the change should have touched but did not (a migration or index, a failure-path test, an
-`error.tsx`, a change-log line).
+error state, a change-log line).
 
 ## Priorities, highest first
 
@@ -25,11 +25,12 @@ the change should have touched but did not (a migration or index, a failure-path
    exposure in responses, unsafe dependencies.
 2. **Scalability**: N+1 queries, missing indexes, unbounded lists, work on the request
    path that belongs in a job, state that cannot be replicated.
-3. **Maintainability and architecture**: layering and import direction per `AGENTS.md` and `backend/AGENTS.md`,
-   naming, duplication, a feature that reaches into another, a module importing another
-   module's service or data layer, logic in `app/`, in a route adapter beyond mounting
-   middleware, validating, resolving the caller, calling one controller function and
-   responding, or in a controller beyond composing its service and other controllers.
+3. **Maintainability and architecture**: layering and import direction per `AGENTS.md` and
+   `backend/AGENTS.md`, naming, duplication, a feature that reaches into another, logic in
+   the routing layer or in a `routes` file beyond mounting middleware, validating and
+   naming the handler (business logic belongs in the controller, its handlers and exported
+   rules; queries in the service), a controller reaching another module's service, a
+   service imported from outside its module.
    Is every new file in the home the `backend/AGENTS.md` table names for it (module file,
    `models/`, `middleware/`, `services/`, `services/utils/`, `infra/jobs/`,
    `infra/subscribers/`)? A file in two defensible homes is a finding.
@@ -54,8 +55,8 @@ the change should have touched but did not (a migration or index, a failure-path
 
 Every finding names `file:line`, quotes the problem in one line, states the consequence,
 and gives the fix. "Looks wrong" is not a finding; run the test or read the schema when
-in doubt. Run only commands that read: `bun run typecheck`, `bun run lint`, `bun test`,
-`git diff`, never `bun run format` or anything that writes.
+in doubt. Run only commands that read: the package's `typecheck`, `lint` and `test` commands,
+`git diff`, never `format` or anything that writes.
 
 ## Report
 

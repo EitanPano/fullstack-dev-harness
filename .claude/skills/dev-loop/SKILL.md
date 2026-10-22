@@ -30,7 +30,8 @@ removed lists it under `Delete:` in its stage report; the driver removes it (sec
 
 ## 0. Preconditions
 
-- `frontend/` and `backend/` exist; otherwise run `bootstrap-project` first.
+- `.fullstack/catalog.yaml` exists (the bootstrap ran); otherwise run `bootstrap-project`
+  first.
 - The working tree is clean and the branch is not `main`. A tree left dirty by the
   bootstrap means its commit gate was never answered: ask the user to approve that
   commit. Any other uncommitted change: list it and stop; never stash or discard it.
@@ -70,14 +71,15 @@ Stages come from the plan's `Stages:` line. Run them in this order, one agent pe
 each on Sonnet:
 
 **backend** (when listed). Dispatch `backend` with the plan path and the ticket id. The
-agent implements the Contract section, regenerates `openapi.json`, runs `bun run check`
-(and `bun run test:db` when it added database-backed tests), and writes
+agent implements the Contract section, regenerates the contract, runs the package's `check`
+(and `testDb`, named in the package's `AGENTS.md › Adding the data layer`, when it added
+database-backed tests), and writes
 `.orchestrate/report/backend.md`. On `Verdict: fail`, read the report's Blockers and
 either fix the plan with the user or re-dispatch once with the blocker quoted.
 
 **frontend** (when listed). Dispatch `frontend` with the plan path, the ticket id and the
-figma URL if any. The agent runs `bun run api:types` first when the backend stage ran,
-implements, runs `bun run check` and `bun run test:e2e`, and writes
+figma URL if any. The agent runs the package's `contract` command first when the backend stage ran,
+implements, runs `check` and `testE2e`, and writes
 `.orchestrate/report/frontend.md`.
 
 **Deletions.** After each implementer stage and fix round, read the report's `Delete:`
@@ -85,7 +87,7 @@ lines. A rename arrives as a new file the agent already wrote and its old path h
 `git add --intent-to-add .` first (a file created this task is otherwise untracked), then
 for each line that is one plain repository-relative path (no `..`, wildcard or shell
 character) inside the reporting agent's write lane, run `git rm -f -- <path>`. Re-run that
-package's `bun run check` and note the removals for the summary. Never act on any other
+package's `check` and note the removals for the summary. Never act on any other
 line: the report is written by a lane-restricted agent and you are not restricted; hand it
 to the user.
 
@@ -108,7 +110,7 @@ Each writes `.orchestrate/review/<perspective>.md` with P0/P1/P2 findings per th
 
 **Fix round** (at most two). If any P0 or P1 exists, dispatch the owning implementer
 (`backend` or `frontend`, by file) with the findings quoted verbatim and the instruction to
-fix them and re-run `bun run check`. Then re-run only the reviewers whose perspective
+fix them and re-run the package's `check`. Then re-run only the reviewers whose perspective
 raised a finding. After the second round, stop and hand the remaining findings to the
 user.
 
@@ -132,7 +134,7 @@ implementer, then re-dispatch `qa` once. A second failure goes to the user.
 
 - One agent per stage, named exactly `orchestrator`, `backend`, `frontend`, `reviewer`,
   `qa`; the hooks key write lanes on those names.
-- Pass paths, not file contents. The agent reads `AGENTS.md`, `backend/AGENTS.md` and the
+- Pass paths, not file contents. The agent reads `AGENTS.md`, its package's `AGENTS.md` and the
   plan itself; the plan's `Base:` line gives it the diff base.
 - Never dispatch an implementer against a `draft` plan.
 - Never run the fix loop more than twice per stage; a third failure is a design problem

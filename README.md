@@ -2,35 +2,35 @@
 
 A template repository for building a full-stack product with AI coding agents. Clone it,
 open it in Claude Code, and the harness supplies what the agents would otherwise guess:
-the stack, the architecture, the definition of done, the procedure from backlog line to
-reviewed code, and the guardrails that keep each agent in its lane.
+the procedure from backlog line to reviewed code, the guardrails that keep each agent in its
+lane, the definition of done, and a stack from the template catalog
+`https://github.com/EitanPano/fullstack-templates`, pinned in `catalog.lock`.
 
 What you get after the bootstrap:
 
-- `frontend/`: Next.js 16 (App Router), React 19, TypeScript strict, Tailwind v4, Vitest,
-  Playwright with axe, a typed API client generated from the backend's contract.
-- `backend/`: Express 5 on Bun, zod validation, OpenAPI generated from the same schemas,
-  `bun test`. The backend is layered: `config/` (env, routes), `api/<name>/` (schema,
-  route, controller, service, repository), `models/`, `middleware/`, `services/` (security,
-  communicate, utils, the db and cache seams) and `infra/` (dependencies, memory store,
-  scheduler and jobs, pub/sub and subscribers). Authentication ships (register, login,
-  logout, refresh with rotation, OTP), with rate limiting and a commented reference
-  module; a product without accounts is scaffolded with `--auth none` and gets neither
-  authentication nor its secrets. No database is pre-chosen: the bootstrap asks for the engine (Postgres,
-  MongoDB, or later) and the first task adds it following the `database` skill.
-- `docker-compose.yml` with both application images behind the `app` profile; the
-  database service joins it with the data-layer task.
+- The packages of the stack you choose, each generated from a catalog template that ships its
+  own `AGENTS.md` (layer map, how to add a module or a feature, errors, tests), with its
+  commands and ports recorded in `.fullstack/catalog.yaml`.
+- `docker-compose.yml` with the application images behind the `app` profile and, when a
+  database provider was chosen, its service.
 - Five role agents (orchestrator, backend, frontend, reviewer, qa), nine skills, and
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
   access to secret files.
 
+The catalog's current stacks: `next-bun-express` is a layered Express 5 API on Bun with an
+`auth` flag, and a Next.js 16 frontend with a client typed from the server's contract. The
+catalog README has the matrix.
+
 ## Prerequisites
 
 - Claude Code 2.1.295 or newer.
-- Bun 1.4 or newer and Node 24 or newer, both on the `PATH` that Claude Code sees. On
+- Bun 1.4 or newer, Node 24 or newer and git, all on the `PATH` that Claude Code sees. On
   Windows, Git Bash backs the Bash tool.
-- Docker with Compose v2 for the compose stack and the database you choose. On Linux,
-  Playwright needs `bun x playwright install --with-deps chromium` once.
+- The bootstrap clones the catalog into
+  `~/.cache/fullstack-templates/<version>/` (override with `FULLSTACK_TEMPLATES_CACHE`; use a
+  local checkout with `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`).
+- Docker with Compose v2 for the compose stack and the database you choose.
+- On Linux, the frontend package's `AGENTS.md › Tests` names the browser install.
 
 ## Clone checklist
 
@@ -41,10 +41,10 @@ What you get after the bootstrap:
    every command. Check that the hooks run: ask Claude to run `cat ~/.netrc` and expect a
    refusal that names the guardrail (a refusal of `.env` alone could come from the
    permission rules even with dead hooks).
-3. Run `/bootstrap-project`. It walks the product forms in `.doc/`, asks which database
-   engine the product uses and whether it has accounts, scaffolds `frontend/` and
-   `backend/`, runs every gate, writes the first backlog lines, and asks to commit the
-   scaffold. Budget 15 minutes, most of it installs.
+3. Run `/bootstrap-project`. It walks the product forms in `.doc/`, fetches the catalog, asks
+   which stack and which flags and capabilities its templates declare, scaffolds the
+   packages, runs every gate, writes the first backlog lines, and asks to commit the scaffold
+   (including `.fullstack/catalog.yaml`). Budget 15 minutes, most of it installs.
 4. Run `/dev-loop` for the first task; it starts from a clean tree, so commit the scaffold
    first. Approve the plan by editing its `Status:` line; review the reports in
    `.orchestrate/` before you commit.
@@ -53,8 +53,8 @@ What you get after the bootstrap:
 
 1. A task is one line in `.plan/000-backlog.md`.
 2. The orchestrator writes `.plan/NNN-YYYY-MM-DD-<slug>.md` (draft). You approve it.
-3. The backend agent implements the plan's Contract and regenerates `openapi.json`; the
-   frontend agent regenerates its types and implements the feature. Both test first.
+3. The backend agent implements the plan's Contract and regenerates the server's contract;
+   the frontend agent regenerates its types and implements the feature. Both test first.
 4. Five reviewers (security, architecture, error-handling, simplicity, operations) read
    the diff in parallel; P0 and P1 findings go back to the implementer, at most twice.
 5. QA runs every gate, adds adversarial tests, and checks each acceptance criterion
@@ -71,30 +71,25 @@ follows are in `AGENTS.md` and `.claude/rules/`.
 | --- | --- |
 | `AGENTS.md` | Rules, stack, architecture, definition of done; the single source of truth |
 | `CLAUDE.md` | Loads `AGENTS.md` into Claude Code |
-| `templates/backend/AGENTS.md` | The backend layer map; copied to `backend/AGENTS.md`, loaded when an agent works there |
+| `catalog.lock` | The pinned catalog version: repository, tag, commit |
+| `.fullstack/catalog.yaml` | Stack, templates, flags, commands and ports per package; written by the bootstrap |
+| `<package>/AGENTS.md` | Shipped by the template: the package's layer map and its agent-facing sections |
 | `.doc/` | Product definition, architecture, glossary: fill-in forms |
 | `.plan/` | Backlog and one plan per task |
 | `.claude/agents/` | Role definitions |
 | `.claude/rules/` | Conventions: code style, naming, UI and styling, git workflow |
 | `.claude/skills/` | Procedures: bootstrap, dev loop, plans, tests, API, errors, database, review, release |
 | `.claude/hooks/` | Guardrails, wired by `.claude/settings.json` |
-| `templates/` and `scripts/bootstrap.mjs` | What the bootstrap copies and runs |
+| `scripts/bootstrap.mjs` | Fetches the catalog pinned in `catalog.lock` and runs its generator |
 | `.orchestrate/` | Generated by the loop (reports, reviews, tickets); git-ignored |
 | `.cursor/`, `.github/copilot-instructions.md` | Pointers to `AGENTS.md` for other tools |
 
 ## Adding a module
 
-1. Copy `backend/src/api/module/` and `backend/src/models/module/`.
-2. Rename `module` to `<name>`, `Module` to `<Name>` and `MODULE` to `<NAME>` (directories,
-   files, identifiers, comments, constants). These steps live here and in
-   `backend/AGENTS.md`; the copied files no longer carry them.
-3. Add one line to `backend/src/config/routes.ts`.
-4. Write `backend/tests/<name>.test.ts`.
-5. Run `bun run openapi` then `bun run check` in `backend/`, and `bun run api:types` in
-   `frontend/`.
-
-To drop the reference module, delete both directories, its line in `config/routes.ts` and
-`tests/module.test.ts`.
+1. Follow `backend/AGENTS.md › Adding a module`.
+2. It explains the shipped reference module, the copy-and-rename recipe and the two lines
+   that mount and register a module.
+3. Run the package's `contract` then `check` commands.
 
 ## Guardrails and recovery
 
@@ -115,14 +110,14 @@ them.
 
 ## Updating the harness in an existing project
 
-Harness files (`AGENTS.md`, `.claude/`, `templates/`, `scripts/`) are plain files; pull
-them from a newer template and review the diff. `templates/` changes do not touch an
-already-scaffolded `frontend/` or `backend/`; copy `templates/backend/AGENTS.md` over
-`backend/AGENTS.md` by hand when the layer map changed.
+Harness files (`AGENTS.md`, `.claude/`, `scripts/`, `catalog.lock`) are plain files; pull
+them from a newer template and review the diff. A lock bump changes only what the next
+bootstrap generates; an already generated project keeps its packages and their `AGENTS.md`.
 
-Editing `templates/backend/` or `templates/root/docker-compose.yml`: a line ending in an
-`@auth` comment exists only in `--auth full` scaffolds, one ending in `@noauth` only in
-`--auth none`; `@auth-start` … `@auth-end` (and the `@noauth` pair) do the same for a block.
-Files only authentication uses are listed in `AUTH_ONLY_PATHS` in `scripts/bootstrap.mjs`.
-A template file can therefore hold both variants of a line and does not type-check on its
-own; prove a change by scaffolding both variants with `--root` and running every gate.
+A project scaffolded before the catalog has no `.fullstack/catalog.yaml`, and its
+`backend/AGENTS.md` lacks the sections the new agents point at, so it stays on the
+pre-catalog harness (the last commit before this change). The pointers in the harness name
+sections of the catalog version the lock pinned when the project was generated.
+
+To try an unreleased catalog, use `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`.
+

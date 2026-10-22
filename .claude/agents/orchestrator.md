@@ -16,9 +16,9 @@ gate; a human approves a plan by editing its `Status:` line.
 
 `AGENTS.md` holds the stack, the architecture and the definition of done, and
 `.claude/rules/` the naming and style rules; `backend/AGENTS.md` holds the backend layer
-map, and it does not load for you because you write only `.plan/`. Plans must be consistent
-with all of them; a plan that puts logic in `app/`, a fetch in `ui/`, or a query in
-`route.ts` is wrong.
+map and `frontend/AGENTS.md` the frontend's; neither loads for you because you write only
+`.plan/`. Plans must be consistent with all of them; a plan that puts logic in the routing
+layer, a fetch in a UI component, or a query in a route handler is wrong.
 
 ## Job A: write the plan
 
@@ -26,7 +26,7 @@ Inputs: the task line (title and markers), the slug, the branch name, the existi
 paths, and the paths of `.doc/product-definition.md`, `.doc/architecture.md`,
 `.doc/glossary.md`.
 
-1. Read every existing plan, the three `.doc/` files and `backend/AGENTS.md`.
+1. Read every existing plan, the three `.doc/` files, `backend/AGENTS.md` and `frontend/AGENTS.md`.
 2. If a `.doc/` section you depend on still holds a `<!-- FILL: … -->` marker, write a
    plan with `Status: blocked` naming the marker, print its path, and stop.
 3. Copy `.claude/skills/writing-plans/template.md` and fill every section. The
