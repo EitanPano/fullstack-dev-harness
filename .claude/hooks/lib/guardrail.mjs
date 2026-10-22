@@ -108,10 +108,74 @@ const SEGMENT_OPERATORS = ['&&', '||', '|', ';', '&', '\n', '\r', '$(', '`', '('
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'pwsh', 'powershell', 'cmd'])
 const PREFIXES = new Set([
   'sudo', 'doas', 'env', 'nohup', 'time', 'command', 'exec', 'eval', 'xargs', 'nice', 'busybox',
-  'timeout', 'stdbuf', 'caffeinate', 'bunx', 'npx', 'pnpx'
+  'timeout', 'stdbuf', 'caffeinate', 'npx', 'pnpx'
 ])
-// Package runners: `bun x pkg`, `bun run pkg`, `npm exec pkg`, … run the named program.
-const RUNNERS = { bun: ['x', 'run'], npm: ['exec', 'run', 'x'], pnpm: ['dlx', 'exec', 'run'], yarn: ['dlx', 'run'] }
+
+// Package runners: `bun run pkg`, `uv run prog`, `npm exec pkg`, … run the named program.
+// A runner's flags that take a value must consume it, in `--flag value` and `--flag=value`
+// spelling, or the value would be mistaken for the program (`uv run --directory backend rm`).
+// An unlisted value flag still shifts the program by one token: the table is a best effort
+// over the runner's documented flags, not a parser.
+//
+// Sources (value flags only; boolean flags need no entry):
+// - uv 0.12.23, `uv run --help`, `uv tool run --help`, `uvx --help`, `uv --help` (global).
+//   `uv run`: --extra --no-extra --group --no-group --only-group --no-editable-package
+//   --env-file -w/--with --with-editable --with-requirements --package --python-platform
+//   --index --default-index -i/--index-url --extra-index-url -f/--find-links --index-strategy
+//   --keyring-provider -P/--upgrade-package --upgrade-group --resolution --prerelease
+//   --prerelease-package --fork-strategy --exclude-newer --exclude-newer-package
+//   --no-sources-package --reinstall-package --link-mode -C/--config-setting
+//   --config-settings-package --no-build-isolation-package --no-build-package
+//   --no-binary-package --cache-dir --refresh-package --color -p/--python
+//   --allow-insecure-host --directory --project --config-file.
+//   `uv tool run` / `uvx` replace --extra … --package with --from, -c/--constraints,
+//   -b/--build-constraints, --overrides, --torch-backend. `uv` global: --cache-dir --color
+//   --allow-insecure-host --directory --project --config-file.
+// - bun 1.4, `bun run --help` (every `=<val>` flag except the optional-value --inspect* and
+//   -e/-p, which stay out so inline code keeps its current handling) and `bunx --help`
+//   (-p/--package).
+// - npm, `npm exec --help` and `npm run --help`: --package, -w/--workspace, --script-shell.
+//   `-c/--call` is deliberately absent: its value is a command string that is re-tokenised.
+//   (`-p` is npm's --parseable, not --package.)
+// - poetry, https://python-poetry.org/docs/cli/ (global options): -C/--directory, -P/--project;
+//   `poetry run` takes no option of its own.
+// - pdm, https://pdm-project.org/latest/reference/cli/ (`pdm run`): -p/--project, -k/--skip,
+//   --venv, --env, --env-file, --working-dir.
+// - hatch, https://hatch.pypa.io/latest/cli/reference/ (root options): -e/--env, -p/--project,
+//   --data-dir, --cache-dir, --config. `hatch run test:cmd` prefixes the program with an
+//   environment name and may lead with `+key=value` matrix selectors.
+// - pipx, pnpm and yarn: not installed and no citable page, so they are simple runners.
+const flagSet = list => new Set(list.split(/\s+/).filter(Boolean))
+const UV_COMMON = '-w --with --with-editable --with-requirements --python-platform --index --default-index -i --index-url --extra-index-url -f --find-links --index-strategy --keyring-provider -P --upgrade-package --upgrade-group --resolution --prerelease --prerelease-package --fork-strategy --exclude-newer --exclude-newer-package --no-sources-package --reinstall-package --link-mode -C --config-setting --config-settings-package --no-build-isolation-package --no-build-package --no-binary-package --cache-dir --refresh-package --color -p --python --allow-insecure-host --directory --project --config-file --env-file'
+const UV_RUN_FLAGS = flagSet(`${UV_COMMON} --extra --no-extra --group --no-group --only-group --no-editable-package --package`)
+const UV_TOOL_FLAGS = flagSet(`${UV_COMMON} --from -c --constraints -b --build-constraints --overrides --torch-backend`)
+const UV_GLOBAL_FLAGS = flagSet('--cache-dir --color --allow-insecure-host --directory --project --config-file')
+const BUN_RUN_FLAGS = flagSet('--elide-lines -F --filter --shell --watch-kill-signal -r --preload --require --import --cpu-prof-name --cpu-prof-dir --cpu-prof-interval --heap-prof-name --heap-prof-dir --heap-prof-interval --install --port --conditions --fetch-preconnect --max-http-header-size --dns-result-order --redirect-warnings --disable-warning --title --unhandled-rejections --console-depth --user-agent --cron-title --cron-period --main-fields --extension-order --tsconfig-override -d --define --drop --feature -l --loader --jsx-factory --jsx-fragment --jsx-import-source --jsx-runtime --env-file --cwd -c --config')
+const BUNX_FLAGS = flagSet('-p --package')
+const NPM_FLAGS = flagSet('--package -w --workspace --script-shell')
+const NO_FLAGS = new Set()
+
+// path: the subcommand words; flags: value flags that may follow it; global: value flags
+// that may precede it. `envPrefix`: the program may carry a `name:` prefix (hatch).
+const RUNNERS = {
+  bun: { global: BUN_RUN_FLAGS, subs: [{ path: ['x'], flags: BUNX_FLAGS }, { path: ['run'], flags: BUN_RUN_FLAGS }] },
+  bunx: { global: BUNX_FLAGS, subs: [{ path: [], flags: BUNX_FLAGS }] },
+  npm: { global: NPM_FLAGS, subs: [{ path: ['exec'], flags: NPM_FLAGS }, { path: ['run'], flags: NPM_FLAGS }, { path: ['x'], flags: NPM_FLAGS }] },
+  pnpm: { global: NO_FLAGS, subs: [{ path: ['dlx'], flags: NO_FLAGS }, { path: ['exec'], flags: NO_FLAGS }, { path: ['run'], flags: NO_FLAGS }] },
+  yarn: { global: NO_FLAGS, subs: [{ path: ['dlx'], flags: NO_FLAGS }, { path: ['run'], flags: NO_FLAGS }] },
+  uv: { global: UV_GLOBAL_FLAGS, subs: [{ path: ['run'], flags: UV_RUN_FLAGS }, { path: ['tool', 'run'], flags: UV_TOOL_FLAGS }] },
+  uvx: { global: UV_TOOL_FLAGS, subs: [{ path: [], flags: UV_TOOL_FLAGS }] },
+  poetry: { global: flagSet('-C --directory -P --project'), subs: [{ path: ['run'], flags: NO_FLAGS }] },
+  pipx: { global: NO_FLAGS, subs: [{ path: ['run'], flags: NO_FLAGS }] },
+  pdm: { global: NO_FLAGS, subs: [{ path: ['run'], flags: flagSet('-p --project -k --skip --venv --env --env-file --working-dir') }] },
+  hatch: { global: flagSet('-e --env -p --project --data-dir --cache-dir --config'), subs: [{ path: ['run'], flags: NO_FLAGS }], envPrefix: true }
+}
+
+// `python`, `python3`, `python3.14`, `py`, `pypy3`, … (a `.exe` suffix is gone by now).
+const PYTHON_PROGRAM = /^(py|pythonw?(\d(\.\d+)?[a-z]*)?|pypy(3(\.\d+)?)?)$/
+// Interpreter options that take a value before the script or module.
+const PYTHON_VALUE_FLAGS = new Set(['-X', '-W', '--check-hash-based-pycs'])
+
 // Flags that consume the next token.
 const FLAG_WITH_VALUE = /^-(u|g|p|C|h|r|t|T|I|L|n|P|d|s|E|S)$/
 const DURATION = /^\d+(\.\d+)?[smhd]?$/
@@ -162,10 +226,16 @@ export function segmentTokens(segment) {
     while (tokens.length > 0 && /^[A-Za-z_]\w*=/.test(tokens[0])) tokens = tokens.slice(1)
     if (tokens.length === 0) return tokens
     const program = programName(tokens[0])
-    const runner = RUNNERS[program]
+    const runner = Object.hasOwn(RUNNERS, program) ? RUNNERS[program] : undefined
     if (runner !== undefined) {
-      if (tokens.length < 2 || !runner.includes(tokens[1].toLowerCase())) return tokens
-      tokens = tokens.slice(2)
+      const rest = stripRunner(runner, tokens)
+      if (rest === null) return tokens
+      tokens = rest
+    } else if (PYTHON_PROGRAM.test(program)) {
+      // `python -m pytest` runs the module `pytest`; inline code and scripts stay as they are.
+      const module = pythonModule(tokens.slice(1))
+      if (module === null) return tokens
+      tokens = module
     } else if (SHELLS.has(program) || PREFIXES.has(program)) {
       tokens = tokens.slice(1)
       if (program === 'timeout' && tokens.length > 0 && DURATION.test(tokens[0])) tokens = tokens.slice(1)
@@ -183,6 +253,77 @@ export function segmentTokens(segment) {
     if (tokens.length > 0 && /\s/.test(tokens[0])) tokens = [...tokenize(tokens[0]), ...tokens.slice(1)]
   }
   return tokens
+}
+
+// The tokens after a runner's subcommand and its flags, or null when this is not a runner
+// invocation (`bun install`, `uv sync`, `uv --version`).
+function stripRunner(runner, tokens) {
+  let i = skipFlags(tokens, 1, runner.global)
+  const sub = runner.subs.find(candidate =>
+    candidate.path.every((word, offset) => tokens[i + offset]?.toLowerCase() === word)
+  )
+  if (sub === undefined) return null
+  i += sub.path.length
+  i = skipFlags(tokens, i, sub.flags)
+  const rest = tokens.slice(i)
+  return runner.envPrefix === true ? stripHatchSelectors(rest) : rest
+}
+
+// Skips flags from `start`; a flag listed in `valueFlags` consumes its value unless it
+// already carries one (`--flag=value`). `--` ends the flags.
+function skipFlags(tokens, start, valueFlags) {
+  let i = start
+  while (i < tokens.length && tokens[i].startsWith('-') && tokens[i] !== '-') {
+    const flag = tokens[i]
+    i += 1
+    if (flag === '--') break
+    if (!flag.includes('=') && valueFlags.has(flag)) i += 1
+  }
+  return i
+}
+
+// `hatch run +py=3.10 -version=9000 test:pytest`: matrix selectors, then `env:program`.
+function stripHatchSelectors(tokens) {
+  let i = 0
+  while (i < tokens.length && /^[+-]\w+=/.test(tokens[i])) i += 1
+  const rest = tokens.slice(i)
+  if (rest.length > 0) rest[0] = rest[0].replace(/^[\w.-]+:(?![\\/])/, '')
+  return rest
+}
+
+// The module tokens of `python [flags] -m <module> …` (the module name first), or null when
+// the invocation runs inline code or a script instead.
+function pythonModule(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]
+    if (arg === '-m') return args.length > i + 1 ? args.slice(i + 1) : null
+    if (/^-m.+/.test(arg)) return [arg.slice(2), ...args.slice(i + 1)]
+    if (isPythonInlineFlag(arg) || !arg.startsWith('-')) return null
+    if (PYTHON_VALUE_FLAGS.has(arg)) i += 1
+  }
+  return null
+}
+
+const PYTHON_INLINE = /^-[A-Za-z]*c$/
+function isPythonInlineFlag(arg) {
+  return PYTHON_INLINE.test(arg)
+}
+
+export function isPythonProgram(program) {
+  return PYTHON_PROGRAM.test(program)
+}
+
+// The code of `python [flags] -c <code>` (`''` when the code is missing), or null when the
+// call is not inline. Only options before the script count, so `python run.py -c conf` is a
+// script run. A cluster such as `-Ic` counts as `-c`.
+export function pythonInlineCode(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]
+    if (isPythonInlineFlag(arg)) return args[i + 1] ?? ''
+    if (!arg.startsWith('-') || arg === '-m' || /^-m.+/.test(arg)) return null
+    if (PYTHON_VALUE_FLAGS.has(arg)) i += 1
+  }
+  return null
 }
 
 export function programName(token) {

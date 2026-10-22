@@ -27,8 +27,10 @@ import {
   allow,
   block,
   isCanonicalPath,
+  isPythonProgram,
   programName,
   projectRoot,
+  pythonInlineCode,
   readPayload,
   resolveRole,
   segmentTokens,
@@ -63,7 +65,9 @@ const WRITE_PROGRAMS = new Set([
   'rni', 'ren', 'rename', 'rimraf'
 ])
 // Inline code can write anything; scripts run by path (`bun run src/x.ts`) are fine.
-const INLINE_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'python', 'python3', 'perl', 'ruby', 'php'])
+// Python (py, python, python3.N, pypy) is judged by isPythonProgram: its `-c` only counts
+// before the script, so `python run.py -c conf` is a script run.
+const INLINE_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'perl', 'ruby', 'php'])
 const INLINE_FLAG = /^(-e|-p|-c|-r|--eval|--print)$/
 // git subcommands that never change the working tree or the history.
 const GIT_READ = new Set([
@@ -140,6 +144,7 @@ function shellWriteChannel(command) {
     if (WRITE_PROGRAMS.has(program)) return program
     if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
     if (INLINE_RUNTIMES.has(program) && args.some(arg => INLINE_FLAG.test(arg))) return `${program} inline code`
+    if (isPythonProgram(program) && pythonInlineCode(args) !== null) return `${program} inline code`
     if (program === 'git') {
       const git = gitCommand(args)
       if (git.option !== undefined) return `git ${git.option}`
