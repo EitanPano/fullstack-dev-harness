@@ -15,7 +15,15 @@
 // Keep both.
 //
 // Access to env/secret FILES is handled by block-secret-file-access.mjs.
-import { allow, block, programName, readPayload, segmentTokens, shellSegments } from './lib/guardrail.mjs'
+import {
+  allow,
+  block,
+  programName,
+  readPayload,
+  runnerTails,
+  segmentTokens,
+  shellSegments
+} from './lib/guardrail.mjs'
 
 const SQL_CLIENTS = new Set([
   'psql', 'pgcli', 'mysql', 'mariadb', 'sqlite3', 'sqlcmd', 'clickhouse-client', 'cockroach', 'usql'
@@ -29,10 +37,19 @@ const command = typeof payload.tool_input.command === 'string' ? payload.tool_in
 const segments = shellSegments(command).map(segment => ({ segment, tokens: segmentTokens(segment) }))
 const programs = new Set(segments.filter(({ tokens }) => tokens.length > 0).map(({ tokens }) => programName(tokens[0])))
 
-for (const { tokens } of segments) {
+for (const { segment, tokens } of segments) {
   if (tokens.length === 0) continue
   const hit = findRule(programName(tokens[0]), tokens.slice(1))
   if (hit !== null) refuse(hit, programName(tokens[0]))
+  // A package runner's flag table is best effort: an unlisted value flag would make its value
+  // the "program" and hide the real one. So judge every token after a runner as a program
+  // start too (`uv run --newflag x rm -rf y`), which fails closed.
+  for (const tail of runnerTails(segment)) {
+    for (let i = 0; i < tail.length; i += 1) {
+      const inner = findRule(programName(tail[i]), tail.slice(i + 1))
+      if (inner !== null) refuse(inner, programName(tail[i]))
+    }
+  }
 }
 
 // SQL travels through pipes and -c flags: when an SQL client appears anywhere, judge the

@@ -6,6 +6,9 @@ import {
   isPythonProgram,
   programName,
   pythonInlineCode,
+  pythonReadsStdin,
+  runnerTails,
+  scriptInlineCode,
   segmentTokens,
   shellSegments,
   tokenize
@@ -82,9 +85,71 @@ test('programName strips directories and Windows suffixes', () => {
 })
 
 test('shellSegments splits on operators outside quotes', () => {
-  assert.deepEqual(shellSegments('uv sync && uv run "a && b" | tail'), ['uv sync', 'uv run "a && b"', 'tail'])
+  assert.deepEqual(shellSegments('uv sync && uv run "a && b" | tail'), [
+    'uv sync',
+    'uv run "a && b"',
+    'tail'
+  ])
 })
 
 test('tokenize removes surrounding quotes', () => {
   assert.deepEqual(tokenize(`a "b c" 'd e' f=g`), ['a', 'b c', 'd e', 'f=g'])
+})
+
+test('tokenize joins quoted and unquoted parts of one word', () => {
+  assert.deepEqual(tokenize('--env-file=".env" x'), ['--env-file=.env', 'x'])
+  assert.deepEqual(tokenize("--env-file='.env' x"), ['--env-file=.env', 'x'])
+  assert.deepEqual(tokenize(`-c'import os; print(1)' y`), ['-cimport os; print(1)', 'y'])
+  assert.deepEqual(tokenize('a "" b'), ['a', '', 'b'])
+  assert.deepEqual(tokenize('backend\\.env x'), ['backend\\.env', 'x'])
+})
+
+test('segmentTokens resolves short flag clusters of a runner', () => {
+  assert.deepEqual(segmentTokens('uv run -qp 3.14 rm -rf x'), ['rm', '-rf', 'x'])
+  assert.deepEqual(segmentTokens('uv run -qq rm x'), ['rm', 'x'])
+  assert.deepEqual(segmentTokens('uv run -p3.14 rm x'), ['rm', 'x'])
+  assert.deepEqual(segmentTokens('uv run -qw httpx rm x'), ['rm', 'x'])
+  // `-wq` is `-w q`: the value is attached, so `httpx` really is the program.
+  assert.deepEqual(segmentTokens('uv run -wq httpx rm x'), ['httpx', 'rm', 'x'])
+})
+
+test('runnerTails keeps what follows each runner, flags unresolved', () => {
+  assert.deepEqual(runnerTails('uv run --newflag v rm -rf x'), [
+    ['--newflag', 'v', 'rm', '-rf', 'x']
+  ])
+  assert.deepEqual(runnerTails('uv run bun run x'), [['bun', 'run', 'x'], ['x']])
+  assert.deepEqual(runnerTails('echo uv run rm'), [])
+})
+
+test('pythonInlineCode reads attached, clustered and module-borne code', () => {
+  assert.equal(pythonInlineCode(['-cprint(1)']), 'print(1)')
+  assert.equal(pythonInlineCode(['-Icprint(1)']), 'print(1)')
+  assert.equal(pythonInlineCode(['-m', 'timeit', 'print(1)', '-n', '1']), 'print(1) -n 1')
+  assert.equal(pythonInlineCode(['-m', 'pytest']), null)
+  assert.equal(pythonInlineCode(['-']), null)
+})
+
+test('pythonReadsStdin: a dash, a heredoc, a pipe, or nothing to run', () => {
+  assert.equal(pythonReadsStdin(['-']), true)
+  assert.equal(pythonReadsStdin(['-', '<<EOF']), true)
+  assert.equal(pythonReadsStdin(['<<EOF']), true)
+  assert.equal(pythonReadsStdin([]), true)
+  assert.equal(pythonReadsStdin(['-X', 'dev']), true)
+  assert.equal(pythonReadsStdin(['script.py']), false)
+  assert.equal(pythonReadsStdin(['script.py', '<', 'in.txt']), false)
+  assert.equal(pythonReadsStdin(['-m', 'pytest']), false)
+  assert.equal(pythonReadsStdin(['-c', 'x']), false)
+  assert.equal(pythonReadsStdin(['--version']), false)
+  assert.equal(pythonReadsStdin(['-V']), false)
+})
+
+test('scriptInlineCode reads separate and attached spellings', () => {
+  assert.equal(scriptInlineCode(['-e', 'x']), 'x')
+  assert.equal(scriptInlineCode(['-ex']), 'x')
+  assert.equal(scriptInlineCode(['--eval=x']), 'x')
+  assert.equal(scriptInlineCode(['-pe', 'x']), 'x')
+  assert.equal(scriptInlineCode(['script.js', '--flag']), null)
+  assert.equal(scriptInlineCode(['--experimental-vm-modules']), null)
+  assert.equal(scriptInlineCode(['-rfoo']), null)
+  assert.equal(scriptInlineCode(['-rfoo'], 'erp'), 'foo')
 })

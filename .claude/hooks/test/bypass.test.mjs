@@ -1,0 +1,156 @@
+// Bypasses the first review found: quoted flag values, attached inline code, short flag
+// clusters, unknown runner flags, and Python code that reaches the interpreter without -c.
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+
+import { shellVerdict } from './harness.mjs'
+
+const label = options => (options?.role ? ` [${options.role}]` : '')
+const show = command => JSON.stringify(command)
+
+const blocks = (command, options) =>
+  test(`blocks: ${show(command)}${label(options)}`, () => {
+    assert.equal(shellVerdict(command, options).blocked, true, 'expected a block')
+  })
+
+const passes = (command, options) =>
+  test(`passes: ${show(command)}${label(options)}`, () => {
+    const verdict = shellVerdict(command, options)
+    assert.equal(verdict.blocked, false, `unexpected block by ${verdict.hook}: ${verdict.stderr}`)
+  })
+
+const HEREDOC_DUMP = "python - <<'EOF'\nimport os\nprint(os.environ)\nEOF"
+const HEREDOC_SECRET = "python - <<'EOF'\nprint(open('.env').read())\nEOF"
+const HEREDOC_OK = "python - <<'EOF'\nprint(1)\nEOF"
+
+// Critical 1: a quoted --flag="value" is the same value.
+for (const command of [
+  'bun run --env-file=".env" dev',
+  "bun run --env-file='.env' dev",
+  'uv run --env-file=".env" poe dev',
+  "uv run --env-file='.env' poe dev",
+  'uv run --env-file ".env" poe dev',
+  'bun run --env-file=".env.local" dev',
+  'FOO=".env" echo x',
+  "FOO='.env' echo x"
+]) {
+  blocks(command)
+}
+passes('uv run --env-file=".env.example" poe dev')
+passes("bun run --env-file='.env.example' dev")
+
+// Critical 2: the code attached to the flag is inline code.
+for (const command of [
+  "python -c'import os;print(os.environ)'",
+  'python -c"import os;print(os.environ)"',
+  "python3.14 -Ic'import os;print(os.environ)'",
+  "uv run python -c'import os;print(os.environ)'",
+  "python -c'print(open(\".env\").read())'",
+  "node -e'console.log(process.env)'",
+  'node -e"console.log(process.env)"',
+  'node --eval="console.log(process.env)"',
+  "node -p'process.env'",
+  "node -e'require(\"fs\").readFileSync(\".env\")'"
+]) {
+  blocks(command)
+}
+for (const role of ['backend', 'qa']) {
+  for (const command of [
+    "python -c'open(\"f\",\"w\")'",
+    'python -c"print(1)"',
+    "py -c'print(1)'",
+    "uv run python -c'print(1)'",
+    "node -e'1'",
+    'node -e"1"',
+    'node --eval="1"',
+    "perl -e'1'",
+    "ruby -e'1'",
+    "php -r'1;'"
+  ]) {
+    blocks(command, { role })
+  }
+}
+passes("python -c'import os;print(os.environ[\"HOME\"])'")
+passes("node -e'console.log(process.env.HOME)'")
+
+// Important 1: short flag clusters and unknown runner flags.
+for (const command of [
+  'uv run -qp 3.14 rm -rf x',
+  'uv run -q rm -rf x',
+  'uv run -qq rm -rf x',
+  'uv run -qqp 3.14 rm -rf x',
+  'uv run -wq httpx rm -rf x',
+  'uv tool run -qp 3.14 rimraf x',
+  'uvx -qp 3.14 rimraf x',
+  'uv run -p3.14 rm -rf x',
+  // An unlisted value flag must not hide the program.
+  'uv run --newflag value rm -rf x',
+  'poetry run --unknown v rimraf x',
+  'pdm run --unknown v git reset --hard',
+  'hatch run --unknown v rm -rf x',
+  'pipx run --spec foo rimraf x',
+  'bun run --newflag v git push --force',
+  'npm exec --prefix backend rimraf x'
+]) {
+  blocks(command)
+}
+for (const role of [undefined, 'backend']) {
+  for (const command of [
+    'uv run -q poe check',
+    'uv run -qq pytest',
+    'uv run -qp 3.14 pytest',
+    'uv run --newflag value pytest',
+    'uv run -qp 3.14 python -m pytest',
+    'poetry run --unknown v pytest',
+    'pipx run --spec black black .'
+  ]) {
+    passes(command, { role })
+  }
+}
+
+// Important 2 and 3: code that reaches the interpreter without -c.
+for (const command of [
+  'python -m timeit "import os; print(os.environ)"',
+  'uv run python -m timeit "import os; print(os.environ)"',
+  'python -m cProfile -c "import os; print(os.environ)"',
+  'echo "import os; print(os.environ)" | python',
+  'echo "import os; print(os.environ)" | uv run python',
+  'python script.py "import os; print(os.environ)"',
+  HEREDOC_DUMP,
+  `uv run ${HEREDOC_DUMP}`,
+  HEREDOC_SECRET,
+  'python - <<EOF\nimport os\nprint(dict(os.environ))\nEOF',
+  'python <<EOF\nimport os\nprint(os.environ)\nEOF',
+  'python <<< "import os; print(os.environ)"'
+]) {
+  blocks(command)
+}
+blocks('python -m timeit "print(1)"', { role: 'backend' })
+for (const role of ['backend', 'qa']) {
+  for (const command of [
+    'python -',
+    'python - <<EOF\nprint(1)\nEOF',
+    HEREDOC_OK,
+    'echo "print(1)" | python',
+    'uv run python < x.py',
+    'python -m timeit "print(1)"',
+    'python -m cProfile -c "print(1)"',
+    'python -m code',
+    'python -m runpy os',
+    'python -m pdb x.py',
+    'python'
+  ]) {
+    blocks(command, { role })
+  }
+}
+passes(HEREDOC_OK)
+passes('echo "print(1)" | python')
+passes('python --version')
+passes('python3.14 -V')
+passes('python --version', { role: 'backend' })
+passes('python script.py', { role: 'backend' })
+passes('python script.py < input.txt', { role: 'backend' })
+passes('echo hi | python script.py', { role: 'backend' })
+passes('python -m pytest -k environ')
+passes('python -m pytest -k environ', { role: 'backend' })
+passes('python manage.py runserver')

@@ -31,8 +31,10 @@ import {
   programName,
   projectRoot,
   pythonInlineCode,
+  pythonReadsStdin,
   readPayload,
   resolveRole,
+  scriptInlineCode,
   segmentTokens,
   sessionCwd,
   shellSegments,
@@ -143,8 +145,15 @@ function shellWriteChannel(command) {
     const args = tokens.slice(1)
     if (WRITE_PROGRAMS.has(program)) return program
     if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
-    if (INLINE_RUNTIMES.has(program) && args.some(arg => INLINE_FLAG.test(arg))) return `${program} inline code`
-    if (isPythonProgram(program) && pythonInlineCode(args) !== null) return `${program} inline code`
+    if (INLINE_RUNTIMES.has(program)) {
+      // Attached spellings (`node -e'code'`, `--eval=code`) are inline code as well.
+      const flagged = args.some(arg => INLINE_FLAG.test(arg))
+      if (flagged || scriptInlineCode(args, 'erp') !== null) return `${program} inline code`
+    }
+    // Python reading its program from stdin (a heredoc, a pipe, `-`) runs inline code too.
+    if (isPythonProgram(program) && (pythonInlineCode(args) !== null || pythonReadsStdin(args))) {
+      return `${program} inline code`
+    }
     if (program === 'git') {
       const git = gitCommand(args)
       if (git.option !== undefined) return `git ${git.option}`
