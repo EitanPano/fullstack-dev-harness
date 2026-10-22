@@ -12,7 +12,10 @@ What you get after the bootstrap:
   own `AGENTS.md` (layer map, how to add a module or a feature, errors, tests), with its
   commands and ports recorded in `.fullstack/catalog.yaml`.
 - `docker-compose.yml` with the application images behind the `app` profile and, when a
-  database provider was chosen, its service.
+  database provider was chosen, its service. `--capability database=postgres` (the
+  bootstrap passes it when you pick Postgres) wires the server to a `database` service with
+  `db/init.sql`, a `DATABASE_URL`, migrations, and the `migrate` and `testDb` commands; the
+  catalog README is the reference for the matrix.
 - Five role agents (orchestrator, backend, frontend, reviewer, qa), nine skills, and
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
   access to secret files.

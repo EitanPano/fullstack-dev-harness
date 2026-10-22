@@ -44,8 +44,9 @@ report says why.
 
 Each package's `AGENTS.md › Tests` names its runner, test directories, stubs and helpers
 (`backend/AGENTS.md`, `frontend/AGENTS.md`). The commands `test` and `testE2e` come from
-`.fullstack/catalog.yaml`; `testDb` is added by the data-layer task and named in the
-package's `AGENTS.md › Adding the data layer`.
+`.fullstack/catalog.yaml`, and so is `testDb` when a provider was chosen at the bootstrap;
+otherwise the data-layer task adds `testDb` and names it in the package's
+`AGENTS.md › Adding the data layer`.
 
 - Server: HTTP tests import the app builder and never start infrastructure or the
   entry file. A module's tests live in one file; middleware, shared capabilities and

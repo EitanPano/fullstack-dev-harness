@@ -21,7 +21,9 @@ their words; suggest a default only when they ask. Do the same for `.doc/archite
 The Data store question is the `database` skill's: engine, client library, or decide
 later. Record the answer as given (the engine the user names, or "decide later", plus the
 client library); whether the server template lists a provider is a separate fact, settled
-in section 2.
+in section 2. When the engine the user names is one the template lists, section 2 passes it
+and the generator wires it; the Data store section is then filled from what was generated
+(see section 5).
 
 The Auth question decides a flag: a product with no accounts (Auth: none) is scaffolded
 with `--flag auth=false`; any other answer keeps the server template's authentication (its
@@ -51,9 +53,10 @@ summary) and ask which one. For the chosen stack, Read `<catalog>/stacks/<id>/st
 `<catalog>/<template path>/template.yaml`. Ask every flag the templates declare (show its
 `summary` and `default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`. Ask the database
-provider here when the template lists one (`capabilities.database.providers`): pass
-`--capability database=<id>`, and the data-layer backlog line is then NOT written, because
-the generator wired the engine.
+provider here when the template lists one (`capabilities.database.providers`). When the
+user named an engine in section 1 that the template lists, pass `--capability
+database=<id>` for it without asking again; the data-layer backlog line is then NOT
+written, because the generator wired the engine.
 
 These three files are the only things this skill reads under the catalog path. Never Glob,
 Grep, list or explore the catalog cache and never dispatch an Explore agent into it; it is
@@ -68,7 +71,10 @@ node scripts/bootstrap.mjs --stack <id> --name <project-name> [--flag k=v]… [-
 It creates the packages the stack lists, under the directories the stack names; a merged
 `docker-compose.yml` and `.gitignore`; `.editorconfig` when absent; and
 `.fullstack/catalog.yaml`, the provenance file (per package: template, version, flags,
-commands and ports). It installs each package and runs its `contract` and `format`
+commands and ports; with a provider, also `providers` and the package's `capabilities`).
+When a provider was chosen it also adds the provider's service to `docker-compose.yml`,
+`db/` with the database init script, and the connection variable in the server's
+`.env.example`. It installs each package and runs its `contract` and `format`
 commands. It refuses to run twice. A failure before the move leaves nothing to clean: the
 generator stages the output and moves it into place all or nothing (a failed move is rolled back).
 
@@ -76,7 +82,11 @@ generator stages the output and moves it into place all or nothing (a failed mov
 
 Open `.fullstack/catalog.yaml`. For each package, run its `check` command from the package
 directory. For a package that declares `testE2e`, first run the browser install its
-`AGENTS.md › Tests` names, then `testE2e`. Every command must exit 0. If one fails, fix the
+`AGENTS.md › Tests` names, then `testE2e`. With a provider (`providers` in
+`.fullstack/catalog.yaml`) the order is: each package's `check` (no Docker needed), then
+`docker compose up -d <service>` (the provider's service, named in `docker-compose.yml`),
+then the server package's `migrate`, then its `testDb`, then `testE2e`. Every command must
+exit 0. If one fails, fix the
 cause (not the gate), re-run it, and tell the user what was wrong. A failing gate on a fresh
 scaffold is a catalog bug: say so explicitly, name the template and version from the
 provenance file, and record it in the final message.
@@ -85,9 +95,11 @@ Then start each package's `dev` command and open the frontend's `http.health` pa
 `http.port`: the page must reach the server (for `frontend/next`, the API version pill
 proves the typed client reaches it).
 
-A fresh server package has: health, the commented reference module, the in-memory store
-(nothing survives a restart until the data-layer task), and authentication when the `auth`
-flag is on. Production secrets are listed in the package's `.env.example`; development runs
+A fresh server package has: health, the commented reference module, and authentication when
+the `auth` flag is on. Its store is either the in-memory store (nothing survives a restart
+until the data-layer task) or, when a provider was chosen, the wired engine with its
+migrations and test database, described in the package's `AGENTS.md › Adding the data
+layer`. Production secrets are listed in the package's `.env.example`; development runs
 with defaults and warns.
 
 ## 5. First backlog lines
@@ -98,7 +110,11 @@ for a named engine, or `- [ ] add the data layer | stack:backend` when the answe
 "decide later" (the `database` skill says what that task delivers). The next line is the
 first in-scope capability from the product definition. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
 `Stack` row of the components table in `.doc/architecture.md` from `.fullstack/catalog.yaml`:
-the stack id and, per package, its directory, template and version.
+the stack id and, per package, its directory, template and version. When a provider was
+passed, fill the Data store section from what was generated: engine and version from the
+provider, the client library and the local service (the `database` service and its
+connection variable) from the package's `AGENTS.md › Adding the data layer` and
+`.fullstack/catalog.yaml`.
 
 ## 6. Branch, commit gate and hand over
 

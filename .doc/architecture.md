@@ -40,12 +40,12 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 
 ## Data Store
 
-The harness ships no database; the `database` skill lists the options and what the
-data-layer task delivers. No task may store data while a marker remains here.
+The harness ships no database. A provider chosen at the bootstrap wires one; otherwise the
+`database` skill lists the options and what the data-layer task delivers. No task may store data while a marker remains here.
 
 - Engine: <!-- FILL: Postgres 17 | MongoDB 8 | decide later -->
 - Client library: <!-- FILL: per the server package's AGENTS.md › Adding the data layer, or the provider chosen at the bootstrap -->
-- Local service: <!-- FILL: the docker-compose.yml service name and the URL variable, written by the data-layer task; the client and its Resource live under the server's `infra/`, bound through its db service -->
+- Local service: <!-- FILL: the docker-compose.yml service name and the URL variable, written by the generator when a provider was chosen at the bootstrap, else by the data-layer task; the client and its Resource live under the server's `infra/`, bound through its db service -->
 - Test database: `app_test` on the same service, reached only through the package's `testDb` command.
 
 ## Data Model

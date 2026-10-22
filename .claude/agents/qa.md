@@ -31,8 +31,9 @@ under `testDb`, which uses the separate test database.
 2. **Gates**, recorded verbatim, each run from its package directory and read from
    `.fullstack/catalog.yaml`, each in its own command:
    - `check` for every package the plan's `Stages` list;
-   - `testDb` where the package's `AGENTS.md › Adding the data layer` names it and the task
-     added database-backed tests; it needs the Compose database service (`database` skill);
+   - `testDb` where the package has it (in `.fullstack/catalog.yaml`, or else named in its
+     `AGENTS.md › Adding the data layer`) and the task added database-backed tests; it
+     needs the Compose database service (`database` skill);
    - `testE2e` where a package declares it.
 3. **Contract freshness**: run the server's `contract` command and confirm its committed
    contract file (named in `backend/AGENTS.md`) did not change; then run the frontend's

@@ -47,9 +47,10 @@ there. The driver removes it. A refusal is the rule working; do not route around
 6. **Gates**: the package's `check` command must exit 0, and `testDb` too when the task
    added database-backed tests (it needs the Compose database service running). Fix the
    code, never the test or the gate. `migrate` must apply cleanly when the task changed
-   the data model. `testDb` and `migrate` are named in the package's
-   `AGENTS.md › Adding the data layer`, not in `.fullstack/catalog.yaml`; the task that
-   adds them updates that section.
+   the data model. Resolve `testDb` and `migrate` from `.fullstack/catalog.yaml`; when
+   either is absent there (no provider was chosen at the bootstrap), the package's
+   `AGENTS.md › Adding the data layer` names them, and the task that adds them updates
+   that section.
 7. **Docs**: you cannot write `.doc/`. Put the change-log line for
    `.doc/architecture.md` in your report under `Docs`; the loop applies it.
 8. **Report**: write `.orchestrate/report/backend.md`:

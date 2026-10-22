@@ -72,8 +72,8 @@ each on Sonnet:
 
 **backend** (when listed). Dispatch `backend` with the plan path and the ticket id. The
 agent implements the Contract section, regenerates the contract, runs the package's `check`
-(and `testDb`, named in the package's `AGENTS.md › Adding the data layer`, when it added
-database-backed tests), and writes
+(and `testDb`, from `.fullstack/catalog.yaml` or else the package's
+`AGENTS.md › Adding the data layer`, when it added database-backed tests), and writes
 `.orchestrate/report/backend.md`. On `Verdict: fail`, read the report's Blockers and
 either fix the plan with the user or re-dispatch once with the blocker quoted.
 
