@@ -6,7 +6,8 @@ description: Version and publish a release. Use when choosing a version number, 
 # Cutting a Release
 
 > Creating a tag, merging, or publishing requires **explicit user approval** every
-> time — see the git-workflow rule. This skill describes how to do it once approved.
+> time — see `.claude/rules/git-workflow.md`. This skill describes how to do it
+> once approved.
 
 ## Semantic Versioning
 `MAJOR.MINOR.PATCH`

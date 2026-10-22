@@ -1,23 +1,60 @@
 # Product Definition
 
+Fill every `<!-- FILL: … -->` marker before the first plan. The `bootstrap-project` skill
+walks this file with you; the orchestrator refuses to plan against a section that still
+holds a marker. Delete a marker only by replacing it with a decision.
+
 ## Purpose
 
-## Product Vision
+<!-- FILL: one paragraph. What this product does and for whom, in plain words. -->
 
 ## Problem Statement
 
+<!-- FILL: the situation that exists today and why it is worth changing. -->
+
 ## Value Proposition
 
-## Product Scope
-- In scope:
-- Out of scope:
+<!-- FILL: the one thing a user gets here that they do not get elsewhere. -->
 
 ## Target Users
-- Primary users: 
-- Secondary users:
 
+- Primary users: <!-- FILL: who they are and what they are trying to do -->
+- Secondary users: <!-- FILL: or "none" -->
+
+## Product Scope
+
+- In scope (v1):
+  <!-- FILL: three to seven capabilities, each one line, each testable -->
+- Out of scope (v1):
+  <!-- FILL: what is deliberately not built now -->
+
+## Auth and Tenancy
+
+- Authentication: <!-- FILL: none | email+password | magic link | OAuth (which providers) -->
+- Authorization: <!-- FILL: roles and what each may do, or "every signed-in user is equal" -->
+- Tenancy: <!-- FILL: single tenant | multi-tenant (which entity owns data, e.g. `org`) -->
+
+## Non-functional Requirements
+
+- Accessibility: WCAG 2.2 AA <!-- FILL: confirm or change -->
+- Browsers: last two versions of Chrome, Firefox, Safari, Edge <!-- FILL: confirm or change -->
+- Performance: <!-- FILL: e.g. first page under 2 s on a 4G connection -->
+- Locale: <!-- FILL: single language (which) | multiple (which) -->
+- Data retention and privacy: <!-- FILL: anything the product must or must not keep -->
 
 ## Acceptance Criteria
-Each criterion must be provable by a test. 
-- AC01 — Quality gates: `npx tsc --noEmit` is clean and the unit and e2e suites pass.
 
+Each criterion must be provable by a test or a command. Keep the numbering stable; QA
+reports against it.
+
+- AC01 — Quality gates: `bun run check` is green in `frontend/` and `backend/`, and the
+  e2e suite passes.
+- AC02 — <!-- FILL: the first user-visible capability, phrased as a provable statement -->
+- AC03 — <!-- FILL -->
+
+## Ready to plan
+
+- [ ] No `FILL` marker remains in Purpose, Target Users, Product Scope, Auth and Tenancy or
+      Acceptance Criteria.
+- [ ] `.doc/architecture.md` has its data model and API sections filled.
+- [ ] `.doc/glossary.md` names every entity used above.

@@ -1,59 +1,128 @@
-# AI4Dev Agent Files
+# Full-stack dev harness
 
-A structured workspace for running an AI-driven product development loop.
+A template repository for building a full-stack product with AI coding agents. Clone it,
+open it in Claude Code, and the harness supplies what the agents would otherwise guess:
+the stack, the architecture, the definition of done, the procedure from backlog line to
+reviewed code, and the guardrails that keep each agent in its lane.
 
-This repository holds the source-of-truth instructions, product docs, planning artifacts, and orchestration outputs used to build a frontend-first social app MVP through specialized agents.
+What you get after the bootstrap:
 
-## What this repository is
+- `frontend/`: Next.js 16 (App Router), React 19, TypeScript strict, Tailwind v4, Vitest,
+  Playwright with axe, a typed API client generated from the backend's contract.
+- `backend/`: Express 5 on Bun, zod validation, OpenAPI generated from the same schemas,
+  `bun test`. The backend is layered: `config/` (env, routes), `api/<name>/` (schema,
+  route, controller, service, repository), `models/`, `middleware/`, `services/` (security,
+  communicate, utils, the db and cache seams) and `infra/` (dependencies, memory store,
+  scheduler and jobs, pub/sub and subscribers). Authentication ships (register, login,
+  logout, refresh with rotation, OTP), with rate limiting and a commented reference
+  module; a product without accounts is scaffolded with `--auth none` and gets neither
+  authentication nor its secrets. No database is pre-chosen: the bootstrap asks for the engine (Postgres,
+  MongoDB, or later) and the first task adds it following the `database` skill.
+- `docker-compose.yml` with both application images behind the `app` profile; the
+  database service joins it with the data-layer task.
+- Five role agents (orchestrator, backend, frontend, reviewer, qa), nine skills, and
+  fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
+  access to secret files.
 
-- A coordination and governance repo for multi-agent delivery
-- A place to keep product intent, architecture notes, backlog, and implementation plans aligned
-- A contract handoff point for future backend implementation
+## Prerequisites
 
-## Current project focus
+- Claude Code 2.1.295 or newer.
+- Bun 1.4 or newer and Node 24 or newer, both on the `PATH` that Claude Code sees. On
+  Windows, Git Bash backs the Bash tool.
+- Docker with Compose v2 for the compose stack and the database you choose. On Linux,
+  Playwright needs `bun x playwright install --with-deps chromium` once.
 
-- Product: TBD
-- Scope: Frontend-first, mock-data-driven user journeys
-- Delivery model: Orchestrator -> Frontend/Backend (when needed) -> QA
+## Clone checklist
 
-See the product definition in .doc/product-definition.md.
+1. Create a repository from this template (or `git clone` and remove the remote).
+2. Open it in Claude Code and accept the workspace trust dialog. Until you do, Claude Code
+   ignores the `permissions.allow` list in `.claude/settings.json` (the hooks still run),
+   so a headless `claude -p` run in a fresh clone falls back to its permission mode for
+   every command. Check that the hooks run: ask Claude to run `cat ~/.netrc` and expect a
+   refusal that names the guardrail (a refusal of `.env` alone could come from the
+   permission rules even with dead hooks).
+3. Run `/bootstrap-project`. It walks the product forms in `.doc/`, asks which database
+   engine the product uses and whether it has accounts, scaffolds `frontend/` and
+   `backend/`, runs every gate, writes the first backlog lines, and asks to commit the
+   scaffold. Budget 15 minutes, most of it installs.
+4. Run `/dev-loop` for the first task; it starts from a clean tree, so commit the scaffold
+   first. Approve the plan by editing its `Status:` line; review the reports in
+   `.orchestrate/` before you commit.
+
+## How work moves
+
+1. A task is one line in `.plan/000-backlog.md`.
+2. The orchestrator writes `.plan/NNN-YYYY-MM-DD-<slug>.md` (draft). You approve it.
+3. The backend agent implements the plan's Contract and regenerates `openapi.json`; the
+   frontend agent regenerates its types and implements the feature. Both test first.
+4. Five reviewers (security, architecture, error-handling, simplicity, operations) read
+   the diff in parallel; P0 and P1 findings go back to the implementer, at most twice.
+5. QA runs every gate, adds adversarial tests, and checks each acceptance criterion
+   with evidence.
+6. You decide whether to commit. Role agents never commit, merge, push or rewrite history;
+   the driver commits only on your yes.
+
+The whole procedure is in `.claude/skills/dev-loop/SKILL.md`; the rules every agent
+follows are in `AGENTS.md` and `.claude/rules/`.
 
 ## Repository map
 
 | Path | Purpose |
-|---|---|
-| AGENTS.md | Canonical operating rules and guardrails for all agents |
-| CLAUDE.md | Loads AGENTS.md into compatible runtimes |
-| .doc/ | Product and architecture source docs |
-| .plan/ | Prioritized backlog and approved implementation plans |
-| .claude/rules/ | Always-on coding and workflow constraints |
-| .claude/skills/ | On-demand procedural playbooks |
-| .claude/agents/ | Role definitions for orchestrator, frontend, backend, qa, and security-reviewer |
-| .claude/hooks/ | Runtime guardrails that enforce boundaries and safety |
-| .orchestrate/ | Generated outputs from the latest dev-loop run |
-| .github/copilot-instructions.md | Copilot entry point that points to AGENTS.md |
+| --- | --- |
+| `AGENTS.md` | Rules, stack, architecture, definition of done; the single source of truth |
+| `CLAUDE.md` | Loads `AGENTS.md` into Claude Code |
+| `templates/backend/AGENTS.md` | The backend layer map; copied to `backend/AGENTS.md`, loaded when an agent works there |
+| `.doc/` | Product definition, architecture, glossary: fill-in forms |
+| `.plan/` | Backlog and one plan per task |
+| `.claude/agents/` | Role definitions |
+| `.claude/rules/` | Conventions: code style, naming, UI and styling, git workflow |
+| `.claude/skills/` | Procedures: bootstrap, dev loop, plans, tests, API, errors, database, review, release |
+| `.claude/hooks/` | Guardrails, wired by `.claude/settings.json` |
+| `templates/` and `scripts/bootstrap.mjs` | What the bootstrap copies and runs |
+| `.orchestrate/` | Generated by the loop (reports, reviews, tickets); git-ignored |
+| `.cursor/`, `.github/copilot-instructions.md` | Pointers to `AGENTS.md` for other tools |
 
-## How work moves through this repo
+## Adding a module
 
-1. Add or prioritize tasks in .plan/000-backlog.md.
-2. Create or update an implementation plan in .plan/NNN-YYYY-MM-DD-topic.md.
-3. Execute the dev loop in your local environment.
-4. Review generated artifacts in .orchestrate/:
-   - PLAN.md mirror
-   - api-contract.yaml
-   - agent reports
-   - qa-report.md
-   - trace.json
-5. Validate acceptance criteria against .doc/product-definition.md.
+1. Copy `backend/src/api/module/` and `backend/src/models/module/`.
+2. Rename `module` to `<name>`, `Module` to `<Name>` and `MODULE` to `<NAME>` (directories,
+   files, identifiers, comments, constants). These steps live here and in
+   `backend/AGENTS.md`; the copied files no longer carry them.
+3. Add one line to `backend/src/config/routes.ts`.
+4. Write `backend/tests/<name>.test.ts`.
+5. Run `bun run openapi` then `bun run check` in `backend/`, and `bun run api:types` in
+   `frontend/`.
 
-## Source of truth and generated files
+To drop the reference module, delete both directories, its line in `config/routes.ts` and
+`tests/module.test.ts`.
 
-- Durable, hand-maintained sources:
-  - .doc/
-  - .plan/
-  - .claude/rules/
-  - .claude/skills/
-  - AGENTS.md
-- Generated, disposable artifacts:
-  - .orchestrate/* (except .orchestrate/README.md, which documents the folder)
+## Guardrails and recovery
 
+The hooks in `.claude/hooks/` fail closed: a hook that crashes, times out or cannot start
+blocks the tool call. If `node` is missing from Claude Code's `PATH`, every tool call
+(Read and Edit included) is blocked until that is fixed. To recover, put
+`{ "disableAllHooks": true }` in `.claude/settings.local.json` (git-ignored) or edit
+`.claude/settings.json` by hand, then restore the hooks once `node` resolves. On a
+Claude Code older than 2.1.295 the hooks run but fail open, so upgrade before relying on
+them.
+
+## Optional integrations
+
+- **Linear**: set `tracker: linear` in the backlog header and add the Linear MCP server
+  to a `.mcp.json`; the loop falls back to local ticket files when the tool is absent.
+- **Figma**: add a `figma:<url>` marker to a backlog line and the Figma MCP server; the
+  frontend agent reads the frame when the tool is present.
+
+## Updating the harness in an existing project
+
+Harness files (`AGENTS.md`, `.claude/`, `templates/`, `scripts/`) are plain files; pull
+them from a newer template and review the diff. `templates/` changes do not touch an
+already-scaffolded `frontend/` or `backend/`; copy `templates/backend/AGENTS.md` over
+`backend/AGENTS.md` by hand when the layer map changed.
+
+Editing `templates/backend/` or `templates/root/docker-compose.yml`: a line ending in an
+`@auth` comment exists only in `--auth full` scaffolds, one ending in `@noauth` only in
+`--auth none`; `@auth-start` … `@auth-end` (and the `@noauth` pair) do the same for a block.
+Files only authentication uses are listed in `AUTH_ONLY_PATHS` in `scripts/bootstrap.mjs`.
+A template file can therefore hold both variants of a line and does not type-check on its
+own; prove a change by scaffolding both variants with `--root` and running every gate.

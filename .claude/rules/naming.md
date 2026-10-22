@@ -1,13 +1,18 @@
 # Naming
 
-Applies to API routes, domain entities, services, files, and data fields.
+Applies to routes, modules, features, files, tables, collections, fields and environment
+variables.
 
-- Prefer **singular** entity names: `site.service`, `/api/site`, `/api/post`.
-- Use the canonical short term, never a synonym:
-  - `org` — not `organization`
-  - `geo` — not `geolocation` or `localization`
-  - `lat` / `lng` — for coordinates
-- Keep route and file names aligned with the domain name they serve.
-- Do not introduce a second word for a concept that already has one. Canonical
-  terms live in `.doc/glossary.md`; document a new shared term there before
-  using it broadly.
+- Singular entity names everywhere: `post` not `posts`, `/api/post`, `api/post/`,
+  `feature/post/`, table or collection `post`.
+- Use the canonical short term from `.doc/glossary.md`. Never introduce a second word for
+  a concept that already has one; add a new shared term to the glossary before using it.
+- Directories and files are kebab-case. React components are PascalCase exports.
+  SQL tables and columns are snake_case; MongoDB collections are singular and their
+  fields camelCase. Environment variables are SCREAMING_SNAKE_CASE.
+- Route, module, feature and file names match the domain term they serve.
+- `models/` (plural, top-level) holds an entity's TypeScript types; `api/<name>/model.ts`
+  (singular, in the module) is the engine's storage mapping.
+- The word "service" has two homes and one meaning each: `api/<name>/service.ts` is a
+  module's private rules; `services/` is the shared-capability folder (sessions, cache,
+  events, logging, security, communication, pure utils).
