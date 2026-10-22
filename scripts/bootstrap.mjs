@@ -1,403 +1,327 @@
 #!/usr/bin/env node
-// Scaffolds a new project from this harness. Deterministic: the same inputs produce the
-// same tree. Run once, from the repository root:
+// Scaffolds a new project by driving the generator of the template catalog (the public
+// `fullstack-templates` repository). The harness owns no templates: `catalog.lock` pins the
+// catalog's tag and commit, this script fetches that tag into a cache outside the working tree
+// (or uses a local checkout), runs the catalog's generator and checks the provenance file it
+// writes. Run once, from anywhere:
 //
-//   node scripts/bootstrap.mjs [--name <project-name>] [--auth full|none] [--skip-install]
-//     [--root <dir>]
+//   node scripts/bootstrap.mjs --fetch [--templates <path>]
+//   node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… [--capability k=v]…
+//     [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]
 //
-// Steps: check prerequisites → create-next-app (pinned) into frontend/ → overlay
-// templates/frontend → copy templates/backend → copy templates/root → replace
-// __PROJECT_NAME__ → apply the auth variant → install, generate the contract, format. `--root`
-// targets another directory (used to validate the harness itself); `--skip-install` stops after
-// the copy. `--auth full` (the default) keeps the template's working authentication; `--auth
-// none` scaffolds a backend without it (see applyAuthVariant).
+// Steps: prerequisites → read the lock → locate the catalog (cache clone checked against the
+// locked commit, or a local override) → check the catalog's schemaVersion → install the
+// catalog tools → (`--fetch` prints the index and stops) → refuse a second run → generate →
+// verify `.fullstack/catalog.yaml`. `--skip-install` maps to the generator's
+// `--skip-post-generate`. Environment: FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag
+// wins) and FULLSTACK_TEMPLATES_CACHE (cache root, default ~/.cache/fullstack-templates).
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-const CREATE_NEXT_APP = 'create-next-app@16.4.2'
-const CREATE_NEXT_APP_FLAGS = [
-  '--ts',
-  '--tailwind',
-  '--eslint',
-  '--app',
-  '--src-dir',
-  '--import-alias',
-  '@/*',
-  '--use-bun',
-  '--disable-git',
-  '--no-agent-feedback',
-  '--skip-install',
-  '--yes'
-]
-const BOILERPLATE = ['public/file.svg', 'public/globe.svg', 'public/next.svg', 'public/vercel.svg', 'public/window.svg']
-const TEXT_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.mjs', '.js', '.json', '.yml', '.yaml', '.md', '.toml', '.css', '.example'])
+const SUPPORTED_SCHEMA_VERSION = 1
 const MIN_BUN = [1, 4]
 const MIN_NODE = 24
 
-const AUTH_VARIANTS = ['full', 'none']
-
-// Whole files and directories (relative to backend/) that only authentication uses. They are
-// deleted for `--auth none`; a path that no longer exists fails the bootstrap, so the list
-// cannot drift from the templates.
-const AUTH_ONLY_PATHS = [
-  'src/api/auth',
-  'src/api/user',
-  'src/infra/jobs/session-cleanup.ts',
-  'src/infra/subscribers/send-welcome.ts',
-  'src/middleware/auth.ts',
-  'src/middleware/role.ts',
-  'src/models/auth',
-  'src/models/session',
-  'src/models/user',
-  'src/services/communicate/templates',
-  'src/services/security/cookies.ts',
-  'src/services/security/jwt.ts',
-  'src/services/security/otp.ts',
-  'src/services/session.ts',
-  'tests/auth.test.ts',
-  'tests/infra/send-welcome.test.ts',
-  'tests/infra/session-cleanup.test.ts',
-  'tests/middleware/auth.test.ts',
-  'tests/middleware/role.test.ts',
-  'tests/services/cookies.test.ts',
-  'tests/services/jwt.test.ts',
-  'tests/services/otp.test.ts',
-  'tests/services/session.test.ts',
-  'tests/user.test.ts',
-]
-
-// Packages (in backend/package.json) that only the files above use.
-const AUTH_ONLY_DEPENDENCIES = {
-  dependencies: ['cookie-parser', 'jose'],
-  devDependencies: ['@types/cookie-parser'],
-}
-
-// A marker as written in a comment; plain text such as an `@auth/…` package scope is not one.
-const MARKER = /(?:\/\/|#|<!--)[ \t]*@(?:no)?auth(?:-start|-end)?\b/
-
-// Comment syntax of the files the marker pass rewrites: the opening token and, for Markdown,
-// the closing one. Any other file is only checked for leftover markers.
-const MARKER_COMMENTS = {
-  '.ts': ['//', ''],
-  '.tsx': ['//', ''],
-  '.mts': ['//', ''],
-  '.mjs': ['//', ''],
-  '.js': ['//', ''],
-  '.yml': ['#', ''],
-  '.yaml': ['#', ''],
-  '.example': ['#', ''],
-  '.md': ['<!--', ' -->'],
-}
+const USAGE =
+  'usage: node scripts/bootstrap.mjs --fetch [--templates <path>]\n' +
+  '       node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… ' +
+  '[--capability k=v]…\n' +
+  '         [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]'
 
 const args = parseArgs(process.argv.slice(2))
-const auth = args.auth ?? 'full'
 const harnessRoot = fileURLToPath(new URL('..', import.meta.url))
 const root = path.resolve(args.root ?? harnessRoot)
-const templates = path.join(harnessRoot, 'templates')
-const projectName = toProjectName(args.name ?? path.basename(root))
-const frontend = path.join(root, 'frontend')
-const backend = path.join(root, 'backend')
+const override = args.templates ?? process.env.FULLSTACK_TEMPLATES_DIR
+const cacheRoot =
+  process.env.FULLSTACK_TEMPLATES_CACHE ?? path.join(os.homedir(), '.cache', 'fullstack-templates')
 
 main()
 
 function main() {
   step('Checking prerequisites')
   checkPrerequisites()
-  for (const dir of [frontend, backend]) {
-    if (existsSync(dir)) fail(`${dir} already exists; the bootstrap runs once on an empty project`)
-  }
-  step('Checking the auth markers in templates/')
-  checkTemplateMarkers()
 
-  step(`Scaffolding frontend/ with ${CREATE_NEXT_APP}`)
-  run('bun', ['x', CREATE_NEXT_APP, 'frontend', ...CREATE_NEXT_APP_FLAGS], root)
-  for (const file of BOILERPLATE) rmSync(path.join(frontend, file), { force: true })
+  step('Reading catalog.lock')
+  const lock = readLock()
 
-  step('Overlaying templates/frontend')
-  cpSync(path.join(templates, 'frontend'), frontend, {
-    recursive: true,
-    filter: (source) => path.basename(source) !== 'package.partial.json'
-  })
-  mergePackageJson(
-    path.join(frontend, 'package.json'),
-    readJson(path.join(templates, 'frontend', 'package.partial.json')),
-    `${projectName}-frontend`
-  )
+  step('Locating the template catalog')
+  const fromCache = override === undefined || override === ''
+  const catalog = fromCache ? locateCachedCatalog(lock) : locateLocalCatalog()
 
-  step('Copying templates/backend')
-  cpSync(path.join(templates, 'backend'), backend, { recursive: true })
+  step('Checking the catalog schema version')
+  checkSchemaVersion(catalog)
 
-  step('Copying templates/root (existing files are kept)')
-  for (const entry of readdirSync(path.join(templates, 'root'))) {
-    const target = path.join(root, entry)
-    if (existsSync(target)) continue
-    cpSync(path.join(templates, 'root', entry), target, { recursive: true })
+  const tools = path.join(catalog, 'tools')
+  if (!fromCache && !isDirectory(tools)) fail(`${catalog} is not a catalog checkout (no tools/)`)
+
+  step('Installing the catalog tools')
+  const install = runSpawn('bun', ['install', '--frozen-lockfile'], tools)
+  if (install.status !== 0) {
+    fail(`bun install failed in the catalog tools${install.reason}; it needs the network`)
   }
 
-  step(`Naming the project "${projectName}"`)
-  for (const dir of [frontend, backend]) replaceToken(dir)
-  replaceToken(path.join(root, 'docker-compose.yml'))
-
-  step(`Applying the auth variant "${auth}"`)
-  applyAuthVariant()
-
-  if (args.skipInstall) {
-    step('Skipping install (--skip-install)')
-    printNextSteps(true)
+  if (args.fetch) {
+    console.log(`catalog: ${catalog}`)
+    console.log('--- index.yaml ---')
+    process.stdout.write(readFileSync(path.join(catalog, 'index.yaml'), 'utf8'))
     return
   }
 
-  step('Installing backend dependencies')
-  run('bun', ['install'], backend)
-  step('Installing frontend dependencies')
-  run('bun', ['install'], frontend)
-  step('Generating the API contract and its types')
-  run('bun', ['run', 'openapi'], backend)
-  run('bun', ['run', 'api:types'], frontend)
-  step('Formatting')
-  run('bun', ['run', 'format'], backend)
-  run('bun', ['run', 'format'], frontend)
+  const provenance = path.join(root, '.fullstack', 'catalog.yaml')
+  step('Checking this is a fresh project')
+  if (existsSync(provenance)) {
+    fail(
+      'this project was already generated (.fullstack/catalog.yaml exists); ' +
+        'the bootstrap runs once',
+    )
+  }
 
-  printNextSteps(false)
+  step(`Generating the "${args.stack}" stack as "${args.name}"`)
+  const generated = runSpawn(
+    'bun',
+    generatorArguments(fromCache ? lock.version : undefined),
+    catalog,
+  )
+  if (generated.status !== 0) {
+    fail(`the generator failed${generated.reason}; nothing was moved into place`)
+  }
+
+  step('Verifying .fullstack/catalog.yaml')
+  if (!existsSync(provenance) || statSync(provenance).size === 0) {
+    fail('the generator did not write a non-empty .fullstack/catalog.yaml')
+  }
+
+  printNextSteps()
 }
 
 function checkPrerequisites() {
   const node = Number(process.versions.node.split('.')[0])
-  if (node < MIN_NODE) fail(`Node ${MIN_NODE} or newer is required (found ${process.versions.node})`)
+  if (node < MIN_NODE) {
+    fail(`Node ${MIN_NODE} or newer is required (found ${process.versions.node})`)
+  }
 
   const bunCommand = resolveCommand('bun')
   const bun = spawnSync(bunCommand.file, [...bunCommand.prefix, '--version'], { encoding: 'utf8' })
-  if (bun.status !== 0) fail('bun is not on PATH; install it from https://bun.sh')
+  if (bun.status !== 0) {
+    const cause = bun.error === undefined ? '' : ` (${bun.error.message})`
+    fail(`bun is not on PATH${cause}; install it from https://bun.sh`)
+  }
   const [major = 0, minor = 0] = bun.stdout.trim().split('.').map(Number)
   if (major < MIN_BUN[0] || (major === MIN_BUN[0] && minor < MIN_BUN[1])) {
     fail(`Bun ${MIN_BUN.join('.')} or newer is required (found ${bun.stdout.trim()})`)
   }
 
+  const git = spawnSync('git', ['--version'], { encoding: 'utf8' })
+  if (git.status !== 0) fail('git is not on PATH')
+
   const docker = spawnSync('docker', ['--version'], { encoding: 'utf8' })
   if (docker.status !== 0) {
-    console.warn('  warning: docker is not on PATH; the compose stack and any database service need it')
+    console.warn(
+      '  warning: docker is not on PATH; the compose stack and any database service need it',
+    )
   }
 }
 
-// `full` keeps every file and only strips the markers; `none` also deletes the auth-only files
-// and packages and drops what the markers select. Markers are written in the comment syntax
-// of the file (`//`, `#` or `<!-- -->`):
-//   code // @auth                        the line exists only with auth (`@noauth`: only without)
-//   // @auth-start … // @auth-end        the same for a block (`@noauth-start` … `@noauth-end`)
-// The pass fails on an unbalanced block and on any marker left behind, so a scaffold never
-// contains one.
-function applyAuthVariant() {
-  if (auth === 'none') {
-    for (const entry of AUTH_ONLY_PATHS) {
-      const target = path.join(backend, entry)
-      if (!existsSync(target)) fail(`auth-only path ${entry} is missing from templates/backend`)
-      rmSync(target, { recursive: true })
-      pruneEmptyParents(path.dirname(target))
-    }
-    removeAuthDependencies(path.join(backend, 'package.json'))
+function readLock() {
+  const file = path.join(harnessRoot, 'catalog.lock')
+  let lock
+  try {
+    // A BOM (Windows editors add one) makes JSON.parse throw on an otherwise valid file.
+    lock = JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''))
+  } catch (error) {
+    return fail(`cannot read ${file}: ${error.message}`)
   }
-
-  const files = [...listFiles(backend), path.join(root, 'docker-compose.yml')]
-  for (const file of files) {
-    const comment = MARKER_COMMENTS[path.extname(file)]
-    if (comment === undefined) continue
-    const content = readFileSync(file, 'utf8')
-    const applied = applyMarkers(content, comment, path.relative(root, file), auth)
-    if (applied !== content) writeFileSync(file, applied)
-  }
-  for (const file of files) {
-    const left = MARKER.exec(readFileSync(file, 'utf8'))
-    if (left !== null) fail(`${path.relative(root, file)} still contains an auth marker (${left[0]})`)
-  }
-}
-
-// Runs the marker pass for both variants over templates/ before anything is created, so a
-// marker mistake fails here instead of leaving a half-built scaffold to delete by hand.
-function checkTemplateMarkers() {
-  const files = [
-    ...listFiles(path.join(templates, 'backend')),
-    path.join(templates, 'root', 'docker-compose.yml'),
-  ]
-  for (const file of files) {
-    const name = path.relative(harnessRoot, file)
-    const content = readFileSync(file, 'utf8')
-    const comment = MARKER_COMMENTS[path.extname(file)]
-    const results =
-      comment === undefined
-        ? [content]
-        : AUTH_VARIANTS.map((variant) => applyMarkers(content, comment, name, variant))
-    for (const result of results) {
-      const left = MARKER.exec(result)
-      if (left !== null) fail(`${name} holds an auth marker the pass cannot remove (${left[0]})`)
+  for (const field of ['repository', 'version', 'commit']) {
+    if (typeof lock?.[field] !== 'string' || lock[field] === '') {
+      fail(`catalog.lock: "${field}" must be a non-empty string`)
     }
   }
-}
-
-function applyMarkers(content, [open, close], name, variant) {
-  const escape = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const token = `${escape(open)} @(no)?auth`
-  const tail = `${escape(close)}[ \\t]*$`
-  const lineMarker = new RegExp(`^(.*\\S)[ \\t]+${token}${tail}`)
-  const blockStart = new RegExp(`^[ \\t]*${token}-start${tail}`)
-  const blockEnd = new RegExp(`^[ \\t]*${token}-end${tail}`)
-  const keeps = (kind) => (kind === 'no' ? variant === 'none' : variant === 'full')
-
-  const kept = []
-  let block
-  for (const [index, raw] of content.split('\n').entries()) {
-    const line = raw.replace(/\r$/, '')
-    const where = `${name}:${String(index + 1)}`
-    const start = blockStart.exec(line)
-    if (start !== null) {
-      if (block !== undefined) fail(`${where}: a marker block inside another`)
-      block = { kind: start[1] ?? '', where }
-      continue
-    }
-    const end = blockEnd.exec(line)
-    if (end !== null) {
-      if (block === undefined || block.kind !== (end[1] ?? '')) fail(`${where}: unbalanced marker end`)
-      block = undefined
-      continue
-    }
-    if (block !== undefined && !keeps(block.kind)) continue
-    const single = lineMarker.exec(line)
-    if (single === null) kept.push(raw)
-    else if (keeps(single[2] ?? '')) {
-      // A CRLF checkout keeps its carriage return.
-      kept.push(line.replace(lineMarker, '$1') + raw.slice(line.length))
-    }
+  if (!/^[0-9a-f]{40}$/.test(lock.commit)) {
+    fail('catalog.lock: "commit" must be 40 lowercase hex characters')
   }
-  if (block !== undefined) fail(`${block.where}: marker block is never closed`)
-  return kept.join('\n')
+  // The version becomes a path segment and a git ref, so it must be a plain tag.
+  if (!/^v\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/.test(lock.version)) {
+    fail('catalog.lock: "version" must be a tag such as v0.1.0')
+  }
+  return lock
 }
 
-function removeAuthDependencies(file) {
-  const pkg = readJson(file)
-  for (const [key, names] of Object.entries(AUTH_ONLY_DEPENDENCIES)) {
-    for (const name of names) {
-      if (pkg[key]?.[name] === undefined) fail(`${name} is missing from backend package.json ${key}`)
-      delete pkg[key][name]
+// The lock pins a tag, but a tag can move; the commit check is what makes the pin real.
+function locateCachedCatalog(lock) {
+  const dir = path.join(cacheRoot, lock.version)
+  if (!existsSync(dir)) {
+    console.log(`  cloning ${lock.repository} at ${lock.version} into ${dir}`)
+    const cloned = runSpawn(
+      'git',
+      [
+        'clone',
+        '--depth',
+        '1',
+        '--branch',
+        lock.version,
+        '--quiet',
+        '-c',
+        'advice.detachedHead=false',
+        '--',
+        lock.repository,
+        dir,
+      ],
+      process.cwd(),
+    )
+    if (cloned.status !== 0) {
+      const what = `git clone of ${lock.repository} into ${dir} failed${cloned.reason}`
+      fail(`${what}; it needs the network`)
     }
   }
-  writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`)
-}
-
-// Every file below a directory, node_modules excluded.
-function listFiles(dir) {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.name === 'node_modules') return []
-    const full = path.join(dir, entry.name)
-    return entry.isDirectory() ? listFiles(full) : [full]
-  })
-}
-
-// A deleted file can leave its directory empty (jobs/, subscribers/); git does not track one.
-function pruneEmptyParents(start) {
-  const floor = path.join(backend, 'src') + path.sep
-  let dir = start
-  while (dir.startsWith(floor) && readdirSync(dir).length === 0) {
-    rmSync(dir, { recursive: true })
-    dir = path.dirname(dir)
+  const head = spawnSync('git', ['-C', dir, 'rev-parse', 'HEAD'], { encoding: 'utf8' })
+  const actual = head.status === 0 ? head.stdout.trim() : ''
+  if (actual !== lock.commit) {
+    const found = actual === '' ? 'an unknown commit' : actual
+    fail(
+      `catalog.lock expects commit ${lock.commit} but ${dir} is at ${found}; ` +
+        'the tag moved or the cache is stale: delete that directory by hand and run again',
+    )
   }
+  return dir
 }
 
-function mergePackageJson(file, partial, name) {
-  const pkg = readJson(file)
-  pkg.name = name
-  pkg.engines = { bun: '>=1.4.0', node: '>=24.0.0' }
-  for (const key of ['scripts', 'dependencies', 'devDependencies']) {
-    pkg[key] = sortKeys({ ...(pkg[key] ?? {}), ...(partial[key] ?? {}) })
-  }
-  writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`)
+function locateLocalCatalog() {
+  const dir = path.resolve(override)
+  if (!isDirectory(dir)) fail(`template catalog ${dir} does not exist`)
+  console.warn(`  warning: using the local catalog ${dir}; catalog.lock is bypassed`)
+  return dir
 }
 
-function replaceToken(target) {
-  if (!existsSync(target)) return
-  if (statSync(target).isDirectory()) {
-    for (const entry of readdirSync(target)) {
-      if (entry === 'node_modules') continue
-      replaceToken(path.join(target, entry))
+// One regex on one line instead of a YAML parser: the harness stays dependency-free.
+function checkSchemaVersion(catalog) {
+  const file = path.join(catalog, 'index.yaml')
+  if (!existsSync(file)) fail(`${file} is missing; ${catalog} is not a template catalog`)
+  let version
+  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const match = /^schemaVersion:\s*(\d+)\s*$/.exec(line)
+    if (match !== null) {
+      version = Number(match[1])
+      break
     }
-    return
   }
-  if (!TEXT_EXTENSIONS.has(path.extname(target))) return
-  const content = readFileSync(target, 'utf8')
-  if (!content.includes('__PROJECT_NAME__')) return
-  writeFileSync(target, content.replaceAll('__PROJECT_NAME__', projectName))
+  if (version === undefined) fail(`${file} has no schemaVersion`)
+  if (version > SUPPORTED_SCHEMA_VERSION) {
+    fail(
+      `catalog schemaVersion ${version} is newer than this harness supports ` +
+        `(${SUPPORTED_SCHEMA_VERSION}); update the harness`,
+    )
+  }
 }
 
-function printNextSteps(skipped) {
-  console.log('\nDone. Next:')
-  if (skipped) {
-    console.log('  cd backend && bun install && bun run openapi')
-    console.log('  cd frontend && bun install && bun run api:types')
+// The generator resolves --out against its own cwd (the catalog), so every path is absolute.
+// A local override records its own identity, so only the cache path passes the version.
+function generatorArguments(catalogVersion) {
+  const list = ['tools/generate.ts', '--stack', args.stack, '--out', root, '--name', args.name]
+  for (const flag of args.flags) list.push('--flag', flag)
+  for (const capability of args.capabilities) list.push('--capability', capability)
+  if (args.answers !== undefined) list.push('--answers', path.resolve(args.answers))
+  if (catalogVersion !== undefined) list.push('--catalog-version', catalogVersion)
+  if (args.skipInstall) list.push('--skip-post-generate')
+  return list
+}
+
+function isDirectory(dir) {
+  return existsSync(dir) && statSync(dir).isDirectory()
+}
+
+function printNextSteps() {
+  console.log('\nThen:')
+  if (args.skipInstall) {
+    console.log(
+      "  Skipped install, contract and format (--skip-install): run each package's install and " +
+        'contract commands from .fullstack/catalog.yaml.',
+    )
   }
-  console.log('  cd backend && bun run check')
-  console.log('  cd frontend && bun run check')
   console.log(
-    process.platform === 'linux'
-      ? '  cd frontend && bun x playwright install --with-deps chromium && bun run test:e2e'
-      : '  cd frontend && bun x playwright install chromium && bun run test:e2e',
+    "  .fullstack/catalog.yaml lists each package's commands (check, test, testE2e, contract) " +
+      'and ports.',
   )
-  console.log('  Then fill .doc/ and add the first line to .plan/000-backlog.md')
-  console.log('  Dependency versions follow the caret ranges in templates/ until the first bun.lock is committed.')
+  console.log(
+    "  Run every package's check command; where a package declares testE2e, install its browser",
+  )
+  console.log('    (its AGENTS.md › Tests says how) and run it.')
+  console.log(
+    '  Fill .doc/ and add the first line to .plan/000-backlog.md (the bootstrap-project skill).',
+  )
+  console.log('  Commit on chore/bootstrap once the gates are green.')
 }
 
-function run(command, commandArgs, cwd) {
+// `reason` carries the spawn error (a missing executable, say) so the failure names its cause.
+function runSpawn(command, commandArgs, cwd) {
   const resolved = resolveCommand(command)
-  const result = spawnSync(resolved.file, [...resolved.prefix, ...commandArgs], { cwd, stdio: 'inherit' })
-  if (result.status !== 0) fail(`${command} ${commandArgs.join(' ')} failed in ${cwd}`)
+  const result = spawnSync(resolved.file, [...resolved.prefix, ...commandArgs], {
+    cwd,
+    stdio: 'inherit',
+  })
+  const reason = result.error === undefined ? '' : ` (${result.error.message})`
+  return { status: result.status ?? 1, reason }
 }
 
-// Windows: an npm-installed `bun` is a .cmd shim that spawn cannot execute directly.
+// Windows: an npm-installed `bun` is a .cmd shim that spawn cannot execute directly. When
+// where.exe lists several hits, a real .exe wins: the official Bun installer ships bun.exe, and
+// the shim goes through cmd.exe, which mishandles quoted paths with spaces.
 function resolveCommand(command) {
   if (process.platform !== 'win32') return { file: command, prefix: [] }
   const where = spawnSync('where.exe', [command], { encoding: 'utf8' })
-  const first = (where.stdout ?? '').split(/\r?\n/).find((line) => line.trim() !== '')
+  const hits = (where.stdout ?? '').split(/\r?\n/).filter((line) => line.trim() !== '')
+  const first = hits.find((line) => /\.exe$/i.test(line.trim())) ?? hits[0]
   if (first === undefined) return { file: command, prefix: [] }
-  return /\.(cmd|bat)$/i.test(first) ? { file: 'cmd.exe', prefix: ['/c', first] } : { file: first, prefix: [] }
+  return /\.(cmd|bat)$/i.test(first)
+    ? { file: 'cmd.exe', prefix: ['/c', first] }
+    : { file: first, prefix: [] }
 }
 
 function parseArgs(argv) {
-  const parsed = { skipInstall: false }
+  const parsed = { fetch: false, skipInstall: false, flags: [], capabilities: [] }
+  const value = (name, i) => {
+    const next = argv[i]
+    if (next === undefined || next.startsWith('--')) die(`${name} needs a value`)
+    return next
+  }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
-    if (arg === '--skip-install') parsed.skipInstall = true
-    else if (arg === '--name') parsed.name = argv[++i]
-    else if (arg === '--root') parsed.root = argv[++i]
-    else if (arg === '--auth') parsed.auth = argv[++i] ?? ''
+    if (arg === '--fetch') parsed.fetch = true
+    else if (arg === '--skip-install') parsed.skipInstall = true
+    else if (arg === '--stack') parsed.stack = value(arg, ++i)
+    else if (arg === '--name') parsed.name = value(arg, ++i)
+    else if (arg === '--flag') parsed.flags.push(value(arg, ++i))
+    else if (arg === '--capability') parsed.capabilities.push(value(arg, ++i))
+    else if (arg === '--answers') parsed.answers = value(arg, ++i)
+    else if (arg === '--templates') parsed.templates = value(arg, ++i)
+    else if (arg === '--root') parsed.root = value(arg, ++i)
+    else if (arg === '--auth') die('--auth is gone; use --flag auth=false')
     else die(`unknown argument ${arg}`)
   }
-  if (parsed.auth !== undefined && !AUTH_VARIANTS.includes(parsed.auth)) {
-    die(`--auth must be one of ${AUTH_VARIANTS.join(', ')}`)
+  if (parsed.fetch) {
+    const others = Object.keys(parsed).filter(
+      (key) =>
+        !['fetch', 'templates', 'flags', 'capabilities'].includes(key) &&
+        parsed[key] !== false &&
+        parsed[key] !== undefined,
+    )
+    if (others.length > 0 || parsed.flags.length > 0 || parsed.capabilities.length > 0) {
+      die('--fetch accepts only --templates')
+    }
+  } else if (parsed.stack === undefined || parsed.name === undefined) {
+    die(`--stack and --name are required\n${USAGE}`)
   }
   return parsed
-}
-
-function toProjectName(raw) {
-  const name = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return name === '' ? 'app' : name
-}
-
-function readJson(file) {
-  return JSON.parse(readFileSync(file, 'utf8'))
-}
-
-function sortKeys(object) {
-  return Object.fromEntries(Object.entries(object).sort(([a], [b]) => a.localeCompare(b)))
 }
 
 function step(message) {
   console.log(`\n==> ${message}`)
 }
 
-// An argument error happens before any path exists, so it must not look at the scaffold.
+// An argument error happens before anything is fetched or written.
 function die(message) {
   console.error(`bootstrap: ${message}`)
   process.exit(1)
@@ -405,11 +329,5 @@ function die(message) {
 
 function fail(message) {
   console.error(`bootstrap: ${message}`)
-  if (existsSync(frontend) || existsSync(backend)) {
-    console.error(
-      'bootstrap: the scaffold is incomplete. Delete frontend/ and backend/ by hand (the guardrail ' +
-        'hook refuses to delete directory trees for an agent), then run the bootstrap again.',
-    )
-  }
   process.exit(1)
 }
