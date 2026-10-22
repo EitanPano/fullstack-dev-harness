@@ -35,7 +35,8 @@ there. The driver removes it. A refusal is the rule working; do not route around
 3. **Tests first**: the module's test file per `backend/AGENTS.md › Tests`, from the plan's
    Validation items: happy path, validation failure, not found, auth or tenancy denial
    where applicable; store-backed tests in the database block the package's `AGENTS.md`
-   names. Run the package's `test` command and watch them fail.
+   names. Run the package's `test` command and watch them fail; where the package has
+   `testDb`, run that too, since `check` skips the store-backed suites.
 4. **Implement**: `service` (queries, only when the module has data), `controller` (the
    handlers, one per endpoint, and the exported rules that are the module's only public
    API), `routes` (the router: the endpoint's middleware, validation, the handler); then
@@ -44,12 +45,13 @@ there. The driver removes it. A refusal is the rule working; do not route around
    procedure.
 5. **Contract**: the package's `contract` command. The committed contract file must be
    fresh (a test checks it).
-6. **Gates**: the package's `check` command must exit 0, and `testDb` too when the task
-   added database-backed tests (it needs the Compose database service running). Fix the
+6. **Gates**: the package's `check` command must exit 0, and `testDb` too where the package
+   has it (it needs the Compose database service running). Fix the
    code, never the test or the gate. `migrate` must apply cleanly when the task changed
-   the data model. `testDb` and `migrate` are named in the package's
-   `AGENTS.md › Adding the data layer`, not in `.fullstack/catalog.yaml`; the task that
-   adds them updates that section.
+   the data model. Resolve `testDb` and `migrate` from `.fullstack/catalog.yaml`; when
+   either is absent there (no provider was chosen at the bootstrap), the package's
+   `AGENTS.md › Adding the data layer` names them, and the task that adds them updates
+   that section.
 7. **Docs**: you cannot write `.doc/`. Put the change-log line for
    `.doc/architecture.md` in your report under `Docs`; the loop applies it.
 8. **Report**: write `.orchestrate/report/backend.md`:

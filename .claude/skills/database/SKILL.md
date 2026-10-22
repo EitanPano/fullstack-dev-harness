@@ -27,11 +27,19 @@ The Data store answer in `.doc/architecture.md` records the engine the user name
 "decide later") and the client library (for example "Postgres 17 with an ORM" or "MongoDB 8
 with the official driver"). Whether the server template lists a provider is a separate
 fact. When it lists one for the engine, the bootstrap generates it wired
-(`--capability database=<id>`) and no data-layer task is needed. When it lists none, the
+(`--capability database=<id>`): that is the data-layer task already done, and no such task
+is written. The package's `AGENTS.md › Adding the data layer` then describes what exists and
+how to change the model, and the rules under "Every engine" and "What the shipped code
+assumes of the store" still bind every later change. When it lists none, the
 first backlog line is `- [ ] add the <engine> data layer | stack:backend`; for "decide
 later" it is the same line with the engine left for the task to fill (`add the data layer`).
 
 ## The data-layer task
+
+Only when the bootstrap wired no provider. A provider wired at the bootstrap is this task
+already done, except item 8 (the change-log line and the Data Model section), which still
+falls to the bootstrap; items 1 to 7 are what it delivered. Skip to "What the shipped code
+assumes of the store" and "Every engine" for the rules that keep binding.
 
 The database seam is a file seam, not a type seam: it exports the active store, and its
 type changes with the engine. One task, planned and reviewed like any other, delivers:
@@ -120,8 +128,9 @@ properties, or a race the memory store hides reaches production:
 ## Test database
 
 Tests never touch the development database. The same local service hosts a second database
-named `app_test`. The memory store needs no database, and `check` never does:
-database-backed tests run only under `testDb`. A cache test uses a separate index or
+named `app_test`. With the in-memory store, store-backed suites run under `check`. Once the
+package has a database, `check` skips them and they run only under `testDb`, against a
+database whose name marks it as the test database. A cache test uses a separate index or
 database and flushes only that. A test opts in through the database block the
 package's `AGENTS.md › Tests` names, which resets the test database before each test. Never
 fake a data-access file with a process-global module mock. In production a human or the
