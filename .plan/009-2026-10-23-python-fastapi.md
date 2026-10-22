@@ -178,6 +178,16 @@ repositories. It uses the rubric written first.
 
 ### Decisions (ADR 0002 records these; implementers do not reopen them)
 
+As run: ADR 0002 (catalog `docs/adr/0002-python-fastapi.md`) is the binding text for M4-1 to
+M4-19 and M4-23. Where the summaries below differ, the ADR wins. It was corrected by an
+architecture review on 2026-10-23. The main differences:
+
+- three model bases and pydantic's `MISSING` sentinel (M4-7);
+- no pydantic-settings and no dotenv loading (M4-11);
+- `pytest -p tests.db.plugin`, not `python -m pytest` (M4-12);
+- M4-19, one selector event loop;
+- M4-23, the entry, the image and Compose.
+
 - **M4-1 Toolchain.**
   - uv, pinned by `[tool.uv] required-version` and the pinned setup-uv action version.
   - Python 3.14 (OQ1), build backend `uv_build`, src layout `src/app/`.
