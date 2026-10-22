@@ -252,6 +252,13 @@ function printNextSteps() {
   console.log(
     '  Fill .doc/ and add the first line to .plan/000-backlog.md (the bootstrap-project skill).',
   )
+  if (args.capabilities.length > 0 || args.answers !== undefined) {
+    const when =
+      args.capabilities.length > 0 ? 'A capability was passed' : 'If the answers chose a provider'
+    console.log(`  ${when}, then after the check commands:`)
+    console.log('    docker compose up -d <service>   (the service name is in docker-compose.yml)')
+    console.log("    the server package's migrate, then its testDb (see .fullstack/catalog.yaml)")
+  }
   console.log('  Commit on chore/bootstrap once the gates are green.')
 }
 
