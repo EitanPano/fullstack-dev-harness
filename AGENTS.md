@@ -86,12 +86,12 @@ database engine is a catalog provider chosen at the bootstrap or added later by 
 | --- | --- |
 | `install` | Install dependencies from the committed lockfile state. |
 | `dev` | Start the development server with reload. |
-| `check` | Every gate, no Docker. Exit 0 means done. |
+| `check` | Every gate, no Docker. Exit 0 means done, except where the package has `testDb`: there `check` skips the store-backed suites and `testDb` runs them. |
 | `typecheck` | The type gate alone. |
 | `lint` | The lint gate alone, including the layer-boundary rules. |
 | `format` | Rewrite files to the project's formatting. |
 | `test` | Unit tests that need no infrastructure. |
-| `testDb` | Tests that need the database; present when a database exists (a provider chosen at the bootstrap, or the data-layer task). |
+| `testDb` | The whole suite against the test database; present when a database exists (a provider chosen at the bootstrap, or the data-layer task). |
 | `testE2e` | The e2e suite with the accessibility scan; present on a frontend. |
 | `contract` | A server produces the OpenAPI document; a frontend regenerates its types from it. |
 | `migrate` | Applies the data model change; present when a database exists (a provider chosen at the bootstrap, or the data-layer task). |
@@ -103,8 +103,11 @@ them in the package's `AGENTS.md › Adding the data layer`, which that task upd
 them from that section.
 
 `docker compose --profile app up --build` at the repository root runs the whole stack from
-each package's Dockerfile; `docker compose up -d <service>` starts one infrastructure service
-(the database, once added) for local work. Never run a scaffolder inside an existing package.
+each package's Dockerfile. With a database, export the production secrets and the database
+URL the server's `.env.example` lists, and run the server package's `migrate` inside the
+stack first (the package's `AGENTS.md › Adding the data layer` says how).
+`docker compose up -d --wait <service>` starts one infrastructure service (the database,
+when the project has one) for local work. Never run a scaffolder inside an existing package.
 
 ## Architecture
 
@@ -181,11 +184,13 @@ loads them with this file; other tools reach them through the pointers in
 
 A task is done only when every item holds and the stage report shows the evidence.
 
-1. The `check` command of every package the task touched exits 0.
+1. The `check` command of every package the task touched exits 0, and `testDb` where that
+   package has one, with none skipped.
 2. Every new behaviour has a unit test for the happy path and at least one failure or empty
    path. Every user journey the task adds has an e2e test where the stack has a frontend.
 3. No test was deleted, skipped or focused (`.skip`, `.only`). A removed test is named and
-   justified in the report.
+   justified in the report. The store-backed suites that `check` skips in a package with
+   `testDb` are expected; `testDb` must report none skipped.
 4. Errors follow the `error-handling` skill. No secrets, stack traces or query text leave
    the server.
 5. A schema or endpoint change ran the server's and the frontend's `contract` commands and

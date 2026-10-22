@@ -15,7 +15,8 @@ What you get after the bootstrap:
   database provider was chosen, its service. `--capability database=postgres` (the
   bootstrap passes it when you pick Postgres) wires the server to a `database` service with
   `db/init.sql`, a `DATABASE_URL`, migrations, and the `migrate` and `testDb` commands; the
-  catalog README is the reference for the matrix.
+  catalog README is the reference for the matrix. A provider needs a catalog release that
+  lists it (v1.0.0 or later); `catalog.lock` still pins v0.1.1 until that release.
 - Five role agents (orchestrator, backend, frontend, reviewer, qa), nine skills, and
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
   access to secret files.

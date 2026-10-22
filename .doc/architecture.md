@@ -116,7 +116,8 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
   bodies and secrets are never logged.
 - Health: `GET /api/health` is the liveness check and never depends on a store.
   `GET /api/health/ready` pings every dependency in the dependency registry
-  (`memory`, `pubsub` and `scheduler` in the template; one ping round in flight at a
+  (`memory`, `pubsub` and `scheduler` in the template, plus the database resource when a
+  provider was chosen at the bootstrap; one ping round in flight at a
   time, the answer reused for a second) and answers 503 with the per-dependency map under
   `dependencies` when one is down. Nothing in the shipped compose file reads it; a
   `HEALTHCHECK` or a compose `healthcheck` that points at it is the data-layer task's or
@@ -132,7 +133,7 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
 - Deployment: one image per package from the two Dockerfiles, both running as a
   non-root user; `docker compose --profile app up --build` runs the stack locally.
   <!-- FILL: the production target (which host, how secrets are injected). -->
-- Data migrations: <!-- FILL: who runs the server's `migrate` command in production and when, once the data layer exists -->
+- Data migrations: <!-- FILL: who runs the server's `migrate` command in production and when, once the data layer exists; with a provider chosen at the bootstrap, answer it at the bootstrap -->
 
 ## Change Log
 

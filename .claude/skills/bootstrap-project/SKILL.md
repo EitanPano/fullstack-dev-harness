@@ -15,7 +15,8 @@ database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24
 Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in order, ask the
 user one question at a time and replace the marker with their answer. Keep answers in
 their words; suggest a default only when they ask. Do the same for `.doc/architecture.md`
-(Data store, Data Model, API versioning, Auth, External Dependencies, Deployment) and
+(Data store, Data Model, Data migrations, API versioning, Auth, External Dependencies,
+Deployment) and
 `.doc/glossary.md` (one row per entity named in the scope).
 
 The Data store question is the `database` skill's: engine, client library, or decide
@@ -54,9 +55,11 @@ summary) and ask which one. For the chosen stack, Read `<catalog>/stacks/<id>/st
 `summary` and `default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`. Ask the database
 provider here when the template lists one (`capabilities.database.providers`). When the
-user named an engine in section 1 that the template lists, pass `--capability
-database=<id>` for it without asking again; the data-layer backlog line is then NOT
-written, because the generator wired the engine.
+user named an engine in section 1 that the template lists, the provider fixes the client
+library (the package's `AGENTS.md › Adding the data layer` names it): tell the user and
+confirm. On a yes, pass `--capability database=<id>`; the data-layer backlog line is then
+NOT written, because the generator wired the engine. On a no, pass no capability and write
+the data-layer backlog line.
 
 These three files are the only things this skill reads under the catalog path. Never Glob,
 Grep, list or explore the catalog cache and never dispatch an Explore agent into it; it is
@@ -71,8 +74,8 @@ node scripts/bootstrap.mjs --stack <id> --name <project-name> [--flag k=v]… [-
 It creates the packages the stack lists, under the directories the stack names; a merged
 `docker-compose.yml` and `.gitignore`; `.editorconfig` when absent; and
 `.fullstack/catalog.yaml`, the provenance file (per package: template, version, flags,
-commands and ports; with a provider, also `providers` and the package's `capabilities`).
-When a provider was chosen it also adds the provider's service to `docker-compose.yml`,
+capabilities, commands and ports; and the top-level `providers` map, which is empty when
+none was chosen). When a provider was chosen it also adds the provider's service to `docker-compose.yml`,
 `db/` with the database init script, and the connection variable in the server's
 `.env.example`. It installs each package and runs its `contract` and `format`
 commands. It refuses to run twice. A failure before the move leaves nothing to clean: the
@@ -80,13 +83,26 @@ generator stages the output and moves it into place all or nothing (a failed mov
 
 ## 4. Verify, in this order
 
-Open `.fullstack/catalog.yaml`. For each package, run its `check` command from the package
-directory. For a package that declares `testE2e`, first run the browser install its
-`AGENTS.md › Tests` names, then `testE2e`. With a provider (`providers` in
-`.fullstack/catalog.yaml`) the order is: each package's `check` (no Docker needed), then
-`docker compose up -d <service>` (the provider's service, named in `docker-compose.yml`),
-then the server package's `migrate`, then its `testDb`, then `testE2e`. Every command must
-exit 0. If one fails, fix the
+Open `.fullstack/catalog.yaml`. Run each command from its package directory.
+
+Without a provider:
+
+1. Each package's `check`.
+2. For a package that declares `testE2e`, the browser install its `AGENTS.md › Tests`
+   names, then `testE2e`.
+
+With a provider (a non-empty `providers` map, e.g. `providers: { database: <id> }`;
+`providers: {}` means none):
+
+1. Each package's `check` (no Docker needed).
+2. `docker compose up -d --wait <service>` (the provider's service, named in
+   `docker-compose.yml`).
+3. The server package's `migrate`, then its `testDb`, each only when the package's commands
+   list it.
+4. For a package that declares `testE2e`, the browser install, then `testE2e`.
+
+The order matters: the server connects its database before it listens, and the e2e suite
+starts the server. Every command must exit 0. If one fails, fix the
 cause (not the gate), re-run it, and tell the user what was wrong. A failing gate on a fresh
 scaffold is a catalog bug: say so explicitly, name the template and version from the
 provenance file, and record it in the final message.
@@ -107,13 +123,15 @@ with defaults and warns.
 Follow the grammar at the top of `.plan/000-backlog.md`. When no database provider was
 passed at generation, the first line is `- [ ] add the <engine> data layer | stack:backend`
 for a named engine, or `- [ ] add the data layer | stack:backend` when the answer was
-"decide later" (the `database` skill says what that task delivers). The next line is the
-first in-scope capability from the product definition. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
+"decide later" (the `database` skill says what that task delivers). With a provider, the
+first line is the first in-scope capability from the product definition; without one it is
+the next line. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
 `Stack` row of the components table in `.doc/architecture.md` from `.fullstack/catalog.yaml`:
 the stack id and, per package, its directory, template and version. When a provider was
 passed, fill the Data store section from what was generated: engine and version from the
-provider, the client library and the local service (the `database` service and its
-connection variable) from the package's `AGENTS.md › Adding the data layer` and
+provider service's image in `docker-compose.yml` (or the package's `AGENTS.md › Adding the
+data layer`), the client library and the local service (the provider's Compose service and
+its connection variable) from the package's `AGENTS.md › Adding the data layer` and
 `.fullstack/catalog.yaml`.
 
 ## 6. Branch, commit gate and hand over
@@ -132,4 +150,4 @@ for the first task.
 - Create a real env file; secrets stay in the shell environment.
 - Install a database client or start a database service. The exception: a provider chosen
   at generation was wired by the generator, and its Compose service is started with
-  `docker compose up -d <service>`.
+  `docker compose up -d --wait <service>`.
