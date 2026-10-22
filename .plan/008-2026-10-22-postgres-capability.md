@@ -1,6 +1,7 @@
 # The first capability: Postgres for bun-express, catalog v1.0.0
 
 Status: active
+Status set by the session on Eitan's delegation; Eitan confirms.
 Owner: Eitan
 Last updated: 2026-10-22
 Approval: Eitan's instruction on 2026-10-22, "start working on milestone 3 plan … if there is
@@ -26,7 +27,7 @@ client. That project ships migrations, a `migrate` command and a `testDb` comman
 separate `app_test` database, a `database` Compose service with a healthcheck and `db/init.sql`.
 Its `.fullstack/catalog.yaml` records `testDb` and `migrate`. Its `check` still needs no
 Docker. CI generates the `postgres`, `auth-off-postgres` and `stack-postgres` cases, starts the
-provider with Compose, and runs `migrate`, `check`, `testDb` and e2e. Projects generated without a
+provider with Compose, and runs `check`, `migrate`, `testDb` and e2e. Projects generated without a
 capability keep the in-memory store and the harness's data-layer task, so both paths stay valid
 (ADR Anti-goals). The harness's bootstrap skill, agents and skills then work with a provider
 chosen at the bootstrap. `testDb` and `migrate` resolve from the provenance file first. A
@@ -304,7 +305,7 @@ tag `v1.0.0` once Eitan merges it; the harness lock bump follows that tag.
      rejects; `ping` does `select 1`; `close` closes and forgets the client. No I/O at import.
    - `src/services/db.ts`: `getDb()`, `Executor` (M3-15).
    - `src/infra/migrations/0001-init.sql` (M3-16, `@auth` blocks).
-   - `src/infra/scripts/migrate.ts`: exports `migrate({ db?, dir?, log? })` (M3-16); run as a
+   - `src/infra/scripts/migrate.ts`: exports `migrate({ client?, directory?, logger? })` (M3-16); run as a
      script it migrates, logs each applied file, closes and exits non-zero on failure.
    - `src/api/module/service.ts`: SQL, signatures kept plus the optional executor, the
      `(created_at, id)` cursor, `withTransaction`.
@@ -346,12 +347,12 @@ tag `v1.0.0` once Eitan merges it; the harness lock bump follows that tag.
    `.claude/skills/writing-tests/SKILL.md`: resolve `testDb` and `migrate` from
    `.fullstack/catalog.yaml`, else from the package's `AGENTS.md › Adding the data layer`.
    `.claude/skills/bootstrap-project/SKILL.md` §4 and §5: with a provider, start its Compose
-   service, run `migrate`, `check`, `testDb`, then e2e, and fill Data store from the provider.
+   service, run `check`, `migrate`, `testDb`, then e2e, and fill Data store from the provider.
    §4's "fresh server package" paragraph covers both paths. `.claude/skills/database/SKILL.md`
    (the wired provider; the test-database rule). `.doc/architecture.md` (the hints at Data
    store). `README.md`.
 10. H2, `scripts/bootstrap.mjs` `printNextSteps`: when `--capability` (or an answers file)
-    selected a provider, print `docker compose up -d database` and "run the server package's
+    selected a provider, print `docker compose up -d <service>` and "run the server package's
     `migrate` then `testDb` command (`.fullstack/catalog.yaml`)". Dependency-free, no YAML
     parsing.
 11. H3, proof (V20–V23): bootstrap scratch roots from the local catalog checkout on the feature
@@ -447,3 +448,26 @@ catalog keeps `v0.1.1` and the harness lock still pins it, so a revert leaves `m
 bootstrap untouched. No data migration runs against anything but throwaway case databases and
 scratch roots. The generated Postgres project's migrations are forward-only by design; dropping
 or resetting a database is a human's job (`database` skill).
+
+## As built
+
+Deviations from the plan text above (the original sections stay as planned, except the plain
+factual errors corrected in place: the verification order is `check` first, H2 prints
+`<service>`, and `migrate` takes `{ client?, directory?, logger? }`):
+
+- The capability manifest has per-flag `onlyPaths` for overlay files (ruling R10).
+- Provider env entries are `secret: true`: there is no Compose default for `DATABASE_URL`
+  (R11, from the catalog's final fix wave). The full stack fails fast unless the production
+  secrets and the database URL are exported.
+- Env entries gained `testOverride`; capability kind names are reserved as flag names; env
+  values are constrained to one line.
+- Nothing runs migrations automatically. The docs give the command; a one-shot migrate
+  service is a follow-up.
+- The harness and the catalog say `docker compose up -d --wait <service>`.
+- `testDb` refuses to pass with every store-backed suite skipped.
+- Execution was regrouped into ten tasks plus two final reviews and fix waves, with the ledger
+  in `.superpowers/sdd/008-2026-10-22-postgres-capability/progress.md` (git-ignored).
+- Follow-ups: the `v1.0.0` tag and the `catalog.lock` bump (Eitan), a one-shot migrate
+  service, hash pins on overlay-shadowed base files, optimistic concurrency for the user
+  update, a partial index for the session purge, signal cleanup in test-generated, a
+  real-catalog generate unit test.
