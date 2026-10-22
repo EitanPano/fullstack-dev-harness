@@ -2,8 +2,8 @@
 
 Status: done (executed 2026-10-22 by the interactive session: Sonnet implementers per task
 group, Sonnet task reviews, one Opus final review with one fix wave per repository; both
-branches committed and pushed on Eitan's approval; the lock bump to `v0.2.0` and the
-V01/V13 re-run follow his catalog tag, per ledger R19)
+branches committed and pushed on Eitan's approval; the catalog was released as `v0.1.1`
+(Eitan's choice over Open Question 4's `v0.2.0`) and the lock pins it, per ledger R19)
 Owner: Eitan
 Last updated: 2026-10-22
 Approval: Eitan's instruction on 2026-10-22, "continue with the plan", given after the plan was
@@ -33,7 +33,7 @@ both packages. Nothing a user can do today is lost: `--auth none` becomes `--fla
 
 ## Scope
 
-- In, catalog side (`fullstack-templates`, one branch, released as `v0.2.0`):
+- In, catalog side (`fullstack-templates`, one branch, released as `v0.1.1`):
   - `server/bun-express/base/AGENTS.md` and `frontend/next/base/AGENTS.md` gain the short
     sections the harness skills refer to by name: `Adding a module`, `Adding the data layer`,
     `Errors`, `Tests` (server) and `Adding a feature`, `Styling`, `Errors`, `Tests`
@@ -85,8 +85,9 @@ both packages. Nothing a user can do today is lost: `--auth none` becomes `--fla
   below still says `route.ts`, `repository.ts` or "one line in `config/routes.ts`", read the
   current shape.
 - Catalog `v0.1.0` is commit `e9d709c7ba5e7117b100c6eafccc1829e6f429b4`, tagged 2026-10-22;
-  its `validate` and `test-generated` workflows passed on that commit. `v0.2.0` is this plan's
-  own catalog release and the version the lock pins at the end.
+  its `validate` and `test-generated` workflows passed on that commit. `v0.1.1` (commit
+  `304a78a4bb74eed980740bc1e51ddd24a5648b68`) is this plan's own catalog release and the
+  version the lock pins at the end.
 - The write lanes stay keyed on `backend/` and `frontend/` (ADR Constraints; `.plan/006`);
   generated packages keep those directory names. Role-agent shell posture is unchanged.
   `.fullstack/catalog.yaml` is in no lane, so only the interactive session (the bootstrap)
@@ -128,7 +129,8 @@ both packages. Nothing a user can do today is lost: `--auth none` becomes `--fla
    (bun-express `2.0.0` is already on `main` unreleased; `next` goes `1.0.1`), or fold them
    into milestone 3's `v1.0.0`? Recommended: `v0.2.0`. The harness skills point at sections by
    name, so the sections must exist in the version the lock pins; a breaking template change
-   on `main` deserves its own `0.x` minor (ledger R2).
+   on `main` deserves its own `0.x` minor (ledger R2). Decided: `v0.1.1` (Eitan, 2026-10-22);
+   its release notes carry a Breaking section for bun-express `2.0.0`.
 5. Where the engine specifics of the `database` skill go. Its Postgres, MongoDB and cache-store
    sections name Bun SQL, the `mongodb` driver and TypeScript file names. Move them, condensed,
    into `server/bun-express/base/AGENTS.md › Adding the data layer` now, or keep them in the
@@ -159,7 +161,7 @@ both packages. Nothing a user can do today is lost: `--auth none` becomes `--fla
 
 ## Steps
 
-### Catalog (`fullstack-templates`, branch `fix/skill-facing-sections`, released as `v0.2.0`)
+### Catalog (`fullstack-templates`, branch `fix/skill-facing-sections`, released as `v0.1.1`)
 
 1. `server/bun-express/base/AGENTS.md`. Intro (lines 3–7): "What holds for the whole repository
    is in the root `AGENTS.md`; nothing here repeats it. This file ships with the package; an
@@ -216,13 +218,13 @@ both packages. Nothing a user can do today is lost: `--auth none` becomes `--fla
    `## 2.0.0` entry gains the same line. Then `bun tools/validate.ts --readme`, `bun tools/validate.ts`,
    `bun tools/validate.ts --lockfiles`, `cd tools && bun run check`, `bun tools/test-generated.ts
    --e2e --install-browsers` (5 of 5). Pull request, both workflows green, Eitan's yes, then
-   the annotated tag `v0.2.0` whose message is the release notes.
+   the annotated tag `v0.1.1` whose message is the release notes.
 
 ### Harness: lock and bootstrap (Sonnet implementer)
 
 1. `catalog.lock` (JSON, Open Question 2):
-   `{ "repository": "https://github.com/EitanPano/fullstack-templates", "version": "v0.2.0",
-   "commit": "<the v0.2.0 commit>" }`. If the harness steps start before the catalog tag, pin
+   `{ "repository": "https://github.com/EitanPano/fullstack-templates", "version": "v0.1.1",
+   "commit": "<the v0.1.1 commit>" }`. If the harness steps start before the catalog tag, pin
    `v0.1.0` / `e9d709c7ba5e7117b100c6eafccc1829e6f429b4` and bump in the same branch.
 2. `scripts/bootstrap.mjs`, rewritten as the D8 driver. Interface:
    `node scripts/bootstrap.mjs --fetch [--templates <path>]` and
@@ -411,13 +413,13 @@ both packages. Nothing a user can do today is lost: `--auth none` becomes `--fla
   `git grep -n 'templates/' -- ':!.plan'` is empty
 - V11 — hooks and lanes are untouched — proof: `git diff <Base> --stat -- .claude/hooks
   .claude/settings.json` is empty
-- V12 — the catalog release holds the sections the skills point at — proof: on the `v0.2.0`
+- V12 — the catalog release holds the sections the skills point at — proof: on the `v0.1.1`
   commit, `grep -n '^## ' server/bun-express/base/AGENTS.md frontend/next/base/AGENTS.md` lists
   `Adding a module`, `Adding the data layer`, `Errors`, `Tests` and `Adding a feature`,
   `Styling`, `Errors`, `Tests`; the harness-only grep of Scope returns nothing in either base;
   the `validate`, `test-generated` and `release` workflows are green on the tag
 - V13 — the lock pins the released commit — proof: `catalog.lock` `commit` equals
-  `git rev-parse v0.2.0^{}` in the catalog, and V01's cache directory `HEAD` equals it
+  `git rev-parse v0.1.1^{}` in the catalog, and V01's cache directory `HEAD` equals it
 - V14 — the generator left the harness root's own files alone — proof: in V01's scratch root
   (a copy of the harness root files), `git status --short` shows only the generated packages,
   `docker-compose.yml`, `.gitignore` (appended under the marker header), `.editorconfig` and
@@ -426,9 +428,12 @@ both packages. Nothing a user can do today is lost: `--auth none` becomes `--fla
 Results (2026-10-22): V01 PASS at `v0.1.0` (the cache path; both `check` commands and e2e
 green); V02 PASS against the local checkout on `fix/skill-facing-sections` (2.0.0 module files,
 the eight sections present, checks and e2e green); V03 PASS with the amended proof (R15);
-V04–V08 PASS; V09–V11 PASS (controller greps, hooks untouched); V12 PASS locally (sections and
-greps; the catalog's `validate`, `test-generated` and `release` runs happen on the PR and the
-tag); V13 PASS for `v0.1.0` and re-run after the `v0.2.0` bump; V14 PASS as written (R21).
+V04–V08 PASS; V09–V11 PASS (controller greps, hooks untouched); V12 PASS (sections and greps
+locally; `validate` and `test-generated` green on catalog PR #1, `release` green on the
+`v0.1.1` tag); V13 PASS for `v0.1.0`; V14 PASS as written (R21). After the bump to `v0.1.1`,
+V01 and V13 PASS again from an empty cache: the cache `HEAD`, the lock and `v0.1.1^{}` are all
+`304a78a`; backend `check` 353 tests, frontend `check` 7 tests, `testE2e` 1 test with the
+accessibility scan.
 Evidence: `.superpowers/sdd/007-2026-10-22-catalog-consumption/` (`task-H1-report.md`,
 `task-H6-report.md`, `H-final-fix-report.md`, `progress.md`).
 
@@ -438,8 +443,8 @@ Evidence: `.superpowers/sdd/007-2026-10-22-catalog-consumption/` (`task-H1-repor
   that package — the sections are prose with file names, the worked code stays in the shipped
   reference module (Open Question 6); the four server sections take at most 130 lines together
   and the final review checks the server file stays under 480 lines (ledger R6).
-- Two repositories to keep in step: the harness skills name sections that only `v0.2.0` has —
-  the lock pins `v0.2.0`; a bootstrap from `v0.1.0` is refused by the commit check, not by a
+- Two repositories to keep in step: the harness skills name sections that only `v0.1.1` has —
+  the lock pins `v0.1.1`; a bootstrap from `v0.1.0` is refused by the commit check, not by a
   missing heading.
 - The generator appends to the harness root's `.gitignore` and creates `docker-compose.yml`
   there — expected per D1 and D5; V14 shows exactly which root files change.
@@ -463,7 +468,7 @@ Evidence: `.superpowers/sdd/007-2026-10-22-catalog-consumption/` (`task-H1-repor
 ## Rollout Order
 
 catalog branch (sections, cleanups, release workflow, versions) → catalog PR and CI → tag
-`v0.2.0` (Eitan) → harness lock and bootstrap → `templates/` removed → bootstrap skill → D9
+`v0.1.1` (Eitan) → harness lock and bootstrap → `templates/` removed → bootstrap skill → D9
 files (AGENTS.md and rules, then agents and skills, then `.doc/` and README) → V01–V14 in scratch
 roots → Opus review and fix wave → Eitan's review, then PR to `main`
 
@@ -473,5 +478,5 @@ Every harness change is on `feat/catalog-consumption`; reverting the branch rest
 `templates/` and today's bootstrap, since both stay in git history. `main` keeps bootstrapping
 from its own templates until the PR merges. A project scaffolded before this plan keeps its
 packages and its own `backend/AGENTS.md` either way and stays on the pre-catalog harness. The
-catalog release cannot be un-tagged; a wrong `v0.2.0` is followed by `v0.2.1` and a lock bump.
+catalog release cannot be un-tagged; a wrong `v0.1.1` is followed by `v0.1.2` and a lock bump.
 No data, migration or product code is involved.
