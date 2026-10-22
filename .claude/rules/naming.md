@@ -7,12 +7,12 @@ variables.
   `feature/post/`, table or collection `post`.
 - Use the canonical short term from `.doc/glossary.md`. Never introduce a second word for
   a concept that already has one; add a new shared term to the glossary before using it.
-- Directories and files are kebab-case. React components are PascalCase exports.
+- Directories and files are kebab-case. UI components are PascalCase exports.
   SQL tables and columns are snake_case; MongoDB collections are singular and their
   fields camelCase. Environment variables are SCREAMING_SNAKE_CASE.
 - Route, module, feature and file names match the domain term they serve.
-- `models/` (plural, top-level) holds an entity's TypeScript types; `api/<name>/model.ts`
+- `models/` (plural, top-level) holds an entity's types; `api/<name>/model`
   (singular, in the module) is the engine's storage mapping.
-- The word "service" has two homes and one meaning each: `api/<name>/service.ts` is a
-  module's private rules; `services/` is the shared-capability folder (sessions, cache,
+- The word "service" has two homes and one meaning each: `api/<name>/service` is a
+  module's private queries; `services/` is the shared-capability folder (sessions, cache,
   events, logging, security, communication, pure utils).

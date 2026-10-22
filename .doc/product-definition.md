@@ -47,7 +47,7 @@ holds a marker. Delete a marker only by replacing it with a decision.
 Each criterion must be provable by a test or a command. Keep the numbering stable; QA
 reports against it.
 
-- AC01 — Quality gates: `bun run check` is green in `frontend/` and `backend/`, and the
+- AC01 — Quality gates: every package's `check` command is green, and the
   e2e suite passes.
 - AC02 — <!-- FILL: the first user-visible capability, phrased as a provable statement -->
 - AC03 — <!-- FILL -->

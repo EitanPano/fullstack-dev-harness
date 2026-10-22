@@ -35,25 +35,27 @@ acceptance criteria (AC numbers) it satisfies.>
 
 ### Backend
 
-1. Models: `backend/src/models/<entity>/` (types, and the data-model source or migration
-   as the engine requires, per the `database` skill).
-2. `backend/src/api/<entity>/schema.ts`: <zod schemas, OpenAPI registration>.
-3. `backend/src/api/<entity>/repository.ts` (queries), `service.ts` (private rules),
-   `controller.ts` (the module's public API, the only file another module imports),
-   `route.ts` (the HTTP adapter: middleware, `validate()`, status).
-4. One line in `backend/src/config/routes.ts`.
-5. `bun run openapi`.
-6. `backend/tests/<entity>.test.ts`: happy path, validation failure, not found (the ones
-   that touch records inside `describeDb`).
-7. `bun run check`; `bun run test:db` when a `describeDb` block exists.
+1. Models: `backend/src/models/<entity>/` (the entity's types, and the data-model source
+   or migration as the engine requires, per `backend/AGENTS.md › Adding the data layer`
+   and the `database` skill).
+2. `backend/src/api/<entity>/` `schema`: <request and response schemas, contract
+   registration>.
+3. `service` (queries, when the module has data), `controller` (handlers and exported
+   rules, the module's only public API), `routes` (the router).
+4. The module's mount line and registration line, per `backend/AGENTS.md › Adding a
+   module`.
+5. The package's `contract` command.
+6. `backend/tests/` <entity> tests: happy path, validation failure, not found (the
+   store-backed ones in the database block).
+7. `check`; `testDb` when a database block exists.
 
 ### Frontend
 
-1. `bun run api:types`.
-2. `frontend/src/feature/<name>/model.ts`, `server/<loader>.ts`, `ui/<component>.tsx`.
-3. `frontend/src/app/<route>/page.tsx` (+ `loading.tsx`, `error.tsx`).
-4. `frontend/tests/unit/<name>.test.tsx`, `frontend/tests/e2e/<journey>.spec.ts`.
-5. `bun run check`.
+1. The package's `contract` command.
+2. `frontend/src/feature/<name>/`, per `frontend/AGENTS.md › Adding a feature`.
+3. `frontend/src/app/<route>/` the page (with its loading and error states).
+4. `frontend/tests/` the unit test and the e2e test.
+5. `check`.
 
 ## Validation
 

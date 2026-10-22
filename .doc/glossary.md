@@ -8,9 +8,9 @@ docs use these words and no synonyms. Add a term here before using it anywhere e
 | Term | Meaning | Used as |
 | --- | --- | --- |
 | session | A refresh-token record: hashed token, rotation state, expiry | table `session`, model `session` |
-| caller | The authenticated principal on a request: `{ id, role, sessionId }` | `res.locals.caller` |
+| caller | The authenticated principal on a request: `{ id, role, sessionId }` | the resolved caller |
 | OTP | A six-digit one-time code sent to a target; valid 10 min, 5 attempts | module `auth` |
-| target | An email or phone a message or OTP is sent to: `{ type, value }` | OTP endpoints, `models/user/type.ts` (`ContactTarget`); the communicate layer calls the address `to` |
+| target | An email or phone a message or OTP is sent to: `{ type, value }` | OTP endpoints, the user entity's public type (`ContactTarget`); the communicate layer calls the address `to` |
 | module (reference) | The shipped CRUD module `api/module/` that a developer copies | `api/module/`, `models/module/` |
 | <!-- FILL: term --> | <!-- FILL: one-line definition --> | <!-- FILL: table `x`, route `/api/x`, module `x` --> |
 
