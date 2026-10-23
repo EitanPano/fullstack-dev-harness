@@ -83,5 +83,5 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
 
 A deleted, skipped or todo test in the diff (spellings per the package's `AGENTS.md › Tests`:
 for example `.skip` and `.todo`, or `pytest.mark.skip`, `skipif`, `xfail`, `-k` and
-`--deselect` in a gate) is a QA failure unless the stage report names it and the reason (behaviour removed on
-purpose). When a test fails, fix the code, not the test.
+`--deselect` in a gate command) is a QA failure unless the stage report names it and the
+reason (behaviour removed on purpose). When a test fails, fix the code, not the test.

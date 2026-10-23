@@ -26,9 +26,11 @@ project); this skill is the procedure.
   decision: the sort key and the id, fetched as `limit + 1` rows after the cursor so the
   extra row proves there is a next page. A bad cursor is a validation failure. The index
   behind it is in the `database` skill.
-- Validation is a gate declared in the router (middleware in Express, a dependency in
-  FastAPI): it parses the request parts the endpoint reads, and the handler reads them typed.
-  A failure is always the same 400 envelope, naming the part (`invalid body`) and the fields.
+- Validation is declared once, from the module's schema: a `validate` middleware in the
+  router (Express) or the handler's typed parameters (FastAPI). It parses the request parts
+  the endpoint reads, and the handler reads them typed. A failure is always the same 400
+  envelope, naming the part (`invalid body`) and the fields. `backend/AGENTS.md › Adding a
+  module` shows the spelling.
 - Rate limits are declared in the router, ahead of validation, so a 429 does not wait for
   parsing. Each endpoint has its own entry in the package's policy constants (never
   literals in a router) and so never shares another endpoint's bucket. The subject of the
@@ -41,9 +43,10 @@ project); this skill is the procedure.
 A module is a directory under the server package's `api/`, singular name, mounted at
 `/api/<name>`. It has the files it needs:
 
-- `routes`: the router. The gates (rate limit, validation, auth; middleware in Express, dependencies
-  in FastAPI) are declared here and nowhere else; each endpoint is one line naming its
-  handler. No logic.
+- `routes`: the router. The gates (rate limit, auth, roles; middleware in Express,
+  dependencies in FastAPI) are declared here and nowhere else, and so is Express's
+  `validate` middleware (FastAPI validates from the handler's typed parameters); each
+  endpoint is one line naming its handler. No logic.
 - `controller`: the handlers and the exported rules that are the module's only public API.
   A handler reads typed input, applies the rules, maps records to response shapes and
   sends the status. A rule is a typed function with no request or response in it.

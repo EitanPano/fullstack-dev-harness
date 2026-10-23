@@ -105,9 +105,11 @@ them from that section.
 
 `docker compose --profile app up --build` at the repository root runs the whole stack from
 each package's Dockerfile. With a database, export the production secrets and the database
-URL the server's `.env.example` lists; the server's one-shot `<dir>-migrate` service runs
-the migrations before the server starts (the package's `AGENTS.md › Adding the data layer`
-says how). The `migrate` command stays for local development.
+URL the server's `.env.example` lists. If `docker-compose.yml` has a `<dir>-migrate` service
+(catalog v1.1.0 and later), `docker compose --profile app up --build` runs the migrations
+before the server; otherwise run the server package's `migrate` inside the stack first (its
+`AGENTS.md › Adding the data layer` says how). The `migrate` command stays for local
+development.
 `docker compose up -d --wait <service>` starts one infrastructure service (the database,
 when the project has one) for local work. Never run a scaffolder inside an existing package.
 
@@ -192,8 +194,8 @@ A task is done only when every item holds and the stage report shows the evidenc
 2. Every new behaviour has a unit test for the happy path and at least one failure or empty
    path. Every user journey the task adds has an e2e test where the stack has a frontend.
 3. No test was deleted, skipped or focused. The spellings (for example `.skip` and `.only`
-   in TypeScript; `pytest.mark.skip`, `skipif`, `xfail`, or `-k` and `--deselect` in a gate in
-   Python) are listed in the package's `AGENTS.md › Tests`. A removed test is named and
+   in TypeScript; `pytest.mark.skip`, `skipif`, `xfail`, or `-k` and `--deselect` in a gate
+   command in Python) are listed in the package's `AGENTS.md › Tests`. A removed test is named and
    justified in the report. The store-backed suites that `check` skips in a package with
    `testDb` are expected; `testDb` must report none skipped.
 4. Errors follow the `error-handling` skill. No secrets, stack traces or query text leave

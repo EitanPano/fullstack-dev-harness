@@ -21,10 +21,11 @@ What you get after the bootstrap:
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
   access to secret files.
 
-The catalog's current stacks: `next-bun-express` is a layered Express 5 API on Bun with an
-`auth` flag, and a Next.js 16 frontend with a client typed from the server's contract;
+The catalog's stacks: `next-bun-express` is a layered Express 5 API on Bun with an `auth`
+flag, and a Next.js 16 frontend with a client typed from the server's contract;
 `next-python-fastapi` pairs the same frontend with a layered FastAPI API on Python managed by
-uv. The catalog README has the matrix.
+uv, and arrives with catalog v1.1.0 (`catalog.lock` must pin that release before the
+bootstrap offers it). The catalog README has the matrix.
 
 ## Prerequisites
 

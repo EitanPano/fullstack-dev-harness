@@ -64,8 +64,9 @@ the data-layer backlog line.
 
 Before scaffolding, check each chosen template's `tools` (name and minimum version, from
 its `template.yaml`) against the machine, for example `uv --version` for a Python backend.
-Name any missing or old tool and stop with its install hint; do not scaffold. The generator
-runs the same check as its preflight, so this is the early, friendly one.
+Name any missing or old tool, the version found and the minimum, then stop; do not
+scaffold. The generator runs the same check as its preflight, so this is the early, friendly
+one.
 
 These three files are the only things this skill reads under the catalog path. Never Glob,
 Grep, list or explore the catalog cache and never dispatch an Explore agent into it; it is
