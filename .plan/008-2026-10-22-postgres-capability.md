@@ -1,9 +1,9 @@
 # The first capability: Postgres for bun-express, catalog v1.0.0
 
-Status: active
+Status: done
 Status set by the session on Eitan's delegation; Eitan confirms.
 Owner: Eitan
-Last updated: 2026-10-22
+Last updated: 2026-10-23
 Approval: Eitan's instruction on 2026-10-22, "start working on milestone 3 plan … if there is
 anything to do before working on it, do it automatically … completed after … a PR is opened on
 both this repo and the templates repo to a dev branch". Open questions are resolved by their
@@ -471,3 +471,10 @@ factual errors corrected in place: the verification order is `check` first, H2 p
   service, hash pins on overlay-shadowed base files, optimistic concurrency for the user
   update, a partial index for the session purge, signal cleanup in test-generated, a
   real-catalog generate unit test.
+- Closed 2026-10-23 (gate G0 of plan 009):
+  - catalog `dev` merged into `main` as 1c6997a (PR #3);
+  - `v1.0.0` tagged there;
+  - `catalog.lock` bumped to it, with a fresh-cache bootstrap proof in the lock PR.
+
+  The migrate service, the pins and the real-catalog generate test moved into plan 009. The other
+  follow-ups stay open.
