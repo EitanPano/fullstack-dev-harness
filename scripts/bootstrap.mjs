@@ -242,8 +242,8 @@ function printNextSteps() {
     )
   }
   console.log(
-    "  .fullstack/catalog.yaml lists each package's commands (check, test, testE2e, contract, " +
-      'migrate and testDb where a database was added) and ports.',
+    "  .fullstack/catalog.yaml lists each package's commands (install, check, test, contract, " +
+      'and testE2e, migrate and testDb where the package declares them) and ports.',
   )
   console.log("  Run every package's check command.")
   if (args.capabilities.length > 0 || args.answers !== undefined) {
