@@ -242,12 +242,22 @@ function printNextSteps() {
     )
   }
   console.log(
-    "  .fullstack/catalog.yaml lists each package's commands (check, test, testE2e, contract) " +
-      'and ports.',
+    "  .fullstack/catalog.yaml lists each package's commands (install, check, test, contract, " +
+      'and testE2e, migrate and testDb where the package declares them) and ports.',
   )
-  console.log(
-    "  Run every package's check command; where a package declares testE2e, install its browser",
-  )
+  console.log("  Run every package's check command.")
+  if (args.capabilities.length > 0 || args.answers !== undefined) {
+    const when =
+      args.capabilities.length > 0
+        ? 'With a provider (a capability was passed)'
+        : 'With a provider (if the answers chose one)'
+    console.log(`  ${when}: after the check commands, run`)
+    console.log(
+      '    docker compose up -d --wait <service>   (the service name is in docker-compose.yml),',
+    )
+    console.log("    then the server package's migrate and testDb (see .fullstack/catalog.yaml).")
+  }
+  console.log('  Where a package declares testE2e, install its browser')
   console.log('    (its AGENTS.md › Tests says how) and run it.')
   console.log(
     '  Fill .doc/ and add the first line to .plan/000-backlog.md (the bootstrap-project skill).',

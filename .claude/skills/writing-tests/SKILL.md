@@ -44,11 +44,12 @@ report says why.
 
 Each package's `AGENTS.md › Tests` names its runner, test directories, stubs and helpers
 (`backend/AGENTS.md`, `frontend/AGENTS.md`). The commands `test` and `testE2e` come from
-`.fullstack/catalog.yaml`; `testDb` is added by the data-layer task and named in the
-package's `AGENTS.md › Adding the data layer`.
+`.fullstack/catalog.yaml`, and `testDb` is there too when a provider was chosen at the
+bootstrap; otherwise the data-layer task adds `testDb` and names it in the package's
+`AGENTS.md › Adding the data layer`. Run `testDb` wherever the package has it.
 
 - Server: HTTP tests import the app builder and never start infrastructure or the
-  entry file. A module's tests live in one file; middleware, shared capabilities and
+  entry file. A module's tests live in one file; gates, shared capabilities and
   infrastructure units get a file each, with no HTTP. Messages (mail, sms) are observed
   through a capturing provider registered at its boundary, never a module mock. An event
   reaction is observed after the action by waiting for the detached handlers to drain; the
@@ -57,7 +58,7 @@ package's `AGENTS.md › Adding the data layer`.
   test asserts the committed OpenAPI document is fresh.
 - Server, database-backed: tests that read or write records through the engine opt in
   through the block the package names and run under `testDb`, against the test database.
-  `check` never needs Docker. Until the product has a database, the test resets the
+  `check` never needs Docker and skips these suites once the package has `testDb`. Until the product has a database, the test resets the
   in-memory store before each test. The `database` skill defines the test database.
 - Frontend: unit tests cover components, loaders and actions. Components get props and are
   asserted through roles and text. Loaders and actions run with the API stubbed at the
@@ -75,10 +76,12 @@ package's `AGENTS.md › Adding the data layer`.
 ## Reliability
 
 - No flaky tests. A test that needs a retry is a bug.
-- Focusing a test (`.only`) is rejected by every runner's configuration.
+- Focusing a test (`.only` in TypeScript runners) is rejected by the runner's configuration;
+  the package's `AGENTS.md › Tests` lists its spellings.
 
 ## Deleted and skipped tests
 
-A deleted, `.skip`ped or `.todo` test in the diff is a QA failure unless the stage report
-names it and the reason (behaviour removed on purpose). When a test fails, fix the code,
-not the test.
+A deleted, skipped or todo test in the diff (spellings per the package's `AGENTS.md › Tests`:
+for example `.skip` and `.todo`, or `pytest.mark.skip`, `skipif`, `xfail`, `-k` and
+`--deselect` in a gate command) is a QA failure unless the stage report names it and the
+reason (behaviour removed on purpose). When a test fails, fix the code, not the test.

@@ -12,20 +12,27 @@ What you get after the bootstrap:
   own `AGENTS.md` (layer map, how to add a module or a feature, errors, tests), with its
   commands and ports recorded in `.fullstack/catalog.yaml`.
 - `docker-compose.yml` with the application images behind the `app` profile and, when a
-  database provider was chosen, its service.
+  database provider was chosen, its service. `--capability database=postgres` (the
+  bootstrap passes it when you pick Postgres) wires the server to a `database` service with
+  `db/init.sql`, a `DATABASE_URL`, migrations, and the `migrate` and `testDb` commands; the
+  catalog README is the reference for the matrix. A provider needs a catalog release that
+  lists it (v1.0.0 or later); `catalog.lock` still pins v0.1.1 until that release.
 - Five role agents (orchestrator, backend, frontend, reviewer, qa), nine skills, and
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
   access to secret files.
 
-The catalog's current stacks: `next-bun-express` is a layered Express 5 API on Bun with an
-`auth` flag, and a Next.js 16 frontend with a client typed from the server's contract. The
-catalog README has the matrix.
+The catalog's stacks: `next-bun-express` is a layered Express 5 API on Bun with an `auth`
+flag, and a Next.js 16 frontend with a client typed from the server's contract;
+`next-python-fastapi` pairs the same frontend with a layered FastAPI API on Python managed by
+uv, and arrives with catalog v1.1.0 (`catalog.lock` must pin that release before the
+bootstrap offers it). The catalog README has the matrix.
 
 ## Prerequisites
 
 - Claude Code 2.1.295 or newer.
 - Bun 1.4 or newer, Node 24 or newer and git, all on the `PATH` that Claude Code sees. On
-  Windows, Git Bash backs the Bash tool.
+  Windows, Git Bash backs the Bash tool. A package's own tools (uv for a Python backend) come
+  from its template's `tools` and are checked at the bootstrap.
 - The bootstrap clones the catalog into
   `~/.cache/fullstack-templates/<version>/` (override with `FULLSTACK_TEMPLATES_CACHE`; use a
   local checkout with `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`).
@@ -100,6 +107,9 @@ blocks the tool call. If `node` is missing from Claude Code's `PATH`, every tool
 `.claude/settings.json` by hand, then restore the hooks once `node` resolves. On a
 Claude Code older than 2.1.295 the hooks run but fail open, so upgrade before relying on
 them.
+
+The hooks have a test suite: `node --test ".claude/hooks/test/*.test.mjs"`. Any change to
+`.claude/hooks/` must pass it.
 
 ## Optional integrations
 

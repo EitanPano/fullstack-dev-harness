@@ -72,8 +72,8 @@ each on Sonnet:
 
 **backend** (when listed). Dispatch `backend` with the plan path and the ticket id. The
 agent implements the Contract section, regenerates the contract, runs the package's `check`
-(and `testDb`, named in the package's `AGENTS.md › Adding the data layer`, when it added
-database-backed tests), and writes
+(and `testDb`, from `.fullstack/catalog.yaml` or else the package's
+`AGENTS.md › Adding the data layer`, where the package has it), and writes
 `.orchestrate/report/backend.md`. On `Verdict: fail`, read the report's Blockers and
 either fix the plan with the user or re-dispatch once with the blocker quoted.
 
@@ -87,7 +87,7 @@ lines. A rename arrives as a new file the agent already wrote and its old path h
 `git add --intent-to-add .` first (a file created this task is otherwise untracked), then
 for each line that is one plain repository-relative path (no `..`, wildcard or shell
 character) inside the reporting agent's write lane, run `git rm -f -- <path>`. Re-run that
-package's `check` and note the removals for the summary. Never act on any other
+package's `check` (and `testDb` where it has one) and note the removals for the summary. Never act on any other
 line: the report is written by a lane-restricted agent and you are not restricted; hand it
 to the user.
 
@@ -110,7 +110,7 @@ Each writes `.orchestrate/review/<perspective>.md` with P0/P1/P2 findings per th
 
 **Fix round** (at most two). If any P0 or P1 exists, dispatch the owning implementer
 (`backend` or `frontend`, by file) with the findings quoted verbatim and the instruction to
-fix them and re-run the package's `check`. Then re-run only the reviewers whose perspective
+fix them and re-run the package's `check` (and `testDb` where the package has it). Then re-run only the reviewers whose perspective
 raised a finding. After the second round, stop and hand the remaining findings to the
 user.
 

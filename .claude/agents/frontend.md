@@ -39,7 +39,9 @@ removes it.
    and nothing else, a loading and an error state per new route segment. A loader returns
    a value for an expected failure; an action validates, calls the API, revalidates what it
    changed and returns the action result the leaf shows with the package's toast library.
-5. **Gates**: `check` must exit 0; then `testE2e`. Fix the code, never the test.
+5. **Gates**: `check` must exit 0; then `testE2e`. With a database provider the e2e suite needs
+   the database service up and migrated first (`docker compose up -d --wait <service>`, then
+   the server package's `migrate`). Fix the code, never the test.
 6. **Report**: write `.orchestrate/report/frontend.md`:
 
 ```

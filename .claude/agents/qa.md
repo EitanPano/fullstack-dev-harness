@@ -31,16 +31,17 @@ under `testDb`, which uses the separate test database.
 2. **Gates**, recorded verbatim, each run from its package directory and read from
    `.fullstack/catalog.yaml`, each in its own command:
    - `check` for every package the plan's `Stages` list;
-   - `testDb` where the package's `AGENTS.md › Adding the data layer` names it and the task
-     added database-backed tests; it needs the Compose database service (`database` skill);
+   - `testDb` where the package has it (in `.fullstack/catalog.yaml`, or else named in its
+     `AGENTS.md › Adding the data layer`); it needs the Compose database service
+     (`database` skill), and none of its suites may be skipped;
    - `testE2e` where a package declares it.
 3. **Contract freshness**: run the server's `contract` command and confirm its committed
    contract file (named in `backend/AGENTS.md`) did not change; then run the frontend's
    `contract` command and confirm its generated types file did not change. A change in
    either means the implementer shipped a stale contract: finding, owner by file.
-4. **Diff hygiene**: `git diff <Base>` contains no deleted test, no `.skip`, `.only` or
-   `.todo`, and no debug output left in source. Each is a finding unless the stage
-   report justified it.
+4. **Diff hygiene**: `git diff <Base>` contains no deleted test, no skipped, focused or
+   todo test (spellings per the package's `AGENTS.md › Tests`), and no debug output left in
+   source. Each is a finding unless the stage report justified it.
 5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
    state, missing or malformed input, boundary sizes, repeated rapid submission, another
    tenant's id, an unauthenticated call. Put them under `backend/tests/` or

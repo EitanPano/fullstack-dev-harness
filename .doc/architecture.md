@@ -23,11 +23,13 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 1. A browser request reaches a route in the frontend's routing layer.
 2. The page calls a feature loader in `feature/<name>/server/`, which calls the API through
    the typed API client.
-3. The module's router mounts the endpoint's middleware (validation against the module's
-   request schema among it) and names the handler. The controller's handler reads the
-   validated input, applies the rules, reads and writes through the module's service (and,
-   across a module boundary, another module's controller), publishes events and sends the
-   response in the schema's shape; failures leave as the error envelope.
+3. The module's router declares the endpoint's gates and names the handler; validation is
+   declared once, from the module's request schema (a `validate` middleware in Express, the
+   handler's typed parameters in FastAPI; see `backend/AGENTS.md › Adding a module`). The
+   controller's handler reads the validated input, applies the rules, reads and writes
+   through the module's service (and, across a module boundary, another module's
+   controller), publishes events and sends the response in the schema's shape; failures
+   leave as the error envelope.
 4. Mutations go through server actions in the same feature directory and revalidate the
    affected route.
 
@@ -40,12 +42,12 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 
 ## Data Store
 
-The harness ships no database; the `database` skill lists the options and what the
-data-layer task delivers. No task may store data while a marker remains here.
+The harness ships no database. A provider chosen at the bootstrap wires one; otherwise the
+`database` skill lists the options and what the data-layer task delivers. No task may store data while a marker remains here.
 
 - Engine: <!-- FILL: Postgres 17 | MongoDB 8 | decide later -->
 - Client library: <!-- FILL: per the server package's AGENTS.md › Adding the data layer, or the provider chosen at the bootstrap -->
-- Local service: <!-- FILL: the docker-compose.yml service name and the URL variable, written by the data-layer task; the client and its Resource live under the server's `infra/`, bound through its db service -->
+- Local service: <!-- FILL: the docker-compose.yml service name and the URL variable, written by the generator when a provider was chosen at the bootstrap, else by the data-layer task; the client and its Resource live under the server's `infra/`, bound through its db service -->
 - Test database: `app_test` on the same service, reached only through the package's `testDb` command.
 
 ## Data Model
@@ -90,11 +92,12 @@ data-layer task delivers. No task may store data while a marker remains here.
   disclosures are accepted: register's 409 tells that an email exists (limited per IP), and
   `PATCH /api/user/me`'s 409 tells that a phone is verified by another account
   (authenticated callers only). A phone claim conflicts only with a verified holder.
-- Where authentication is enforced: the route gate is declarative and fails fast. The
-  auth middleware resolves the caller when a route mounts it; `requireAuth` and
-  `requireRole` reject anonymous or unauthorised calls before any handler runs. The
-  handler resolves the caller and passes it to the controller's rules, which decide
-  authority (who may touch which record); the service never does.
+- Where authentication is enforced: the route gate is declarative and fails fast. The auth
+  gate resolves the caller when a route declares it, and the role gate rejects anonymous or
+  unauthorised calls before any handler runs (the names are in the server package's
+  `AGENTS.md › Authentication`). The handler resolves the caller and passes it to the
+  controller's rules, which decide authority (who may touch which record); the service
+  never does.
 - The frontend's server is the API client, so the frontend auth task must forward
   `X-Forwarded-For` and the backend runs with `TRUST_PROXY` set; otherwise rate limiting
   sees one address.
@@ -116,7 +119,8 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
   bodies and secrets are never logged.
 - Health: `GET /api/health` is the liveness check and never depends on a store.
   `GET /api/health/ready` pings every dependency in the dependency registry
-  (`memory`, `pubsub` and `scheduler` in the template; one ping round in flight at a
+  (`memory`, `pubsub` and `scheduler` in the template, plus the database resource when a
+  provider was chosen at the bootstrap; one ping round in flight at a
   time, the answer reused for a second) and answers 503 with the per-dependency map under
   `dependencies` when one is down. Nothing in the shipped compose file reads it; a
   `HEALTHCHECK` or a compose `healthcheck` that points at it is the data-layer task's or
@@ -132,7 +136,7 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
 - Deployment: one image per package from the two Dockerfiles, both running as a
   non-root user; `docker compose --profile app up --build` runs the stack locally.
   <!-- FILL: the production target (which host, how secrets are injected). -->
-- Data migrations: <!-- FILL: who runs the server's `migrate` command in production and when, once the data layer exists -->
+- Data migrations: <!-- FILL: who runs the server's `migrate` command in production and when, once the data layer exists; with a provider chosen at the bootstrap, answer it at the bootstrap -->
 
 ## Change Log
 
