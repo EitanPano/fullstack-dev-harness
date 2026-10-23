@@ -23,6 +23,16 @@ export function runHook(hook, payload) {
   return { status: result.status, stderr: result.stderr }
 }
 
+// Spawns a hook with raw stdin, no payload wrapping: for malformed input and for fixture hooks.
+// `hookPath` is a file name under .claude/hooks or an absolute path.
+export function runHookRaw(hookPath, input) {
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: ROOT }
+  delete env.AGENT_ROLE
+  const file = path.isAbsolute(hookPath) ? hookPath : path.join(HOOKS, hookPath)
+  const result = spawnSync('node', [file], { input, env, encoding: 'utf8' })
+  return { status: result.status, stderr: result.stderr }
+}
+
 export function shellPayload(command, { role, tool = 'Bash' } = {}) {
   const payload = { tool_name: tool, tool_input: { command } }
   if (role !== undefined) payload.agent_type = role

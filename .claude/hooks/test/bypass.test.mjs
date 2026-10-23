@@ -154,3 +154,61 @@ passes('echo hi | python script.py', { role: 'backend' })
 passes('python -m pytest -k environ')
 passes('python -m pytest -k environ', { role: 'backend' })
 passes('python manage.py runserver')
+
+// Final review, C1 and I-pre: a backslash-escaped quote outside quotes is a literal character,
+// so it must neither merge the arguments after it nor hide a later command.
+for (const command of [
+  'rm \\" -rf x \\"',
+  "rm \\' -rf x \\'",
+  'cat \\" .env \\"',
+  "cat \\' .env \\'",
+  'git push \\" --force \\"',
+  'echo \\" ; rm -rf x ; echo \\"',
+  "echo \\' ; rm -rf x ; echo \\'"
+]) {
+  blocks(command)
+}
+blocks('echo \\" ; tee frontend/x ; echo \\"', { role: 'backend' })
+blocks('echo \\" > frontend/x ; echo \\"', { role: 'backend' })
+blocks('echo `"; Remove-Item -Recurse x; echo `"')
+passes('echo \\"hello\\"')
+passes('echo it\\\'s fine')
+passes('git commit -m "say \\"hi\\" ; ok"')
+passes('cat backend\\notes.txt')
+
+// Final review, M2: node, bun and deno reading their program from stdin run inline code.
+const NODE_DUMP = 'console.log(process.env)'
+for (const command of [
+  `node - <<'EOF'\n${NODE_DUMP}\nEOF`,
+  `echo "${NODE_DUMP}" | node`,
+  `echo "${NODE_DUMP}" | node -`,
+  `bun - <<'EOF'\n${NODE_DUMP}\nEOF`,
+  `echo "${NODE_DUMP}" | bun`,
+  `echo "${NODE_DUMP}" | deno run -`,
+  "node - <<'EOF'\nconsole.log(require('fs').readFileSync('.env', 'utf8'))\nEOF"
+]) {
+  blocks(command)
+}
+for (const command of [
+  "node - <<'EOF'\nrequire('fs').writeFileSync('frontend/x', '1')\nEOF",
+  'echo "1" | node',
+  'echo "1" | bun',
+  'echo "1" | deno run -'
+]) {
+  blocks(command, { role: 'backend' })
+}
+passes("node - <<'EOF'\nconsole.log(1)\nEOF")
+passes('echo "console.log(1)" | node')
+passes('node script.js')
+passes('node --version', { role: 'backend' })
+passes('node --test', { role: 'backend' })
+passes('node script.js < input.txt', { role: 'backend' })
+passes('bun run check', { role: 'backend' })
+passes('bun test', { role: 'backend' })
+passes('bun --version', { role: 'backend' })
+passes('deno test', { role: 'backend' })
+
+// Final review, M4: nesting more wrappers than the analysis follows is refused, not ignored.
+blocks('sudo sudo sudo sudo sudo sudo sudo sudo sudo rm -rf x')
+blocks('nice nice nice nice nice nice nice nice nice tee frontend/x', { role: 'backend' })
+passes('sudo sudo sudo ls')

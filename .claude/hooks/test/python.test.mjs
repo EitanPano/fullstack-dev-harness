@@ -201,3 +201,142 @@ powershell('uv run python -c "print(1)"', true, { role: 'backend' })
 powershell('uv run poe check', false)
 powershell('uv run poe check', false, { role: 'backend' })
 powershell('uv sync --locked', false)
+
+// Final review, C2: uv's own Python channels, `uv run -m <module>` and `uv run -` (a script
+// on stdin), reach the interpreter without naming it.
+const PY_DUMP = 'import os;print(os.environ)'
+const PY_WRITE = "open('frontend/x.txt','w').write('1')"
+for (const command of [
+  `uv run -m timeit "${PY_DUMP}"`,
+  `uv run --module timeit "${PY_DUMP}"`,
+  `uv run -qm timeit "${PY_DUMP}"`,
+  `uv run -m timeit -n1 "print(open('.env').read())"`,
+  `uv run -m timeit -n1 "print(open('/home/u/.pypirc').read())"`,
+  `uv run -m code <<'EOF'\n${PY_DUMP}\nEOF`,
+  `uv run - <<'EOF'\n${PY_DUMP}\nEOF`,
+  `echo "${PY_DUMP}" | uv run -`,
+  `echo "${PY_DUMP}" | uv run --no-project -`,
+  `uv run - <<'EOF'\nprint(open('.env').read())\nEOF`
+]) {
+  blocks(command)
+}
+for (const command of [
+  `uv run -m timeit "${PY_WRITE}"`,
+  `uv run --module timeit "${PY_WRITE}"`,
+  `uv run -m code <<'EOF'\n${PY_WRITE}\nEOF`,
+  `uv run - <<'EOF'\n${PY_WRITE}\nEOF`,
+  `echo "${PY_WRITE}" | uv run --no-project -`
+]) {
+  blocks(command, { role: 'backend' })
+}
+for (const role of [undefined, 'backend']) {
+  passes('uv run -m pytest', { role })
+  passes('uv run -m pytest -q -k environ', { role })
+  passes('uv run --module pytest', { role })
+  passes('uv run -m app.openapi --write', { role })
+  passes('uv run pytest -m slow', { role })
+  passes('uv run -pm pytest', { role })
+}
+
+// Final review, I1: hidden uv value flags (not in `--help`) before and after the subcommand.
+for (const command of [
+  'uv --python-preference system run rm -rf x',
+  'uv --preview-features x run git reset --hard',
+  'uv --python-fetch automatic run rimraf x',
+  'uv run --python-preference system rm -rf x',
+  `uv run --python-preference system python -c "${PY_DUMP}"`,
+  `uv --python-preference system run python -c "${PY_DUMP}"`,
+  `uv run --preview-features x python -c "${PY_DUMP}"`,
+  `uv run --python-fetch never python -c "print(open('.env').read())"`,
+  // An unlisted flag still hides nothing: every later interpreter is judged.
+  `uv run --newflag value python -c "${PY_DUMP}"`,
+  `uv --newflag value run python -c "${PY_DUMP}"`,
+  `uv run --newflag value node -e "console.log(process.env)"`,
+  `uv run --newflag value python - <<'EOF'\n${PY_DUMP}\nEOF`,
+  'npm --prefix backend exec rimraf x',
+  'pnpm --filter x exec rm -rf y'
+]) {
+  blocks(command)
+}
+for (const command of [
+  `uv run --python-preference system python -c "${PY_WRITE}"`,
+  `uv run --newflag value python -c "${PY_WRITE}"`,
+  `uv --newflag value run python -c "${PY_WRITE}"`,
+  `uv run --newflag value node -e "1"`,
+  `uv run --newflag value python - <<'EOF'\n${PY_WRITE}\nEOF`
+]) {
+  blocks(command, { role: 'backend' })
+}
+for (const role of [undefined, 'backend']) {
+  passes('uv run --python-preference system pytest', { role })
+  passes('uv --python-preference system run poe check', { role })
+  passes('uv run --newflag value pytest -k environ', { role })
+  passes('uv run --newflag value poe check', { role })
+  passes('bun add rimraf', { role })
+  passes('npm --prefix backend run build', { role })
+  passes('pnpm --filter x exec prettier --check .', { role })
+}
+
+// Final review, I2: `env` behind a runner or wrapper still dumps the environment.
+for (const command of [
+  'uv run env',
+  'uvx env',
+  'poetry run env',
+  'uv run printenv',
+  'bun run env',
+  'sudo env',
+  'nohup env',
+  'env -u FOO',
+  'env FOO=1',
+  'timeout 5 env',
+  'echo ok; uv run env'
+]) {
+  blocks(command)
+}
+passes('env DEBUG=1 uv run poe dev')
+passes('env -u FOO uv run poe dev')
+passes('sudo ls')
+passes('printenv DATABASE_URL')
+
+// Final review, I3: the asyncio and IPython REPLs read stdin.
+for (const module of ['asyncio', 'code', 'pdb', 'ipython', 'IPython']) {
+  blocks(`python -m ${module} <<'EOF'\n${PY_DUMP}\nEOF`)
+  blocks(`echo "${PY_DUMP}" | python -m ${module}`)
+  blocks(`python -m ${module} <<'EOF'\nprint(open('.env').read())\nEOF`)
+  blocks(`python -m ${module} <<'EOF'\n${PY_WRITE}\nEOF`, { role: 'backend' })
+}
+blocks(`python -Im asyncio <<'EOF'\n${PY_DUMP}\nEOF`)
+passes('python -m pdb script.py')
+passes('python -m pytest -k asyncio')
+passes('python -m asyncio --help', { role: undefined })
+
+// Final review, M1: pyw, ipython and dotless versioned launchers.
+for (const launcher of ['pyw', 'ipython', 'python314', 'python3', 'pythonw', 'pypy310']) {
+  blocks(`${launcher} -c "${PY_DUMP}"`)
+  blocks(`${launcher} -c "${PY_WRITE}"`, { role: 'backend' })
+}
+passes('python314 -m pytest', { role: 'backend' })
+
+// Final review, M3: poetry's repository credentials.
+for (const command of [
+  'cat ~/.config/pypoetry/auth.toml',
+  'cat pypoetry/auth.toml',
+  'type %APPDATA%\\pypoetry\\auth.toml',
+  'Get-Content C:\\Users\\x\\AppData\\Roaming\\pypoetry\\auth.toml',
+  `python -c "print(open('/home/u/.config/pypoetry/auth.toml').read())"`
+]) {
+  blocks(command)
+}
+passes('cat docs/auth.toml')
+passes('cat pypoetry/config.toml')
+
+// Final review, M10: a value flag of `uv run` placed before `python -c` neither hides the
+// program nor the secret.
+for (const flag of ['--with-requirements r.txt', '--package app', '--index https://x.test/simple', '--project backend']) {
+  blocks(`uv run ${flag} python -c "${PY_DUMP}"`)
+  blocks(`uv run ${flag} python -c "print(open('.env').read())"`)
+  blocks(`uv run ${flag} python -c "${PY_WRITE}"`, { role: 'backend' })
+  blocks(`uv run ${flag} python - <<'EOF'\n${PY_WRITE}\nEOF`, { role: 'backend' })
+  passes(`uv run ${flag} pytest`)
+  passes(`uv run ${flag} pytest`, { role: 'backend' })
+}
