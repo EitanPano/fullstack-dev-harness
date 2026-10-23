@@ -26,7 +26,7 @@ router validates the request parts it reads, which raises `validation_failed` wi
 failing fields; a controller propagates a callee's error unchanged and may raise one for a
 composition rule; nothing but the error handler builds an error response. The handler maps
 the package's error to its status, a validation error that escaped anyway to 400,
-body-parser failures to 400, 413 or 415, and everything else to a bare `internal` envelope
+body parsing failures (malformed JSON, too large, unsupported charset or encoding) to 400, 413 or 415, and everything else to a bare `internal` envelope
 after logging it. An unknown error is a generic 500 with the stack logged and never sent.
 
 | Code | Status | Use for |

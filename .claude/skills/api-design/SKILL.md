@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: Add or change an API endpoint, its request schemas, or the generated OpenAPI contract. Use when a plan has a Contract section, when adding a module under the server package's api directory, when choosing a path, method, status code or response shape, when a list needs pagination, when an endpoint needs the caller, or when the frontend needs new types. Covers REST conventions, the module shape (router, controller as the module's public API, schema, private service), validation and middleware in the router, crossing a module boundary through controllers, pagination, auth, and how the contract flows to the frontend.
+description: Add or change an API endpoint, its request schemas, or the generated OpenAPI contract. Use when a plan has a Contract section, when adding a module under the server package's api directory, when choosing a path, method, status code or response shape, when a list needs pagination, when an endpoint needs the caller, or when the frontend needs new types. Covers REST conventions, the module shape (router, controller as the module's public API, schema, private service), validation and gates in the router, crossing a module boundary through controllers, pagination, auth, and how the contract flows to the frontend.
 ---
 
 # API Design
@@ -11,9 +11,9 @@ project); this skill is the procedure.
 
 ## Conventions
 
-- Resource paths are singular and flat: `/api/post`, `/api/post/:id`,
-  `/api/post/:id/comment`. No verbs in paths; an action that is not CRUD is a sub-resource
-  (`POST /api/order/:id/cancellation`).
+- Resource paths are singular and flat: `/api/post`, `/api/post/{id}`,
+  `/api/post/{id}/comment`. No verbs in paths; an action that is not CRUD is a sub-resource
+  (`POST /api/order/{id}/cancellation`).
 - Methods: `GET` (read, idempotent), `POST` (create or non-idempotent action), `PATCH`
   (partial update), `PUT` (full replace, rarely), `DELETE`.
 - Status: `200` read/update, `201` create (body is the created entity), `204` delete with
@@ -26,7 +26,8 @@ project); this skill is the procedure.
   decision: the sort key and the id, fetched as `limit + 1` rows after the cursor so the
   extra row proves there is a next page. A bad cursor is a validation failure. The index
   behind it is in the `database` skill.
-- Validation is middleware declared in the router: it parses the request parts the endpoint
+- Validation is a gate declared in the router (middleware in Express, a dependency in
+  FastAPI): it parses the request parts the endpoint
   reads, and the handler reads them typed. A failure is always the same 400 envelope, naming
   the part (`invalid body`) and the fields.
 - Rate limits are declared in the router, ahead of validation, so a 429 does not wait for
@@ -41,13 +42,14 @@ project); this skill is the procedure.
 A module is a directory under the server package's `api/`, singular name, mounted at
 `/api/<name>`. It has the files it needs:
 
-- `routes`: the router. Middleware (rate limit, validation, gates) is mounted here and
+- `routes`: the router. The gates (rate limit, validation, auth; middleware in Express, dependencies in FastAPI)
+  are declared here and
   nowhere else; each endpoint is one line naming its handler. No logic.
 - `controller`: the handlers and the exported rules that are the module's only public API.
   A handler reads typed input, applies the rules, maps records to response shapes and
   sends the status. A rule is a typed function with no request or response in it.
 - `schema`: the leaf. It validates requests, types responses and registers the contract.
-  A schema for a shape declared in `models/` is held to that type by the compiler.
+  A schema for a shape declared in `models/` is held to that type by the type checker.
 - `service`: the private queries, only when the module has data of its own.
 
 Order of work: types in `models/<name>/` → `schema` → test, red → `service` → `controller`
@@ -56,7 +58,7 @@ copying the shipped reference module and its `models/` directory and renaming `m
 `<name>`; drop the files the module does not need.
 
 The file names, the helpers and the worked example are in `backend/AGENTS.md › Adding a
-module`. Logic in a `routes` file beyond mounting middleware, validating and naming the
+module`. Logic in a `routes` file beyond declaring gates, validating and naming the
 handler is a review finding; business logic belongs in the controller, queries in the
 service.
 

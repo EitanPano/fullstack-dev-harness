@@ -49,7 +49,7 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
 `AGENTS.md › Adding the data layer`. Run `testDb` wherever the package has it.
 
 - Server: HTTP tests import the app builder and never start infrastructure or the
-  entry file. A module's tests live in one file; middleware, shared capabilities and
+  entry file. A module's tests live in one file; gates, shared capabilities and
   infrastructure units get a file each, with no HTTP. Messages (mail, sms) are observed
   through a capturing provider registered at its boundary, never a module mock. An event
   reaction is observed after the action by waiting for the detached handlers to drain; the
@@ -76,10 +76,13 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
 ## Reliability
 
 - No flaky tests. A test that needs a retry is a bug.
-- Focusing a test (`.only`) is rejected by every runner's configuration.
+- Focusing a test (`.only` in TypeScript runners) is rejected by the runner's configuration;
+  the package's `AGENTS.md › Tests` lists its spellings.
 
 ## Deleted and skipped tests
 
-A deleted, `.skip`ped or `.todo` test in the diff is a QA failure unless the stage report
+A deleted, skipped or todo test in the diff (spellings per the package's `AGENTS.md › Tests`:
+for example `.skip` and `.todo`, or `pytest.mark.skip`, `skipif`, `xfail`, `-k` and
+`--deselect` in a gate) is a QA failure unless the stage report
 names it and the reason (behaviour removed on purpose). When a test fails, fix the code,
 not the test.

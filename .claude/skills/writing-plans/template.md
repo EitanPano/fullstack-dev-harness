@@ -31,7 +31,7 @@ acceptance criteria (AC numbers) it satisfies.>
 
 | Endpoint | Request | Response | Errors |
 | --- | --- | --- | --- |
-| `GET /api/<entity>/:id` | `params.id: string` | `{ id, …, createdAt }` | 404 |
+| `GET /api/<entity>/{id}` | `params.id: string` | `{ id, …, createdAt }` | 404 |
 
 ### Backend
 

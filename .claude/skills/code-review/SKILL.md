@@ -27,7 +27,7 @@ error state, a change-log line).
    path that belongs in a job, state that cannot be replicated.
 3. **Maintainability and architecture**: layering and import direction per `AGENTS.md` and
    `backend/AGENTS.md`, naming, duplication, a feature that reaches into another, logic in
-   the routing layer or in a `routes` file beyond mounting middleware, validating and
+   the routing layer or in a `routes` file beyond declaring gates, validating and
    naming the handler (business logic belongs in the controller, its handlers and exported
    rules; queries in the service), a controller reaching another module's service, a
    service imported from outside its module.
@@ -41,7 +41,7 @@ error state, a change-log line).
    remove), configuration no one reads, dead code, cleverness that a comment has to
    explain.
 6. **Deployment and operations**: data change shipped with its migration or index, env variable in
-   `config/env.ts` and `.env.example`, Docker build still valid, change log updated.
+   the package's env module (named in its `AGENTS.md`) and `.env.example`, Docker build still valid, change log updated.
 
 ## Severity
 
