@@ -8,7 +8,8 @@ than 3.15"). Scope was decided by question on 2026-10-22: full parity including 
 `next-python-fastapi` stack, one graded eval, the migrate service and hash pins.
 Branch: `feat/python-fastapi` in both repositories, cut from `dev` on 2026-10-23 before G0
 (see Assumptions)
-Base: harness 5a65f41 (`dev`), catalog f2140db (`dev`, the content `v1.0.0` will tag)
+Base: harness 5a65f41 (`dev`), catalog f2140db (`dev`; `v1.0.0` was tagged 2026-10-23 on its
+`main` merge 1c6997a, the same tree)
 Stages: harness and catalog only (no role agents; the interactive session drives Sonnet
 implementers per task, a Sonnet review per task, one Opus final review per repository, and
 the eval), ending in one pull request per repository into `dev`
@@ -491,7 +492,7 @@ or review can check. The eval (E1) measures whether it works.
       - a pass corpus: `uv run poe check`, `uv sync`, `python -m pytest`, and the plan 006
         false positives;
       - a regression set for the existing behaviour.
-15. **H2, text, settings and bootstrap** (after P4).
+15. **H2, text, settings and bootstrap** (after P4; as run: before P4, see As built).
     - `.claude/settings.json` (M4-21).
     - M4-22 text in `AGENTS.md`, `.claude/rules/{naming,code-style}.md`,
       `.claude/skills/{writing-tests,api-design,database,error-handling,code-review,bootstrap-project}/SKILL.md`
@@ -683,4 +684,45 @@ Each task gets a Sonnet review against the ledger and ADR 0002.
 - Generated projects are standalone; nothing migrates existing data. The Postgres
   migrations in generated projects are forward-only, and dropping a database is a human's
   job (the `database` skill).
+
+## As built
+
+How the run differed from the sections above, which stay as planned. The full record is the
+ledger (`.superpowers/sdd/009-2026-10-23-python-fastapi/progress.md`, git-ignored); ADR 0002's
+As built covers the catalog design.
+
+### Gates and decisions
+
+- **G0.** It was still open when the plan went active. The branches were cut from `dev` first.
+  Eitan merged catalog `dev` → `main` (PR #3, 1c6997a); the session tagged `v1.0.0` and opened
+  the lock-bump PR into harness `dev` (#4) with a fresh-cache bootstrap proof. The harness `dev` →
+  `main` PR follows #4.
+- **G1.** ADR 0002 went through an Opus design review (3 Critical, 15 Important, all folded in)
+  and was accepted by Eitan. It is the binding text for M4-1 to M4-19 and M4-23.
+- **Python 3.14.** Confirmed by evidence: 3.15 lacks a `pyyaml` wheel.
+
+### Task shape and order
+
+- **Order.** Catalog tasks ran strictly one at a time. One harness task could run beside them,
+  because the two repositories share no files.
+- **H2 before P4.** H2 ran before P4: the headings it points at are fixed by M4-17. P4 then
+  completed the forbidden-forms lists both packages' `AGENTS.md › Tests` must carry.
+- **P5a and P5b merged into one task, P5.** Listing the provider makes `validate` require both
+  Postgres cases at once.
+- **P3a declared the `auth` flag,** and the auth models moved into P3a.
+- **T2 took bun-express's pins and `container.migrate`,** which its own checks needed.
+
+### Proofs and reviews
+
+- **Linux gates from P1 on.** Every Python task ran its gates on Linux (`python:3.14-slim`) as well
+  as Windows, after P1's Windows-only proof missed a Linux-only test failure.
+- **H3** (V33–V35) passed, run by the session from a script.
+- **The catalog final review** was split into two Opus reviewers: machinery and docs, and the
+  Python template.
+- **E1 was not run.** Eitan chose to skip the eval. V40 stays open as a follow-up; E0's rubric and
+  paired prompts are in `harness-eval/` for a later run.
+- **Eitan's leftovers** (the hooks refuse volume removal): the Docker volumes
+  `lockproof_database-data`, `pgdemo_database-data`, `lindemo_database-data`,
+  `py-pg_database-data`, `bun-pg_database-data`, and the agent worktree directories under
+  `.claude/worktrees/`.
 
