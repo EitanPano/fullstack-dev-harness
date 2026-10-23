@@ -47,7 +47,7 @@ All nine, in this order, with these exact headings:
 `Rollout Order` · `Rollback`
 
 When the task touches the API, `Steps` begins with a `Contract` subsection: each
-endpoint as `METHOD /api/<entity>[/:id]`, its request fields, its response fields, and
+endpoint as `METHOD /api/<entity>[/{id}]`, its request fields, its response fields, and
 the error codes it can return. The backend agent implements exactly that list; the
 frontend agent consumes the generated types.
 

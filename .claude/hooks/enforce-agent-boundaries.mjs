@@ -26,11 +26,19 @@ import process from 'node:process'
 import {
   allow,
   block,
+  commandOf,
+  escapeForms,
+  interpreterViews,
   isCanonicalPath,
+  isPythonProgram,
   programName,
   projectRoot,
+  pythonInlineCode,
+  pythonReadsStdin,
   readPayload,
   resolveRole,
+  scriptInlineCode,
+  scriptReadsStdin,
   segmentTokens,
   sessionCwd,
   shellSegments,
@@ -63,7 +71,9 @@ const WRITE_PROGRAMS = new Set([
   'rni', 'ren', 'rename', 'rimraf'
 ])
 // Inline code can write anything; scripts run by path (`bun run src/x.ts`) are fine.
-const INLINE_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'python', 'python3', 'perl', 'ruby', 'php'])
+// Python (py, python, python3.N, pypy) is judged by isPythonProgram: its `-c` only counts
+// before the script, so `python run.py -c conf` is a script run.
+const INLINE_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'perl', 'ruby', 'php'])
 const INLINE_FLAG = /^(-e|-p|-c|-r|--eval|--print)$/
 // git subcommands that never change the working tree or the history.
 const GIT_READ = new Set([
@@ -93,7 +103,7 @@ const lanes = Object.hasOwn(WRITE_LANES, role) ? WRITE_LANES[role] : undefined
 if (lanes === '*') allow()
 
 if (SHELL_TOOLS.has(payload.tool_name)) {
-  const command = typeof payload.tool_input.command === 'string' ? payload.tool_input.command : ''
+  const command = commandOf(payload)
   const channel = shellWriteChannel(command)
   if (channel !== null) {
     block(`"${role}" may not change files through the shell (${channel}). Use the Edit or Write tool; git writes are the driver's job.`)
@@ -133,28 +143,61 @@ function shellWriteChannel(command) {
     if (!HARMLESS_REDIRECT.test(redirect.trim())) return `redirect ${redirect.trim().split(/\s+/)[0]}`
   }
   for (const segment of shellSegments(command)) {
-    const tokens = segmentTokens(segment)
-    if (tokens.length === 0) continue
-    const program = programName(tokens[0])
-    const args = tokens.slice(1)
-    if (WRITE_PROGRAMS.has(program)) return program
-    if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
-    if (INLINE_RUNTIMES.has(program) && args.some(arg => INLINE_FLAG.test(arg))) return `${program} inline code`
-    if (program === 'git') {
-      const git = gitCommand(args)
-      if (git.option !== undefined) return `git ${git.option}`
-      const { sub, rest } = git
-      // `git diff --output=<file>` and `git log --output <file>` write despite a read subcommand.
-      if (rest.some(arg => /^--output(=|$)/.test(arg))) return `git ${sub} --output`
-      const listOnly = rest.every(arg => GIT_LIST_FLAG.test(arg))
-      const ok =
-        GIT_READ.has(sub) ||
-        (sub === 'branch' && listOnly) ||
-        (sub === 'tag' && listOnly) ||
-        (sub === 'stash' && (rest[0] === 'list' || rest[0] === 'show')) ||
-        (sub === 'config' && rest.some(arg => /^(--get|--list|-l)$/.test(arg)))
-      if (!ok) return `git ${sub || '(no subcommand)'}`
+    // As written, and the way bash unescapes a backslash (`t\ee f` is `tee f`).
+    for (const unescape of escapeForms(segment)) {
+      const channel = segmentWriteChannel(segment, unescape)
+      if (channel !== null) return channel
     }
+  }
+  return null
+}
+
+function segmentWriteChannel(segment, unescape) {
+  const tokens = segmentTokens(segment, unescape)
+  if (tokens.length === 0) return null
+  const program = programName(tokens[0])
+  const args = tokens.slice(1)
+  if (WRITE_PROGRAMS.has(program)) return program
+  if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
+  const inline = interpreterChannel(program, args)
+  if (inline !== null) return inline
+  // A runner's flag table is best effort: an unlisted flag can make its value the apparent
+  // program and hide an interpreter behind it. Judge every later interpreter as a program
+  // start too, which fails closed.
+  for (const view of interpreterViews(segment, unescape)) {
+    const hidden = interpreterChannel(programName(view[0]), view.slice(1))
+    if (hidden !== null) return hidden
+  }
+  if (program === 'git') {
+    const git = gitCommand(args)
+    if (git.option !== undefined) return `git ${git.option}`
+    const { sub, rest } = git
+    // `git diff --output=<file>` and `git log --output <file>` write despite a read subcommand.
+    if (rest.some(arg => /^--output(=|$)/.test(arg))) return `git ${sub} --output`
+    const listOnly = rest.every(arg => GIT_LIST_FLAG.test(arg))
+    const ok =
+      GIT_READ.has(sub) ||
+      (sub === 'branch' && listOnly) ||
+      (sub === 'tag' && listOnly) ||
+      (sub === 'stash' && (rest[0] === 'list' || rest[0] === 'show')) ||
+      (sub === 'config' && rest.some(arg => /^(--get|--list|-l)$/.test(arg)))
+    if (!ok) return `git ${sub || '(no subcommand)'}`
+  }
+  return null
+}
+
+// Inline code through an interpreter writes anything: `node -e`, a bare `node` or `-` reading
+// stdin, Python's `-c`, an inline module, Python reading stdin (a heredoc, a pipe, `-`).
+function interpreterChannel(program, args) {
+  if (INLINE_RUNTIMES.has(program)) {
+    // Attached spellings (`node -e'code'`, `--eval=code`) are inline code as well.
+    const flagged = args.some(arg => INLINE_FLAG.test(arg))
+    if (flagged || scriptInlineCode(args, 'erp') !== null || scriptReadsStdin(args)) {
+      return `${program} inline code`
+    }
+  }
+  if (isPythonProgram(program) && (pythonInlineCode(args) !== null || pythonReadsStdin(args))) {
+    return `${program} inline code`
   }
   return null
 }

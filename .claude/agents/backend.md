@@ -39,7 +39,8 @@ there. The driver removes it. A refusal is the rule working; do not route around
    `testDb`, run that too, since `check` skips the store-backed suites.
 4. **Implement**: `service` (queries, only when the module has data), `controller` (the
    handlers, one per endpoint, and the exported rules that are the module's only public
-   API), `routes` (the router: the endpoint's middleware, validation, the handler); then
+   API), `routes` (the router: the endpoint's gates and its handler; validation is declared
+   from the module's schema, as the package's `AGENTS.md` shows); then
    the module's mount line and its contract registration line, per `backend/AGENTS.md ›
    Adding a module`. Lists paginate per that section. The `api-design` skill holds the
    procedure.

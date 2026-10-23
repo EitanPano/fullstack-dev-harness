@@ -21,13 +21,15 @@ package's; their names and files are in `backend/AGENTS.md › Errors` and `fron
 ## Backend
 
 Controllers (and the service) raise the package's error type with a code, a message and
-optional details. The
-router validates the request parts it reads, which raises `validation_failed` with the
-failing fields; a controller propagates a callee's error unchanged and may raise one for a
-composition rule; nothing but the error handler builds an error response. The handler maps
+optional details. Validation, declared from the module's schema (the router's `validate`
+middleware in Express, the handler's typed parameters in FastAPI), raises
+`validation_failed` with the failing fields; a controller propagates a callee's error
+unchanged and may raise one for a composition rule; nothing but the error handler builds
+an error response. The handler maps
 the package's error to its status, a validation error that escaped anyway to 400,
-body-parser failures to 400, 413 or 415, and everything else to a bare `internal` envelope
-after logging it. An unknown error is a generic 500 with the stack logged and never sent.
+body parsing failures (malformed JSON, too large, unsupported charset or encoding) to 400,
+413 or 415, and everything else to a bare `internal` envelope after logging it. An unknown
+error is a generic 500 with the stack logged and never sent.
 
 | Code | Status | Use for |
 | --- | --- | --- |

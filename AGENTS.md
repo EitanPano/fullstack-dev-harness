@@ -69,7 +69,8 @@ a product is chosen at the bootstrap and recorded in `.fullstack/catalog.yaml`.
 
 - Bun 1.4 or newer, Node 24 or newer and git: the catalog's tools run on Bun and the
   bootstrap clones the catalog, so these are harness prerequisites whatever the stack. Node
-  also runs the harness scripts and the hooks.
+  also runs the harness scripts and the hooks. A package's own tools (uv for a Python
+  backend) come from its `template.yaml` `tools` and are checked at the bootstrap.
 - Docker Compose: the deployment target (one image per package) and the host of local
   infrastructure such as the database.
 
@@ -104,8 +105,11 @@ them from that section.
 
 `docker compose --profile app up --build` at the repository root runs the whole stack from
 each package's Dockerfile. With a database, export the production secrets and the database
-URL the server's `.env.example` lists, and run the server package's `migrate` inside the
-stack first (the package's `AGENTS.md › Adding the data layer` says how).
+URL the server's `.env.example` lists. If `docker-compose.yml` has a `<dir>-migrate` service
+(catalog v1.1.0 and later), `docker compose --profile app up --build` runs the migrations
+before the server; otherwise run the server package's `migrate` inside the stack first (its
+`AGENTS.md › Adding the data layer` says how). The `migrate` command stays for local
+development.
 `docker compose up -d --wait <service>` starts one infrastructure service (the database,
 when the project has one) for local work. Never run a scaffolder inside an existing package.
 
@@ -120,10 +124,11 @@ Two deployable packages and one generated contract between them.
 - Directories: `config/` (env read once, constants, CORS, the route mount table),
   `api/<module>/` (`routes` the router, `controller` the rules and handlers and the module's
   only public API, `schema` the leaf, `service` the private queries when the module has
-  data), `models/<name>/`, `middleware/`, `services/` (stateful shared capabilities;
+  data), `models/<name>/`, `middleware/` (request handling shared across endpoints: the
+  gates and cross-cutting middleware), `services/` (stateful shared capabilities;
   `security/`, `communicate/`, pure `utils/`) and `infra/` (live connections as resources,
   `jobs/`, `subscribers/`, `scripts/`).
-- Request flow: `config routes → module routes → middleware → controller handler →
+- Request flow: `config routes → module routes → gates → controller handler →
   service → db seam → infra store`. Behaviour crosses modules only through the rules a
   controller exports; a module's service is never imported from outside it.
 - The language's tool enforces the import direction; the rest is listed in the package's
@@ -151,7 +156,7 @@ server package's `AGENTS.md`.
 
 **Contract and data**
 
-- HTTP: singular resource paths (`/api/post`, `/api/post/:id`), JSON only, the error
+- HTTP: singular resource paths (`/api/post`, `/api/post/{id}`), JSON only, the error
   envelope from the `error-handling` skill, a request id on every response.
 - The server's request schemas are the single source of truth: they validate requests, type
   responses and produce the OpenAPI document. The frontend regenerates its types with its
@@ -188,7 +193,9 @@ A task is done only when every item holds and the stage report shows the evidenc
    package has one, with none skipped.
 2. Every new behaviour has a unit test for the happy path and at least one failure or empty
    path. Every user journey the task adds has an e2e test where the stack has a frontend.
-3. No test was deleted, skipped or focused (`.skip`, `.only`). A removed test is named and
+3. No test was deleted, skipped or focused. The spellings (for example `.skip` and `.only`
+   in TypeScript; `pytest.mark.skip`, `skipif`, `xfail`, or `-k` and `--deselect` in a gate
+   command in Python) are listed in the package's `AGENTS.md › Tests`. A removed test is named and
    justified in the report. The store-backed suites that `check` skips in a package with
    `testDb` are expected; `testDb` must report none skipped.
 4. Errors follow the `error-handling` skill. No secrets, stack traces or query text leave

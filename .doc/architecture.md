@@ -23,11 +23,13 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 1. A browser request reaches a route in the frontend's routing layer.
 2. The page calls a feature loader in `feature/<name>/server/`, which calls the API through
    the typed API client.
-3. The module's router mounts the endpoint's middleware (validation against the module's
-   request schema among it) and names the handler. The controller's handler reads the
-   validated input, applies the rules, reads and writes through the module's service (and,
-   across a module boundary, another module's controller), publishes events and sends the
-   response in the schema's shape; failures leave as the error envelope.
+3. The module's router declares the endpoint's gates and names the handler; validation is
+   declared once, from the module's request schema (a `validate` middleware in Express, the
+   handler's typed parameters in FastAPI; see `backend/AGENTS.md › Adding a module`). The
+   controller's handler reads the validated input, applies the rules, reads and writes
+   through the module's service (and, across a module boundary, another module's
+   controller), publishes events and sends the response in the schema's shape; failures
+   leave as the error envelope.
 4. Mutations go through server actions in the same feature directory and revalidate the
    affected route.
 
@@ -90,11 +92,12 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
   disclosures are accepted: register's 409 tells that an email exists (limited per IP), and
   `PATCH /api/user/me`'s 409 tells that a phone is verified by another account
   (authenticated callers only). A phone claim conflicts only with a verified holder.
-- Where authentication is enforced: the route gate is declarative and fails fast. The
-  auth middleware resolves the caller when a route mounts it; `requireAuth` and
-  `requireRole` reject anonymous or unauthorised calls before any handler runs. The
-  handler resolves the caller and passes it to the controller's rules, which decide
-  authority (who may touch which record); the service never does.
+- Where authentication is enforced: the route gate is declarative and fails fast. The auth
+  gate resolves the caller when a route declares it, and the role gate rejects anonymous or
+  unauthorised calls before any handler runs (the names are in the server package's
+  `AGENTS.md › Authentication`). The handler resolves the caller and passes it to the
+  controller's rules, which decide authority (who may touch which record); the service
+  never does.
 - The frontend's server is the API client, so the frontend auth task must forward
   `X-Forwarded-For` and the backend runs with `TRUST_PROXY` set; otherwise rate limiting
   sees one address.

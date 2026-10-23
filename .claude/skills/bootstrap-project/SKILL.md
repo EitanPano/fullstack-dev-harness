@@ -8,7 +8,8 @@ description: Turn a fresh clone of this harness into a running full-stack projec
 Runs once per project, in the interactive session (no role agent). The harness owns no
 templates: `catalog.lock` pins a release of the template catalog, and the bootstrap runs
 that catalog's generator. This skill supplies the product, the stack choice and the
-database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24+, git.
+database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24+, git, and
+each chosen template's own tools.
 
 ## 1. Decide the product with the user
 
@@ -61,6 +62,12 @@ confirm. On a yes, pass `--capability database=<id>`; the data-layer backlog lin
 NOT written, because the generator wired the engine. On a no, pass no capability and write
 the data-layer backlog line.
 
+Before scaffolding, check each chosen template's `tools` (name and minimum version, from
+its `template.yaml`) against the machine, for example `uv --version` for a Python backend.
+Name any missing or old tool, the version found and the minimum, then stop; do not
+scaffold. The generator runs the same check as its preflight, so this is the early, friendly
+one.
+
 These three files are the only things this skill reads under the catalog path. Never Glob,
 Grep, list or explore the catalog cache and never dispatch an Explore agent into it; it is
 outside the working tree on purpose.
@@ -108,7 +115,7 @@ scaffold is a catalog bug: say so explicitly, name the template and version from
 provenance file, and record it in the final message.
 
 Then start each package's `dev` command and open the frontend's `http.health` path on its
-`http.port`: the page must reach the server (for `frontend/next`, the API version pill
+`http.port`: the page must reach the server (for a Next.js frontend, the API version pill
 proves the typed client reaches it).
 
 A fresh server package has: health, the commented reference module, and authentication when

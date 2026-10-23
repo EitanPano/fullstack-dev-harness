@@ -13,6 +13,6 @@ package follows its own `AGENTS.md` and its `format` command.
 
 - The harness files are written by hand in the Prettier style: `semi: false`,
   `singleQuote: true`, `printWidth: 100`. The harness has no formatter script.
-- TypeScript strict. No `any`; use `unknown` and narrow. Named exports. Small files with
-  one responsibility.
+- Plain ESM JavaScript on Node built-ins, no dependencies and no build step. Named exports.
+  Small files with one responsibility.
 - Comments say why, not what. No commented-out code.

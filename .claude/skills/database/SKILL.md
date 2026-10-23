@@ -82,7 +82,7 @@ properties, or a race the memory store hides reaches production:
 
 - **One data-model source.** The entity's stored-record type in `models/<name>/` is the
   declaration. Engines that define models in code keep the storage mapping in the module,
-  written so the compiler holds it to that type; engines whose model is the migration
+  written so the type checker holds it to that type; engines whose model is the migration
   history keep one schema file and map rows to the type in the data-access file.
   `.doc/architecture.md` Data Model lists the same entities in prose; the code wins on
   conflict.

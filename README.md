@@ -21,15 +21,18 @@ What you get after the bootstrap:
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
   access to secret files.
 
-The catalog's current stacks: `next-bun-express` is a layered Express 5 API on Bun with an
-`auth` flag, and a Next.js 16 frontend with a client typed from the server's contract. The
-catalog README has the matrix.
+The catalog's stacks: `next-bun-express` is a layered Express 5 API on Bun with an `auth`
+flag, and a Next.js 16 frontend with a client typed from the server's contract;
+`next-python-fastapi` pairs the same frontend with a layered FastAPI API on Python managed by
+uv, and arrives with catalog v1.1.0 (`catalog.lock` must pin that release before the
+bootstrap offers it). The catalog README has the matrix.
 
 ## Prerequisites
 
 - Claude Code 2.1.295 or newer.
 - Bun 1.4 or newer, Node 24 or newer and git, all on the `PATH` that Claude Code sees. On
-  Windows, Git Bash backs the Bash tool.
+  Windows, Git Bash backs the Bash tool. A package's own tools (uv for a Python backend) come
+  from its template's `tools` and are checked at the bootstrap.
 - The bootstrap clones the catalog into
   `~/.cache/fullstack-templates/<version>/` (override with `FULLSTACK_TEMPLATES_CACHE`; use a
   local checkout with `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`).
@@ -104,6 +107,9 @@ blocks the tool call. If `node` is missing from Claude Code's `PATH`, every tool
 `.claude/settings.json` by hand, then restore the hooks once `node` resolves. On a
 Claude Code older than 2.1.295 the hooks run but fail open, so upgrade before relying on
 them.
+
+The hooks have a test suite: `node --test ".claude/hooks/test/*.test.mjs"`. Any change to
+`.claude/hooks/` must pass it.
 
 ## Optional integrations
 
