@@ -7,7 +7,8 @@ variables.
   `feature/post/`, table or collection `post`.
 - Use the canonical short term from `.doc/glossary.md`. Never introduce a second word for
   a concept that already has one; add a new shared term to the glossary before using it.
-- Directories and files are kebab-case. UI components are PascalCase exports.
+- File and directory case follows the package's language, stated in its `AGENTS.md`
+  (kebab-case for a TypeScript package, snake_case module names for Python). UI components are PascalCase exports.
   SQL tables and columns are snake_case; MongoDB collections are singular and their
   fields camelCase. Environment variables are SCREAMING_SNAKE_CASE.
 - Route, module, feature and file names match the domain term they serve.
