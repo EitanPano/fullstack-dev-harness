@@ -8,7 +8,8 @@ description: Turn a fresh clone of this harness into a running full-stack projec
 Runs once per project, in the interactive session (no role agent). The harness owns no
 templates: `catalog.lock` pins a release of the template catalog, and the bootstrap runs
 that catalog's generator. This skill supplies the product, the stack choice and the
-database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24+, git, and each chosen template's own tools.
+database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24+, git, and
+each chosen template's own tools.
 
 ## 1. Decide the product with the user
 

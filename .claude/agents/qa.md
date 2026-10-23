@@ -40,8 +40,8 @@ under `testDb`, which uses the separate test database.
    `contract` command and confirm its generated types file did not change. A change in
    either means the implementer shipped a stale contract: finding, owner by file.
 4. **Diff hygiene**: `git diff <Base>` contains no deleted test, no skipped, focused or
-   todo test (spellings per the package's `AGENTS.md › Tests`), and no debug output left in source. Each is a finding unless the stage
-   report justified it.
+   todo test (spellings per the package's `AGENTS.md › Tests`), and no debug output left in
+   source. Each is a finding unless the stage report justified it.
 5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
    state, missing or malformed input, boundary sizes, repeated rapid submission, another
    tenant's id, an unauthenticated call. Put them under `backend/tests/` or

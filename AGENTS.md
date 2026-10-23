@@ -122,8 +122,9 @@ Two deployable packages and one generated contract between them.
 - Directories: `config/` (env read once, constants, CORS, the route mount table),
   `api/<module>/` (`routes` the router, `controller` the rules and handlers and the module's
   only public API, `schema` the leaf, `service` the private queries when the module has
-  data), `models/<name>/`, `middleware/` (the router's gates),
-  `services/` (stateful shared capabilities; `security/`, `communicate/`, pure `utils/`) and `infra/` (live connections as resources,
+  data), `models/<name>/`, `middleware/` (request handling shared across endpoints: the
+  gates and cross-cutting middleware), `services/` (stateful shared capabilities;
+  `security/`, `communicate/`, pure `utils/`) and `infra/` (live connections as resources,
   `jobs/`, `subscribers/`, `scripts/`).
 - Request flow: `config routes → module routes → gates → controller handler →
   service → db seam → infra store`. Behaviour crosses modules only through the rules a

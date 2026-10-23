@@ -41,7 +41,8 @@ error state, a change-log line).
    remove), configuration no one reads, dead code, cleverness that a comment has to
    explain.
 6. **Deployment and operations**: data change shipped with its migration or index, env variable in
-   the package's env module (named in its `AGENTS.md`) and `.env.example`, Docker build still valid, change log updated.
+   the package's env module (named in its `AGENTS.md`) and `.env.example`, Docker build still
+   valid, change log updated.
 
 ## Severity
 

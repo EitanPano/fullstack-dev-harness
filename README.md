@@ -107,8 +107,8 @@ blocks the tool call. If `node` is missing from Claude Code's `PATH`, every tool
 Claude Code older than 2.1.295 the hooks run but fail open, so upgrade before relying on
 them.
 
-The hooks have a test suite: `node --test ".claude/hooks/test/*.test.mjs"`. Run it and keep it
-green for any change to `.claude/hooks/`.
+The hooks have a test suite: `node --test ".claude/hooks/test/*.test.mjs"`. Any change to
+`.claude/hooks/` must pass it.
 
 ## Optional integrations
 
