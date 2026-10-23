@@ -20,6 +20,7 @@ import {
   allow,
   block,
   commandOf,
+  escapeForms,
   interpreterViews,
   isPythonProgram,
   programName,
@@ -77,19 +78,23 @@ for (const segment of shellSegments(command)) {
   if (/^(printenv|env)(\s+-\w+)*$/i.test(segment)) {
     block(`blocked ${tool} call that dumps the environment (${segment.split(/\s/)[0]}). Read one variable by name instead.`)
   }
-  const tokens = segmentTokens(segment)
-  if (tokens.length === 0) continue
-  // The wrapper-stripped tokens drop runner flags such as `--env-file`, so the raw tokens
-  // are scanned too, however the command is wrapped.
-  const candidates = [...tokens, ...rawTokens(segment)]
-  if (candidates.some(token => isSecretPath(stripRedirect(token)))) {
-    block(`blocked ${tool} call naming a secret file in the command. Use .env.example instead.`)
+  // Read as written and, when there is a backslash, the way bash unescapes it
+  // (`cat .\env` is `cat .env`); either reading may name a secret.
+  for (const unescape of escapeForms(segment)) {
+    const tokens = segmentTokens(segment, unescape)
+    if (tokens.length === 0) continue
+    // The wrapper-stripped tokens drop runner flags such as `--env-file`, so the raw tokens
+    // are scanned too, however the command is wrapped.
+    const candidates = [...tokens, ...rawTokens(segment, unescape)]
+    if (candidates.some(token => isSecretPath(stripRedirect(token)))) {
+      block(`blocked ${tool} call naming a secret file in the command. Use .env.example instead.`)
+    }
+    judgeProgram(tokens, segment)
+    // A runner's flag table is best effort: an unlisted flag can make its value the apparent
+    // program and hide an interpreter behind it (`uv run --newflag x python -c "…"`). So every
+    // later token that names an interpreter is judged as a program start too, which fails closed.
+    for (const view of interpreterViews(segment, unescape)) judgeProgram(view, segment)
   }
-  judgeProgram(tokens, segment)
-  // A runner's flag table is best effort: an unlisted flag can make its value the apparent
-  // program and hide an interpreter behind it (`uv run --newflag x python -c "…"`). So every
-  // later token that names an interpreter is judged as a program start too, which fails closed.
-  for (const view of interpreterViews(segment)) judgeProgram(view, segment)
 }
 
 allow()
@@ -146,9 +151,9 @@ function isSecretPath(value) {
 // `--env-file=.env`), plus the value of each `--flag=value` / `NAME=value`. A token with
 // whitespace is a quoted string handed to something else (inline code, a shell command); it is
 // handled where it is parsed, not as a file name.
-function rawTokens(segment) {
+function rawTokens(segment, unescape) {
   const out = []
-  for (const token of tokenize(segment)) {
+  for (const token of tokenize(segment, unescape)) {
     if (/\s/.test(token)) continue
     out.push(token)
     const eq = token.indexOf('=')

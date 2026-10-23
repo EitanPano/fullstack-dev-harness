@@ -27,6 +27,7 @@ import {
   allow,
   block,
   commandOf,
+  escapeForms,
   interpreterViews,
   isCanonicalPath,
   isPythonProgram,
@@ -142,36 +143,45 @@ function shellWriteChannel(command) {
     if (!HARMLESS_REDIRECT.test(redirect.trim())) return `redirect ${redirect.trim().split(/\s+/)[0]}`
   }
   for (const segment of shellSegments(command)) {
-    const tokens = segmentTokens(segment)
-    if (tokens.length === 0) continue
-    const program = programName(tokens[0])
-    const args = tokens.slice(1)
-    if (WRITE_PROGRAMS.has(program)) return program
-    if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
-    const inline = interpreterChannel(program, args)
-    if (inline !== null) return inline
-    // A runner's flag table is best effort: an unlisted flag can make its value the apparent
-    // program and hide an interpreter behind it. Judge every later interpreter as a program
-    // start too, which fails closed.
-    for (const view of interpreterViews(segment)) {
-      const hidden = interpreterChannel(programName(view[0]), view.slice(1))
-      if (hidden !== null) return hidden
+    // As written, and the way bash unescapes a backslash (`t\ee f` is `tee f`).
+    for (const unescape of escapeForms(segment)) {
+      const channel = segmentWriteChannel(segment, unescape)
+      if (channel !== null) return channel
     }
-    if (program === 'git') {
-      const git = gitCommand(args)
-      if (git.option !== undefined) return `git ${git.option}`
-      const { sub, rest } = git
-      // `git diff --output=<file>` and `git log --output <file>` write despite a read subcommand.
-      if (rest.some(arg => /^--output(=|$)/.test(arg))) return `git ${sub} --output`
-      const listOnly = rest.every(arg => GIT_LIST_FLAG.test(arg))
-      const ok =
-        GIT_READ.has(sub) ||
-        (sub === 'branch' && listOnly) ||
-        (sub === 'tag' && listOnly) ||
-        (sub === 'stash' && (rest[0] === 'list' || rest[0] === 'show')) ||
-        (sub === 'config' && rest.some(arg => /^(--get|--list|-l)$/.test(arg)))
-      if (!ok) return `git ${sub || '(no subcommand)'}`
-    }
+  }
+  return null
+}
+
+function segmentWriteChannel(segment, unescape) {
+  const tokens = segmentTokens(segment, unescape)
+  if (tokens.length === 0) return null
+  const program = programName(tokens[0])
+  const args = tokens.slice(1)
+  if (WRITE_PROGRAMS.has(program)) return program
+  if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
+  const inline = interpreterChannel(program, args)
+  if (inline !== null) return inline
+  // A runner's flag table is best effort: an unlisted flag can make its value the apparent
+  // program and hide an interpreter behind it. Judge every later interpreter as a program
+  // start too, which fails closed.
+  for (const view of interpreterViews(segment, unescape)) {
+    const hidden = interpreterChannel(programName(view[0]), view.slice(1))
+    if (hidden !== null) return hidden
+  }
+  if (program === 'git') {
+    const git = gitCommand(args)
+    if (git.option !== undefined) return `git ${git.option}`
+    const { sub, rest } = git
+    // `git diff --output=<file>` and `git log --output <file>` write despite a read subcommand.
+    if (rest.some(arg => /^--output(=|$)/.test(arg))) return `git ${sub} --output`
+    const listOnly = rest.every(arg => GIT_LIST_FLAG.test(arg))
+    const ok =
+      GIT_READ.has(sub) ||
+      (sub === 'branch' && listOnly) ||
+      (sub === 'tag' && listOnly) ||
+      (sub === 'stash' && (rest[0] === 'list' || rest[0] === 'show')) ||
+      (sub === 'config' && rest.some(arg => /^(--get|--list|-l)$/.test(arg)))
+    if (!ok) return `git ${sub || '(no subcommand)'}`
   }
   return null
 }

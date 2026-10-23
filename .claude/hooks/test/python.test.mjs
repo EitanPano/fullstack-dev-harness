@@ -340,3 +340,13 @@ for (const flag of ['--with-requirements r.txt', '--package app', '--index https
   passes(`uv run ${flag} pytest`)
   passes(`uv run ${flag} pytest`, { role: 'backend' })
 }
+
+// Addendum 2: the `--module=<mod>` spelling is the same channel as `--module <mod>`.
+blocks(`uv run --module=timeit "${PY_DUMP}"`)
+blocks(`uv run --with httpx --module=timeit "${PY_DUMP}"`)
+blocks(`uv run --module=timeit "${PY_WRITE}"`, { role: 'backend' })
+blocks(`uv run --module=code <<'EOF'\n${PY_DUMP}\nEOF`)
+for (const role of [undefined, 'backend']) {
+  passes('uv run --module=pytest -q', { role })
+  passes('uv run --module=app.openapi --write', { role })
+}

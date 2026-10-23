@@ -19,6 +19,7 @@ import {
   allow,
   block,
   commandOf,
+  escapeForms,
   programName,
   readPayload,
   runnerTails,
@@ -35,17 +36,25 @@ const MONGO_CLIENTS = new Set(['mongosh', 'mongo'])
 const payload = await readPayload()
 const command = commandOf(payload)
 
-const segments = shellSegments(command).map(segment => ({ segment, tokens: segmentTokens(segment) }))
+// Each segment is read twice when it has a backslash: as written and the way bash unescapes it
+// (`rm \-rf x` is `rm -rf x`); either reading may trigger a rule.
+const segments = shellSegments(command).flatMap(segment =>
+  escapeForms(segment).map(unescape => ({
+    segment,
+    unescape,
+    tokens: segmentTokens(segment, unescape)
+  }))
+)
 const programs = new Set(segments.filter(({ tokens }) => tokens.length > 0).map(({ tokens }) => programName(tokens[0])))
 
-for (const { segment, tokens } of segments) {
+for (const { segment, unescape, tokens } of segments) {
   if (tokens.length === 0) continue
   const hit = findRule(programName(tokens[0]), tokens.slice(1))
   if (hit !== null) refuse(hit, programName(tokens[0]))
   // A package runner's flag table is best effort: an unlisted value flag would make its value
   // the "program" and hide the real one. So judge every token after a runner as a program
   // start too (`uv run --newflag x rm -rf y`), which fails closed.
-  for (const tail of runnerTails(segment)) {
+  for (const tail of runnerTails(segment, unescape)) {
     for (let i = 0; i < tail.length; i += 1) {
       const inner = findRule(programName(tail[i]), tail.slice(i + 1))
       if (inner !== null) refuse(inner, programName(tail[i]))

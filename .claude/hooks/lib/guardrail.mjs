@@ -308,15 +308,15 @@ export function shellSegments(command) {
 // wrappers (sudo, env, timeout, bash -lc, powershell -NoProfile -Command, …) and package
 // runners (bunx, npx, bun x, bun run, …) are stripped so the real program is first. A
 // quoted command string handed to a shell is re-tokenised.
-export function segmentTokens(segment) {
-  return analyzeSegment(segment).tokens
+export function segmentTokens(segment, unescape = false) {
+  return analyzeSegment(segment, unescape).tokens
 }
 
 // What follows each package runner in the segment, flags included and unresolved. A runner
 // whose flag table is wrong or incomplete shifts the program by a token, so a caller that
 // must not miss a program can look at every later token (see block-destructive-bash).
-export function runnerTails(segment) {
-  return analyzeSegment(segment).tails
+export function runnerTails(segment, unescape = false) {
+  return analyzeSegment(segment, unescape).tails
 }
 
 // How many wrappers and runners are peeled before the program. A deeper nest is refused: an
@@ -327,24 +327,33 @@ const MAX_WRAPPER_DEPTH = 8
 // a command (the token lists, program first). A runner's flag table is best effort, so
 // `uv run --newflag x python -c "…"` makes `x` the apparent program; a caller that judges
 // inline code, stdin and the environment looks at these views too, which fails closed.
-export function interpreterViews(segment) {
+export function interpreterViews(segment, unescape = false) {
   const views = []
-  for (const tail of analyzeTokens(tokenize(segment)).tails) {
+  for (const tail of analyzeSegment(segment, unescape).tails) {
     for (let i = 0; i < tail.length; i += 1) {
       const program = programName(tail[i])
       if (PYTHON_PROGRAM.test(program) || SCRIPT_RUNTIMES.has(program)) {
-        views.push(analyzeTokens(tail.slice(i)).tokens)
+        views.push(analyzeTokens(tail.slice(i), unescape).tokens)
       }
     }
   }
   return views
 }
 
-function analyzeSegment(segment) {
-  return analyzeTokens(tokenize(segment))
+function analyzeSegment(segment, unescape = false) {
+  return analyzeTokens(tokenize(segment, unescape), unescape)
 }
 
-function analyzeTokens(words) {
+// The two readings a caller must judge: the tokens as written (Windows paths such as
+// `backend\README.md` keep their backslashes) and, when the segment has a backslash, the bash
+// reading where a backslash before any character is that character (`rm \-rf x` is
+// `rm -rf x`, `cat .\env` is `cat .env`). A command is refused when either one is. The
+// result is the list of `unescape` arguments to pass to the functions in this file.
+export function escapeForms(segment) {
+  return segment.includes('\\') ? [false, true] : [false]
+}
+
+function analyzeTokens(words, unescape = false) {
   let tokens = words
   const tails = []
   // Set when the last thing stripped was `env`: with no program left it is a bare `env`, which
@@ -390,7 +399,7 @@ function analyzeTokens(words) {
     }
     if (program === 'env') pendingEnv = dropped
     if (tokens.length > 0 && /\s/.test(tokens[0])) {
-      tokens = [...tokenize(tokens[0]), ...tokens.slice(1)]
+      tokens = [...tokenize(tokens[0], unescape), ...tokens.slice(1)]
     }
   }
   // Still wrapped after the last peel: refuse what cannot be inspected.
@@ -427,12 +436,16 @@ function stripRunner(runner, tokens) {
   i += found.path.length
   const tail = tokens.slice(i)
   const seen = new Set()
+  const flagsStart = i
   i = skipFlags(tokens, i, found.flags, seen)
   let rest = tokens.slice(i)
+  const moduleValue = tokens.slice(flagsStart, i).find(token => token.startsWith('--module='))
   // uv's own Python channels: `-m/--module <mod>` runs `python -m <mod>` and a leading `-`
   // hands a script on stdin to the interpreter. Rewriting them lets the Python analysis judge
   // them, inline modules and stdin included.
-  if (found.module === true && (seen.has('-m') || seen.has('--module'))) {
+  if (found.module === true && moduleValue !== undefined) {
+    rest = ['python', '-m', moduleValue.slice('--module='.length), ...rest]
+  } else if (found.module === true && (seen.has('-m') || seen.has('--module'))) {
     rest = ['python', '-m', ...rest]
   } else if (found.stdin !== undefined && rest[0] === '-') {
     rest = [found.stdin, ...rest]
@@ -601,8 +614,10 @@ export function programName(token) {
 // Shell word splitting for guard purposes: whitespace outside quotes separates words, quote
 // characters are removed, and quoted and unquoted parts of one word join (`--flag=".env"` is
 // `--flag=.env`, `-c'code here'` is `-ccode here`). Backslashes are kept as written, so
-// Windows paths survive. An unterminated quote runs to the end.
-export function tokenize(text) {
+// Windows paths survive. An unterminated quote runs to the end. With `unescape`, the bash
+// reading: outside quotes a backslash is dropped and the next character kept as it is, and a
+// trailing backslash vanishes (see `escapeForms`).
+export function tokenize(text, unescape = false) {
   const tokens = []
   let word = null
   let quote = null
@@ -617,6 +632,11 @@ export function tokenize(text) {
           word += text[i + 1]
           i += 1
         }
+      }
+    } else if (unescape && char === '\\') {
+      if (i + 1 < text.length) {
+        word = (word ?? '') + text[i + 1]
+        i += 1
       }
     } else if (char === '\\' && /^[\\"';&|<>()$`]$/.test(text[i + 1] ?? '')) {
       // Outside quotes a backslash makes a quote or an operator character literal (`\"` is a

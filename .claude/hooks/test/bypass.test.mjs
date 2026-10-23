@@ -212,3 +212,37 @@ passes('deno test', { role: 'backend' })
 blocks('sudo sudo sudo sudo sudo sudo sudo sudo sudo rm -rf x')
 blocks('nice nice nice nice nice nice nice nice nice tee frontend/x', { role: 'backend' })
 passes('sudo sudo sudo ls')
+
+// Addendum 2: bash drops a backslash before any ordinary character, so the unescaped form of
+// each token is judged as well as the raw one (which keeps Windows paths working).
+for (const command of [
+  'rm \\-rf x',
+  'cat .\\env',
+  'cat \\.env',
+  'cat ".env"\\',
+  'cat .env\\',
+  'rm -\\r x',
+  'git reset --\\hard',
+  'git push --for\\ce',
+  'sudo r\\m -rf x',
+  'uv run r\\m -rf x'
+]) {
+  blocks(command)
+}
+blocks('t\\ee frontend/x', { role: 'backend' })
+blocks('\\cp a frontend/b', { role: 'backend' })
+blocks('p\\ython -c "print(1)"', { role: 'backend' })
+// In bash `\\` is one backslash, so the quote after it opens a string: this removes files
+// named `\` and ` -rf x `, not a recursive delete.
+passes('rm \\\\" -rf x "')
+passes('type backend\\README.md')
+passes('Get-ChildItem C:\\x\\')
+passes('Get-ChildItem C:\\x\\ -Name')
+passes('type backend\\README.md', { role: 'backend' })
+passes('Get-ChildItem C:\\x\\ -Name', { role: 'backend' })
+passes('bun run check 2>&1 | tail -5')
+passes('bun run check 2>&1 | tail -5', { role: 'backend' })
+passes('uv run poe check')
+passes('uv run poe check', { role: 'backend' })
+passes('git status', { role: 'backend' })
+passes('ls backend\\src', { role: 'backend' })
