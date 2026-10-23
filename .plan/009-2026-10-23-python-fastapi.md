@@ -719,6 +719,18 @@ As built covers the catalog design.
 - **H3** (V33–V35) passed, run by the session from a script.
 - **The catalog final review** was split into two Opus reviewers: machinery and docs, and the
   Python template.
+- **Final reviews and fix waves.** Each repository got one fix wave and an Opus scoped re-review.
+  - **The harness review** found two critical hook bypasses: a tokenizer regression on escaped
+    quotes, and uv's own `-m` and `-` channels.
+  - **The catalog reviews** found no critical issue. Their important findings included the uv 0.13
+    window, first-cookie precedence, the hashing bound, the shutdown budget and smoke diagnostics.
+  - **Targeted addenda followed in both repositories:** four bash-escape spellings found by a
+    controller hunt in the harness; a shutdown-starvation regression and a `detach` warning in the
+    catalog.
+- **Rulings in the fix waves.**
+  - uv 0.12.23 up to, not including, 0.14, with a bounded preflight.
+  - The development and test database host is `127.0.0.1`.
+  - One shutdown budget inside Compose's 10 s grace period.
 - **E1 was not run.** Eitan chose to skip the eval. V40 stays open as a follow-up; E0's rubric and
   paired prompts are in `harness-eval/` for a later run.
 - **Eitan's leftovers** (the hooks refuse volume removal): the Docker volumes
