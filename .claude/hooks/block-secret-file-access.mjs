@@ -19,6 +19,7 @@
 import {
   allow,
   block,
+  commandOf,
   interpreterViews,
   isPythonProgram,
   programName,
@@ -66,7 +67,7 @@ if (blockedPath !== undefined) {
   block(`blocked ${tool} call touching a secret file: ${blockedPath}. Use .env.example instead.`)
 }
 
-const command = typeof toolInput.command === 'string' ? toolInput.command : ''
+const command = commandOf(payload)
 if (/\[(System\.)?Environment\]::GetEnvironmentVariables?\b/i.test(command)) {
   block(`blocked ${tool} call that dumps the environment (GetEnvironmentVariables). Read one variable by name instead.`)
 }

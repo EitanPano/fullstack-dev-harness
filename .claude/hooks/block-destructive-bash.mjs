@@ -18,6 +18,7 @@
 import {
   allow,
   block,
+  commandOf,
   programName,
   readPayload,
   runnerTails,
@@ -32,7 +33,7 @@ const REDIS_CLIENTS = new Set(['redis-cli', 'valkey-cli'])
 const MONGO_CLIENTS = new Set(['mongosh', 'mongo'])
 
 const payload = await readPayload()
-const command = typeof payload.tool_input.command === 'string' ? payload.tool_input.command : ''
+const command = commandOf(payload)
 
 const segments = shellSegments(command).map(segment => ({ segment, tokens: segmentTokens(segment) }))
 const programs = new Set(segments.filter(({ tokens }) => tokens.length > 0).map(({ tokens }) => programName(tokens[0])))

@@ -101,6 +101,17 @@ export function toProjectRelative(rawPath, root, base = root) {
 
 // Shell command helpers shared by the Bash|PowerShell hooks.
 
+// The shell command of a payload ('' for a tool that has none). A Bash or PowerShell call
+// whose command is not a string cannot be inspected, so it blocks.
+export function commandOf(payload) {
+  const command = payload.tool_input.command
+  if (typeof command === 'string') return command
+  if (payload.tool_name === 'Bash' || payload.tool_name === 'PowerShell') {
+    block('shell call whose command is not a string cannot be inspected, blocking by default')
+  }
+  return ''
+}
+
 // Operators that start a new command, matched only outside quotes.
 const SEGMENT_OPERATORS = ['&&', '||', '|', ';', '&', '\n', '\r', '$(', '`', '(', ')']
 
@@ -611,6 +622,9 @@ export function tokenize(text) {
       // Outside quotes a backslash makes a quote or an operator character literal (`\"` is a
       // plain `"`, not the start of a string). Before whitespace or anything else it stays as
       // written, so a Windows path such as `backend\.env` or `C:\dir\ -r` keeps its words.
+      // Whitespace is deliberately not literal: over-splitting in bash only turns words into
+      // apparent flags (it errs to blocking), and PowerShell paths ending in `\` must not
+      // merge with the `-Recurse` after them.
       const next = text[i + 1]
       word = (word ?? '') + (next === '\\' ? '\\\\' : next)
       i += 1

@@ -26,6 +26,7 @@ import process from 'node:process'
 import {
   allow,
   block,
+  commandOf,
   interpreterViews,
   isCanonicalPath,
   isPythonProgram,
@@ -101,7 +102,7 @@ const lanes = Object.hasOwn(WRITE_LANES, role) ? WRITE_LANES[role] : undefined
 if (lanes === '*') allow()
 
 if (SHELL_TOOLS.has(payload.tool_name)) {
-  const command = typeof payload.tool_input.command === 'string' ? payload.tool_input.command : ''
+  const command = commandOf(payload)
   const channel = shellWriteChannel(command)
   if (channel !== null) {
     block(`"${role}" may not change files through the shell (${channel}). Use the Edit or Write tool; git writes are the driver's job.`)
