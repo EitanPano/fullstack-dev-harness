@@ -19,12 +19,14 @@
 import {
   allow,
   block,
+  interpreterViews,
   isPythonProgram,
   programName,
   pythonInlineCode,
   pythonReadsStdin,
   readPayload,
   scriptInlineCode,
+  scriptReadsStdin,
   segmentTokens,
   shellSegments,
   tokenize
@@ -48,6 +50,7 @@ const PATH_FIELDS = ['file_path', 'path', 'notebook_path']
 const PATH_LIST_FIELDS = ['paths', 'file_paths']
 const INLINE_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node'])
 const PYTHON_ENV_DUMP = /(?<!\w)environb?\b(?!\s*\[|\s*\.get\b)/
+const NODE_ENV_DUMP = /\b(process|Bun|Deno)\.env\b(?!\s*[.[])/
 
 const payload = await readPayload()
 const toolInput = payload.tool_input
@@ -81,19 +84,33 @@ for (const segment of shellSegments(command)) {
   if (candidates.some(token => isSecretPath(stripRedirect(token)))) {
     block(`blocked ${tool} call naming a secret file in the command. Use .env.example instead.`)
   }
+  judgeProgram(tokens, segment)
+  // A runner's flag table is best effort: an unlisted flag can make its value the apparent
+  // program and hide an interpreter behind it (`uv run --newflag x python -c "…"`). So every
+  // later token that names an interpreter is judged as a program start too, which fails closed.
+  for (const view of interpreterViews(segment)) judgeProgram(view, segment)
+}
+
+allow()
+
+// Inline code, stdin code and environment dumps of one program and its arguments.
+function judgeProgram(tokens, segment) {
   const program = programName(tokens[0])
   const args = tokens.slice(1)
   const code = inlineCode(program, args)
   if (code !== null && inlineNamesSecret(code)) {
     block(`blocked ${tool} call whose inline code names a secret file. Use .env.example instead.`)
   }
-  // Python that reads its program from stdin (`python - <<EOF`, `echo "…" | python`) has the
-  // code in a heredoc or a pipe, which the segment split has already torn apart: judge the
-  // whole command text, which fails closed.
-  if (isPythonProgram(program) && pythonReadsStdin(args)) {
-    if (PYTHON_ENV_DUMP.test(command)) {
+  // An interpreter that reads its program from stdin (`python - <<EOF`, `echo "…" | node`,
+  // `python -m asyncio`) has the code in a heredoc or a pipe, which the segment split has
+  // already torn apart: judge the whole command text, which fails closed.
+  const readsStdin =
+    (isPythonProgram(program) && pythonReadsStdin(args)) ||
+    (INLINE_RUNTIMES.has(program) && scriptReadsStdin(args))
+  if (readsStdin) {
+    if (PYTHON_ENV_DUMP.test(command) || NODE_ENV_DUMP.test(command)) {
       block(
-        `blocked ${tool} call that dumps the environment (os.environ via stdin). ` +
+        `blocked ${tool} call that dumps the environment (environ via stdin). ` +
           'Read one variable by name instead.'
       )
     }
@@ -110,11 +127,11 @@ for (const segment of shellSegments(command)) {
   }
 }
 
-allow()
-
 function isSecretPath(value) {
   if (value === '' || value === '-') return false
   if (SECRET_DIR.test(value)) return true
+  // poetry's repository credentials: <user config dir>/pypoetry/auth.toml.
+  if (/(^|[\\/])pypoetry[\\/]auth\.toml$/i.test(value)) return true
   let base = value.split(/[\\/]/).pop() ?? ''
   // A glob such as `.env*` or `backend/.env.*` names every env file.
   if (/[*?]/.test(base)) base = base.replace(/[*?].*$/, '')
@@ -168,13 +185,14 @@ function stripRedirect(token) {
 
 function envDump(program, args, segment) {
   if (program === 'printenv' && args.length === 0) return 'printenv'
-  if (program === 'env' && args.length === 0) return 'env'
+  // `env` with only its own flags (`env -u FOO`) and no program prints the environment too.
+  if (program === 'env' && args.every(arg => arg.startsWith('-'))) return 'env'
   if (program === 'set' && args.length === 0) return 'set'
   if (program === 'export' && (args.length === 0 || args.every(arg => arg === '-p'))) return 'export -p'
   if (program === 'declare' && args.length > 0 && args.every(arg => /^-[px]+$/.test(arg))) return 'declare -x'
   if (['get-childitem', 'gci', 'ls', 'dir', 'get-item', 'gi'].includes(program) && args.some(arg => /^env:\\?\*?$/i.test(arg))) return 'Get-ChildItem Env:'
   // A whole-object dump of process.env / Bun.env in inline code (reading one key is fine).
-  const dumpsProcessEnv = /\b(process|Bun|Deno)\.env\b(?!\s*[.[])/.test(segment)
+  const dumpsProcessEnv = NODE_ENV_DUMP.test(segment)
   if (INLINE_RUNTIMES.has(program) && scriptInlineCode(args) !== null && dumpsProcessEnv) {
     return 'process.env dump'
   }

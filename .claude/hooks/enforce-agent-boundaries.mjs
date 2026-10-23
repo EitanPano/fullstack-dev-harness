@@ -26,6 +26,7 @@ import process from 'node:process'
 import {
   allow,
   block,
+  interpreterViews,
   isCanonicalPath,
   isPythonProgram,
   programName,
@@ -35,6 +36,7 @@ import {
   readPayload,
   resolveRole,
   scriptInlineCode,
+  scriptReadsStdin,
   segmentTokens,
   sessionCwd,
   shellSegments,
@@ -145,14 +147,14 @@ function shellWriteChannel(command) {
     const args = tokens.slice(1)
     if (WRITE_PROGRAMS.has(program)) return program
     if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
-    if (INLINE_RUNTIMES.has(program)) {
-      // Attached spellings (`node -e'code'`, `--eval=code`) are inline code as well.
-      const flagged = args.some(arg => INLINE_FLAG.test(arg))
-      if (flagged || scriptInlineCode(args, 'erp') !== null) return `${program} inline code`
-    }
-    // Python reading its program from stdin (a heredoc, a pipe, `-`) runs inline code too.
-    if (isPythonProgram(program) && (pythonInlineCode(args) !== null || pythonReadsStdin(args))) {
-      return `${program} inline code`
+    const inline = interpreterChannel(program, args)
+    if (inline !== null) return inline
+    // A runner's flag table is best effort: an unlisted flag can make its value the apparent
+    // program and hide an interpreter behind it. Judge every later interpreter as a program
+    // start too, which fails closed.
+    for (const view of interpreterViews(segment)) {
+      const hidden = interpreterChannel(programName(view[0]), view.slice(1))
+      if (hidden !== null) return hidden
     }
     if (program === 'git') {
       const git = gitCommand(args)
@@ -169,6 +171,22 @@ function shellWriteChannel(command) {
         (sub === 'config' && rest.some(arg => /^(--get|--list|-l)$/.test(arg)))
       if (!ok) return `git ${sub || '(no subcommand)'}`
     }
+  }
+  return null
+}
+
+// Inline code through an interpreter writes anything: `node -e`, a bare `node` or `-` reading
+// stdin, Python's `-c`, an inline module, Python reading stdin (a heredoc, a pipe, `-`).
+function interpreterChannel(program, args) {
+  if (INLINE_RUNTIMES.has(program)) {
+    // Attached spellings (`node -e'code'`, `--eval=code`) are inline code as well.
+    const flagged = args.some(arg => INLINE_FLAG.test(arg))
+    if (flagged || scriptInlineCode(args, 'erp') !== null || scriptReadsStdin(args)) {
+      return `${program} inline code`
+    }
+  }
+  if (isPythonProgram(program) && (pythonInlineCode(args) !== null || pythonReadsStdin(args))) {
+    return `${program} inline code`
   }
   return null
 }
