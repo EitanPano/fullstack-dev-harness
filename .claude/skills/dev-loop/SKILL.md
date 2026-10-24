@@ -125,8 +125,10 @@ implementer, then re-dispatch `qa` once. A second failure goes to the user.
 ## 6. Finish
 
 - Set the plan to `Status: done` and move the backlog line under `## DONE` with the date.
-- Apply the `Docs:` lines from the backend and frontend reports to
-  `.doc/architecture.md` (change log) and `.doc/glossary.md`.
+- Apply the `Docs:` lines from the backend and frontend reports yourself (the driver, not a
+  role agent, writes `.doc/`), each to the section it names: the change log in
+  `.doc/architecture.md`, a `Deploy mode` line to its Operational Concerns › Deployment
+  (the `deployment` skill), new terms to `.doc/glossary.md`.
 - Summarise: what shipped, the test counts from the QA report, open P2 findings, and the
   branch name. Ask the user whether to commit. Never commit or merge without that answer.
 

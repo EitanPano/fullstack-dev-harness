@@ -8,6 +8,7 @@
 //   node scripts/bootstrap.mjs --fetch [--templates <path>]
 //   node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… [--capability k=v]…
 //     [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]
+//     [--deploy single|split]
 //
 // Steps: prerequisites → read the lock → locate the catalog (cache clone checked against the
 // locked commit, or a local override) → check the catalog's schemaVersion → install the
@@ -21,6 +22,7 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { readProvenance } from './provenance.mjs'
 
 const SUPPORTED_SCHEMA_VERSION = 1
 const MIN_BUN = [1, 4]
@@ -30,7 +32,8 @@ const USAGE =
   'usage: node scripts/bootstrap.mjs --fetch [--templates <path>]\n' +
   '       node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… ' +
   '[--capability k=v]…\n' +
-  '         [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]'
+  '         [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]\n' +
+  '         [--deploy single|split]'
 
 const args = parseArgs(process.argv.slice(2))
 const harnessRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -225,6 +228,7 @@ function generatorArguments(catalogVersion) {
   for (const capability of args.capabilities) list.push('--capability', capability)
   if (args.answers !== undefined) list.push('--answers', path.resolve(args.answers))
   if (catalogVersion !== undefined) list.push('--catalog-version', catalogVersion)
+  if (args.deploy !== undefined) list.push('--deploy', args.deploy)
   if (args.skipInstall) list.push('--skip-post-generate')
   return list
 }
@@ -257,12 +261,49 @@ function printNextSteps() {
     )
     console.log("    then the server package's migrate and testDb (see .fullstack/catalog.yaml).")
   }
+  const withProvider = args.capabilities.length > 0 || args.answers !== undefined
+  printDeploySteps(readProvenance(path.join(root, '.fullstack', 'catalog.yaml')), withProvider)
   console.log('  Where a package declares testE2e, install its browser')
   console.log('    (its AGENTS.md › Tests says how) and run it.')
   console.log(
     '  Fill .doc/ and add the first line to .plan/000-backlog.md (the bootstrap-project skill).',
   )
   console.log('  Commit on chore/bootstrap once the gates are green.')
+}
+
+function printDeploySteps({ deploy, packages }, withProvider) {
+  const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
+  const server = packages.find((pkg) => pkg.template.startsWith('server/'))
+  if (frontend?.port !== undefined) {
+    console.log(`  Once started, the frontend dev server is at http://localhost:${frontend.port}.`)
+  }
+  const compose = 'docker compose --profile app up --build'
+  if (deploy === 'single') {
+    const url = server?.port === undefined ? '' : ` (http://localhost:${server.port})`
+    console.log(
+      `  ${compose} runs one app container: the server serves the built frontend and the API on ` +
+        `the server's port${url}; there is no frontend container.`,
+    )
+    console.log('    It needs Docker Compose 2.35.0 or newer (check: docker compose version).')
+  } else if (frontend?.port !== undefined) {
+    console.log(
+      `  ${compose} runs one container per package; reach the app through port ${frontend.port}.`,
+    )
+  } else if (server?.port !== undefined) {
+    console.log(`  ${compose} runs the server container (port ${server.port}).`)
+  } else {
+    console.log(`  ${compose} runs one container per package.`)
+  }
+  console.log('    The server refuses to start in production without its secrets: export the ones')
+  console.log("    listed in the server's .env.example in your shell first (placeholders are fine")
+  console.log('    for a local proof; never put them in a file).')
+  if (withProvider) {
+    console.log('    With a database, also export its DATABASE_URL; a <dir>-migrate one-shot')
+    console.log('    service (docker-compose.yml) runs the migrations before the server starts.')
+  }
+  console.log('    Reusing a Compose project name reuses its volumes: pass a fresh -p <name> for a')
+  console.log('    clean proof.')
+  console.log('    Stop it with: docker compose --profile app down')
 }
 
 // `reason` carries the spawn error (a missing executable, say) so the failure names its cause.
@@ -305,6 +346,7 @@ function parseArgs(argv) {
     else if (arg === '--name') parsed.name = value(arg, ++i)
     else if (arg === '--flag') parsed.flags.push(value(arg, ++i))
     else if (arg === '--capability') parsed.capabilities.push(value(arg, ++i))
+    else if (arg === '--deploy') parsed.deploy = value(arg, ++i)
     else if (arg === '--answers') parsed.answers = value(arg, ++i)
     else if (arg === '--templates') parsed.templates = value(arg, ++i)
     else if (arg === '--root') parsed.root = value(arg, ++i)
