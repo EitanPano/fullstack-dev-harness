@@ -300,6 +300,18 @@ export function interpreterViews(segment, unescape = false) {
   return views
 }
 
+// Every position of a tail analysed as a command start, wrappers peeled, so `sh -c "rm -rf x"`
+// behind a runner or in a container reads as `rm -rf x`. The tail came from a best-effort flag
+// table or none (a container runtime), so judging every position fails closed.
+export function tailViews(tail, unescape = false) {
+  const views = []
+  for (let i = 0; i < tail.length; i += 1) {
+    const { tokens } = analyzeTokens(tail.slice(i), unescape)
+    if (tokens.length > 0) views.push(tokens)
+  }
+  return views
+}
+
 function analyzeSegment(segment, unescape = false) {
   return analyzeTokens(tokenize(segment, unescape), unescape)
 }

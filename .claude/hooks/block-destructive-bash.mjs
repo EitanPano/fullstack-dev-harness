@@ -15,14 +15,31 @@ import {
   readPayload,
   runnerTails,
   segmentTokens,
-  shellSegments
+  shellSegments,
+  tailViews
 } from './lib/guardrail.mjs'
 
 const SQL_CLIENTS = new Set([
-  'psql', 'pgcli', 'mysql', 'mariadb', 'sqlite3', 'sqlcmd', 'clickhouse-client', 'cockroach', 'usql'
+  'psql', 'pgcli', 'mysql', 'mariadb', 'sqlite3', 'sqlcmd', 'clickhouse-client', 'cockroach', 'usql',
+  'cqlsh', 'duckdb', 'sqlplus'
 ])
 const REDIS_CLIENTS = new Set(['redis-cli', 'valkey-cli'])
 const MONGO_CLIENTS = new Set(['mongosh', 'mongo'])
+// Programs that run a program inside a container, after `exec` or `run`. Their flag tables are
+// not modelled: every token after the subcommand is judged as a program start instead.
+const CONTAINER_RUNTIMES = new Set(['docker', 'docker-compose', 'podman', 'nerdctl', 'kubectl'])
+
+// mongosh spellings that drop a database or collection, or write with an empty filter (every
+// document). Quote runs allow backslashes because quotes may arrive escaped (`\"drop\"`).
+const QUOTES = '[\\\\"\'`]*'
+const MONGO_RULES = [
+  [new RegExp(`\\bdropDatabase\\b${QUOTES}\\s*[(:]`), 'dropDatabase'],
+  [/\.\s*drop\s*\(/, 'collection.drop()'],
+  [/\bdropCollection\s*\(/, 'dropCollection()'],
+  [new RegExp(`[{,\\s]${QUOTES}drop${QUOTES}\\s*:`), '{ drop: … } command'],
+  [/\b(deleteMany|remove)\s*\(\s*(\{\s*\}\s*)?[,)]/, 'deleteMany|remove with an empty filter'],
+  [/\b(updateMany|replaceOne)\s*\(\s*\{\s*\}\s*,/, 'updateMany|replaceOne with an empty filter']
+]
 
 const payload = await readPayload()
 const command = commandOf(payload)
@@ -36,39 +53,95 @@ const segments = shellSegments(command).flatMap(segment =>
     tokens: segmentTokens(segment, unescape)
   }))
 )
-const programs = new Set(segments.filter(({ tokens }) => tokens.length > 0).map(({ tokens }) => programName(tokens[0])))
+// Every program judged, wherever it stood: first in a segment, behind a package runner, or
+// inside a container. The database text rules below key on it.
+const programs = new Set()
 
 for (const { segment, unescape, tokens } of segments) {
   if (tokens.length === 0) continue
-  const hit = findRule(programName(tokens[0]), tokens.slice(1))
-  if (hit !== null) refuse(hit, programName(tokens[0]))
+  judge(tokens)
   // A package runner's flag table is best effort: an unlisted value flag would make its value
   // the "program" and hide the real one. So judge every token after a runner as a program
   // start too (`uv run --newflag x rm -rf y`), which fails closed.
-  for (const tail of runnerTails(segment, unescape)) {
-    for (let i = 0; i < tail.length; i += 1) {
-      const inner = findRule(programName(tail[i]), tail.slice(i + 1))
-      if (inner !== null) refuse(inner, programName(tail[i]))
-    }
-  }
+  for (const tail of runnerTails(segment, unescape)) judgeTail(tail, unescape)
+  const inner = containerTail(programName(tokens[0]), tokens.slice(1))
+  if (inner !== null) judgeTail(inner, unescape)
 }
 
 // SQL travels through pipes and -c flags: when an SQL client appears anywhere, judge the
-// whole command text.
+// whole command text, and each statement of it for the clauses that scope a write.
 const upper = command.toUpperCase()
 if ([...programs].some(program => SQL_CLIENTS.has(program))) {
-  if (/\bDROP\s+(TABLE|DATABASE|SCHEMA)\b/.test(upper)) refuse('DROP TABLE|DATABASE|SCHEMA', 'sql client')
-  if (/\bTRUNCATE\b/.test(upper)) refuse('TRUNCATE', 'sql client')
-  if (/\bDELETE\s+FROM\s+\S+/.test(upper) && !/\bWHERE\b/.test(upper)) refuse('DELETE without WHERE', 'sql client')
+  if (/\bDROP\s+(TABLE|DATABASE|SCHEMA|KEYSPACE)\b/.test(upper)) refuse('DROP TABLE|DATABASE|SCHEMA|KEYSPACE', 'sql client')
+  if (/\bTRUNCATE\s+\S+/.test(upper)) refuse('TRUNCATE', 'sql client')
+  for (const statement of sqlStatements(command)) {
+    if (/\bWHERE\b/.test(statement)) continue
+    if (/\bDELETE\s+((LOW_PRIORITY|QUICK|IGNORE)\s+)*FROM\b/.test(statement)) refuse('DELETE without WHERE', 'sql client')
+    // `ON UPDATE SET NULL`, `DO UPDATE SET` (upsert) and `THEN UPDATE SET` (merge) are not
+    // mass updates.
+    if (/(?<!\b(ON|DO|THEN)\s+)\bUPDATE\s+[\s\S]*?\bSET\b/.test(statement)) refuse('UPDATE without WHERE', 'sql client')
+  }
 }
 if ([...programs].some(program => REDIS_CLIENTS.has(program)) && /\bFLUSH(ALL|DB)\b/.test(upper)) {
   refuse('redis FLUSHALL|FLUSHDB', 'redis-cli')
 }
-if ([...programs].some(program => MONGO_CLIENTS.has(program)) && /\bdropDatabase\s*\(/.test(command)) {
-  refuse('dropDatabase()', 'mongosh')
+if ([...programs].some(program => MONGO_CLIENTS.has(program))) {
+  for (const [pattern, rule] of MONGO_RULES) {
+    if (pattern.test(command)) refuse(`mongosh ${rule}`, 'mongosh')
+  }
 }
 
 allow()
+
+function judge(tokens) {
+  const program = programName(tokens[0])
+  programs.add(program)
+  const hit = findRule(program, tokens.slice(1))
+  if (hit !== null) refuse(hit, program)
+}
+
+function judgeTail(tail, unescape) {
+  for (const view of tailViews(tail, unescape)) judge(view)
+}
+
+// The tokens after a container runtime's `exec` or `run`, or null when it runs nothing inside
+// a container.
+function containerTail(program, args) {
+  if (!CONTAINER_RUNTIMES.has(program)) return null
+  const at = args.findIndex(arg => /^(exec|run)$/i.test(arg))
+  return at === -1 ? null : args.slice(at + 1)
+}
+
+// Upper-cased SQL statements, split at `;` and at quote boundaries (each `-c` value stands
+// alone), so a WHERE in one never excuses a DELETE or UPDATE in another.
+function sqlStatements(text) {
+  const statements = []
+  let current = ''
+  let quote = null
+  const flush = () => {
+    if (current.trim() !== '') statements.push(current.toUpperCase())
+    current = ''
+  }
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i]
+    if ((char === '\\' || char === '`') && i + 1 < text.length) {
+      current += char + text[i + 1]
+      i += 1
+    } else if (char === ';') {
+      flush()
+    } else if (quote === null && (char === '"' || char === "'")) {
+      flush()
+      quote = char
+    } else if (char === quote) {
+      flush()
+      quote = null
+    } else {
+      current += char
+    }
+  }
+  flush()
+  return statements
+}
 
 function refuse(rule, program) {
   // Never echo the full command: it can carry a token or URL, and stderr lands in the
@@ -115,6 +188,12 @@ function findRule(program, args) {
   if (program === 'drizzle-kit' && (words[0] === 'drop' || words[0] === 'push')) return 'drizzle-kit drop|push (generate + migrate instead)'
   if (program === 'prisma' && ((words[0] === 'migrate' && words[1] === 'reset') || (words[0] === 'db' && words.includes('--force-reset')))) return 'prisma reset'
   if (program === 'supabase' && words[0] === 'db' && words[1] === 'reset') return 'supabase db reset'
+
+  // Database programs that drop a database, or drop the target before writing into it.
+  if (program === 'dropdb') return 'dropdb'
+  if (program === 'mysqladmin' && words.includes('drop')) return 'mysqladmin drop'
+  if ((program === 'mongorestore' || program === 'mongoimport') && flags.some(flag => /^--drop(=|$)/i.test(flag))) return `${program} --drop`
+  if (program === 'pg_restore' && flags.some(flag => flag === '--clean' || /^-[A-Za-z]*c/.test(flag))) return 'pg_restore --clean (drops objects first)'
 
   // Container and volume destruction (docker and the docker-compose v1 spelling).
   const dockerWords = program === 'docker-compose' ? ['compose', ...words] : words
