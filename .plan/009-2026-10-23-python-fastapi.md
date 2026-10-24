@@ -1,8 +1,9 @@
 # python-fastapi at parity with bun-express, the next-python-fastapi stack, catalog v1.1.0
 
-Status: active
+Status: done
+Status set by the session on Eitan's delegation; Eitan confirms.
 Owner: Eitan
-Last updated: 2026-10-23
+Last updated: 2026-10-24
 Approval: approved 2026-10-23 ("go with the plan, do it python 3.14 if it's a better solution
 than 3.15"). Scope was decided by question on 2026-10-22: full parity including Postgres, the
 `next-python-fastapi` stack, one graded eval, the migrate service and hash pins.
@@ -737,4 +738,12 @@ As built covers the catalog design.
   `lockproof_database-data`, `pgdemo_database-data`, `lindemo_database-data`,
   `py-pg_database-data`, `bun-pg_database-data`, and the agent worktree directories under
   `.claude/worktrees/`.
+- Closed 2026-10-24, on Eitan's instructions to merge, promote, tag and bump:
+  - harness #4 and #5 merged into `dev` (babe267, 283e4ee), then `dev` into `main` (#6,
+    a853c82). #5 merged before the promotion, so `main` took plans 008 and 009 together;
+  - catalog #4 merged into `dev` (7950ddf), then `dev` into `main` (#5, bdadf31); `v1.1.0` was
+    tagged there and published by `release.yml`;
+  - `catalog.lock` bumped to it (H4), with a fresh-cache bootstrap proof (V36) in the lock PR.
+
+  V40 stays open as a follow-up.
 
