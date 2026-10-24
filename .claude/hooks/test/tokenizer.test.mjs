@@ -8,7 +8,7 @@ import {
   programName,
   pythonInlineCode,
   pythonReadsStdin,
-  runnerTails,
+  commandTails,
   scriptInlineCode,
   segmentTokens,
   shellSegments,
@@ -114,12 +114,12 @@ test('segmentTokens resolves short flag clusters of a runner', () => {
   assert.deepEqual(segmentTokens('uv run -wq httpx rm x'), ['httpx', 'rm', 'x'])
 })
 
-test('runnerTails keeps what follows each runner, flags unresolved', () => {
-  assert.deepEqual(runnerTails('uv run --newflag v rm -rf x'), [
+test('commandTails keeps what follows each runner, flags unresolved', () => {
+  assert.deepEqual(commandTails('uv run --newflag v rm -rf x'), [
     ['--newflag', 'v', 'rm', '-rf', 'x']
   ])
-  assert.deepEqual(runnerTails('uv run bun run x'), [['bun', 'run', 'x'], ['x']])
-  assert.deepEqual(runnerTails('echo uv run rm'), [])
+  assert.deepEqual(commandTails('uv run bun run x'), [['bun', 'run', 'x'], ['x']])
+  assert.deepEqual(commandTails('echo uv run rm'), [])
 })
 
 test('pythonInlineCode reads attached, clustered and module-borne code', () => {
@@ -152,7 +152,7 @@ test('scriptInlineCode reads separate and attached spellings', () => {
   assert.equal(scriptInlineCode(['script.js', '--flag']), null)
   assert.equal(scriptInlineCode(['--experimental-vm-modules']), null)
   assert.equal(scriptInlineCode(['-rfoo']), null)
-  assert.equal(scriptInlineCode(['-rfoo'], 'erp'), 'foo')
+  assert.equal(scriptInlineCode(['-rfoo'], 'php'), 'foo')
 })
 
 // Final review of milestone 4.
@@ -200,11 +200,11 @@ test('I1: hidden uv flags take their value, before and after the subcommand', ()
 })
 
 test('I1: an unknown flag before the subcommand still records the tail', () => {
-  assert.deepEqual(runnerTails('npm --prefix backend exec rimraf x'), [['rimraf', 'x']])
-  assert.deepEqual(runnerTails('pnpm --filter x exec rm -rf y'), [['rm', '-rf', 'y']])
-  assert.deepEqual(runnerTails('uv --newflag value run rm -rf y'), [['rm', '-rf', 'y']])
-  assert.deepEqual(runnerTails('bun add rimraf'), [])
-  assert.deepEqual(runnerTails('uv sync --locked'), [])
+  assert.deepEqual(commandTails('npm --prefix backend exec rimraf x'), [['rimraf', 'x']])
+  assert.deepEqual(commandTails('pnpm --filter x exec rm -rf y'), [['rm', '-rf', 'y']])
+  assert.deepEqual(commandTails('uv --newflag value run rm -rf y'), [['rm', '-rf', 'y']])
+  assert.deepEqual(commandTails('bun add rimraf'), [])
+  assert.deepEqual(commandTails('uv sync --locked'), [])
 })
 
 test('I1: interpreterViews judges every later interpreter after an unknown runner flag', () => {
@@ -244,6 +244,134 @@ test('M1: every Python launcher counts', () => {
   for (const name of ['pytest', 'pythonic', 'python-config', 'pyright', 'pylint']) {
     assert.equal(isPythonProgram(name), false, name)
   }
+})
+
+// Guardrail review of 2026-10-24: wrapper value flags, and inline code in every runtime.
+const wrapperCases = [
+  ['timeout -s KILL 5 rm -rf x', ['rm', '-rf', 'x']],
+  ['timeout -sKILL 5 rm x', ['rm', 'x']],
+  ['timeout --preserve-status 5 rm x', ['rm', 'x']],
+  ['timeout -k 1 5 rm x', ['rm', 'x']],
+  ['timeout --signal=KILL 1.5m rm x', ['rm', 'x']],
+  ['sudo -n rm x', ['rm', 'x']],
+  ['sudo -E -u root rm x', ['rm', 'x']],
+  ['sudo -iu root rm x', ['rm', 'x']],
+  ['sudo --user root rm x', ['rm', 'x']],
+  ['xargs -r rm x', ['rm', 'x']],
+  ['xargs -0 -n 1 rm x', ['rm', 'x']],
+  ['xargs -I {} rm {}', ['rm', '{}']],
+  ['nice --adjustment 5 rm x', ['rm', 'x']],
+  ['stdbuf -o L rm x', ['rm', 'x']],
+  ['stdbuf -oL rm x', ['rm', 'x']],
+  ['exec -a name rm x', ['rm', 'x']],
+  ['env -u FOO -C /tmp rm x', ['rm', 'x']],
+  ['env -S "rm -rf x"', ['rm', '-rf', 'x']],
+  ['env -S"rm x"', ['rm', 'x']],
+  ['env --split-string="-i rm x"', ['rm', 'x']],
+  ['bash -o pipefail -c "rm x"', ['rm', 'x']],
+  ['bash -eo pipefail -c "rm x"', ['rm', 'x']],
+  ['bash +o posix -c "rm x"', ['rm', 'x']],
+  ['cmd /e:on /c "rmdir /s x"', ['rmdir', '/s', 'x']],
+  ['powershell -ExecutionPolicy Bypass -Command "Remove-Item x"', ['Remove-Item', 'x']],
+  ['pwsh -NoProfile -ep Bypass -c "Remove-Item x"', ['Remove-Item', 'x']],
+  ['powershell -ex bypass -WindowStyle Hidden -Command "Remove-Item x"', ['Remove-Item', 'x']],
+  ['powershell -ExecutionPolicy:Bypass -File x.ps1', ['x.ps1']],
+  ['powershell /c "Remove-Item x"', ['Remove-Item', 'x']],
+  ['npx -p pkg rimraf x', ['rimraf', 'x']]
+]
+for (const [command, expected] of wrapperCases) {
+  test(`segmentTokens (wrapper flags): ${command}`, () => {
+    assert.deepEqual(segmentTokens(command), expected)
+  })
+}
+
+test('commandTails records what follows each wrapper, flags unresolved', () => {
+  assert.deepEqual(commandTails('sudo --made-up v rm -rf x'), [
+    ['--made-up', 'v', 'rm', '-rf', 'x']
+  ])
+  assert.deepEqual(commandTails('timeout 5 uv run poe check'), [
+    ['5', 'uv', 'run', 'poe', 'check'],
+    ['poe', 'check']
+  ])
+  assert.deepEqual(commandTails('git status'), [])
+})
+
+test('interpreterViews looks behind wrappers too', () => {
+  const views = lib.interpreterViews('timeout --made-up v 5 python -c "print(1)"')
+  assert.deepEqual(views, [['python', '-c', 'print(1)']])
+  assert.deepEqual(lib.interpreterViews('timeout 5 bun run check'), [['check']])
+})
+
+test('commandLines lists each command string handed to a shell', () => {
+  assert.deepEqual(lib.commandLines('bash -c "cd x; rm y"'), ['bash -c "cd x; rm y"', 'cd x; rm y'])
+  assert.deepEqual(lib.commandLines(`sh -c "bash -c 'a; b'"`), [
+    `sh -c "bash -c 'a; b'"`,
+    "bash -c 'a; b'",
+    'a; b'
+  ])
+  assert.deepEqual(lib.commandLines('sudo --made-up v bash -c "a; b"'), [
+    'sudo --made-up v bash -c "a; b"',
+    'a; b'
+  ])
+  assert.deepEqual(lib.commandLines('fish -C "a; b" -c c'), ['fish -C "a; b" -c c', 'a; b'])
+  assert.deepEqual(lib.commandLines('git commit -m "a; b"'), ['git commit -m "a; b"'])
+})
+
+test('a PowerShell en dash reads as a dash, and cmd runs what is glued to /c', () => {
+  assert.deepEqual(tokenize('Remove-Item –Recurse x'), ['Remove-Item', '-Recurse', 'x'])
+  assert.deepEqual(tokenize('echo "–x"'), ['echo', '–x'])
+  assert.deepEqual(segmentTokens('cmd /crmdir /s x'), ['rmdir', '/s', 'x'])
+  assert.deepEqual(segmentTokens('cmd /c"rmdir /s x"'), ['rmdir', '/s', 'x'])
+})
+
+test('GNU long options abbreviate, and timeout reads any strtod duration', () => {
+  assert.deepEqual(segmentTokens('timeout --sig KILL 5 rm x'), ['rm', 'x'])
+  assert.deepEqual(segmentTokens('nice --adj 5 rm x'), ['rm', 'x'])
+  assert.deepEqual(segmentTokens('timeout 1e1 rm x'), ['rm', 'x'])
+  assert.deepEqual(segmentTokens('timeout 0x10 rm x'), ['rm', 'x'])
+  assert.deepEqual(segmentTokens('timeout inf rm x'), ['rm', 'x'])
+})
+
+test('runtimeOf names the language a program reads', () => {
+  assert.equal(lib.runtimeOf('python3.14'), 'python')
+  assert.equal(lib.runtimeOf('bun'), 'node')
+  assert.equal(lib.runtimeOf('ts-node'), 'node')
+  assert.equal(lib.runtimeOf('perl'), 'perl')
+  assert.equal(lib.runtimeOf('php'), 'php')
+  assert.equal(lib.runtimeOf('git'), null)
+})
+
+test('inlineCode reads the inline flag of each runtime', () => {
+  assert.equal(lib.inlineCode('perl', ['-e', 'print 1']), 'print 1')
+  assert.equal(lib.inlineCode('perl', ['-lne', 'print']), 'print')
+  assert.equal(lib.inlineCode('perl', ['-Eprint 1']), 'print 1')
+  assert.equal(lib.inlineCode('perl', ['-Mstrict', 'script.pl']), null)
+  assert.equal(lib.inlineCode('perl', ['-i.bak', '-pe', 's/a/b/', 'f']), 's/a/b/ f')
+  assert.equal(lib.inlineCode('ruby', ['-ne', 'puts']), 'puts')
+  assert.equal(lib.inlineCode('ruby', ['-rjson', '-e', 'p 1']), 'p 1')
+  assert.equal(lib.inlineCode('ruby', ['-c', 'script.rb']), null)
+  assert.equal(lib.inlineCode('php', ['-r', 'echo 1;']), 'echo 1;')
+  assert.equal(lib.inlineCode('php', ['-R', 'echo $argn;']), 'echo $argn;')
+  assert.equal(lib.inlineCode('php', ['artisan', 'migrate']), null)
+  assert.equal(lib.inlineCode('deno', ['eval', 'console.log(1)']), 'console.log(1)')
+  assert.equal(lib.inlineCode('node', ['-r', './setup.js', 'script.js']), null)
+  assert.equal(lib.inlineCode('python', ['-c', 'print(1)']), 'print(1)')
+  assert.equal(lib.inlineCode('git', ['-e', 'x']), null)
+})
+
+test('inline code over several lines is still inline code', () => {
+  assert.equal(scriptInlineCode(['-econst a = 1\nconsole.log(a)']), 'const a = 1\nconsole.log(a)')
+  assert.equal(scriptInlineCode(['--eval=a\nb']), 'a\nb')
+  assert.equal(lib.inlineCode('perl', ['-e1;\nprint 2']), '1;\nprint 2')
+})
+
+test('readsStdin covers every runtime', () => {
+  assert.equal(lib.readsStdin('perl', []), true)
+  assert.equal(lib.readsStdin('ruby', ['-']), true)
+  assert.equal(lib.readsStdin('php', ['<<EOF']), true)
+  assert.equal(lib.readsStdin('python', ['-']), true)
+  assert.equal(lib.readsStdin('perl', ['script.pl']), false)
+  assert.equal(lib.readsStdin('git', []), false)
 })
 
 test('M2: a bare interpreter or a dash reads its program from stdin', () => {

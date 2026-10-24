@@ -9,11 +9,12 @@
 import {
   allow,
   block,
+  commandLines,
   commandOf,
+  commandTails,
   escapeForms,
   programName,
   readPayload,
-  runnerTails,
   segmentTokens,
   shellSegments,
   tailViews
@@ -44,26 +45,27 @@ const MONGO_RULES = [
 const payload = await readPayload()
 const command = commandOf(payload)
 
-// Each segment is read twice when it has a backslash: as written and the way bash unescapes it
-// (`rm \-rf x` is `rm -rf x`); either reading may trigger a rule.
-const segments = shellSegments(command).flatMap(segment =>
+// Each segment, those of a command string handed to a shell included, is read twice when it has
+// a backslash: as written and the way bash unescapes it (`rm \-rf x` is `rm -rf x`); either
+// reading may trigger a rule.
+const segments = commandLines(command).flatMap(shellSegments).flatMap(segment =>
   escapeForms(segment).map(unescape => ({
     segment,
     unescape,
     tokens: segmentTokens(segment, unescape)
   }))
 )
-// Every program judged, wherever it stood: first in a segment, behind a package runner, or
-// inside a container. The database text rules below key on it.
+// Every program judged, wherever it stood: first in a segment, behind a wrapper or package
+// runner, or inside a container. The database text rules below key on it.
 const programs = new Set()
 
 for (const { segment, unescape, tokens } of segments) {
   if (tokens.length === 0) continue
   judge(tokens)
-  // A package runner's flag table is best effort: an unlisted value flag would make its value
-  // the "program" and hide the real one. So judge every token after a runner as a program
-  // start too (`uv run --newflag x rm -rf y`), which fails closed.
-  for (const tail of runnerTails(segment, unescape)) judgeTail(tail, unescape)
+  // The wrapper and runner flag tables are best effort: an unlisted value flag would make its
+  // value the "program" and hide the real one. So judge every token after a wrapper or runner
+  // as a program start too (`uv run --newflag x rm -rf y`), which fails closed.
+  for (const tail of commandTails(segment, unescape)) judgeTail(tail, unescape)
   const inner = containerTail(programName(tokens[0]), tokens.slice(1))
   if (inner !== null) judgeTail(inner, unescape)
 }

@@ -11,19 +11,17 @@ import process from 'node:process'
 import {
   allow,
   block,
+  commandLines,
   commandOf,
   escapeForms,
+  inlineCode,
   interpreterViews,
   isCanonicalPath,
-  isPythonProgram,
   programName,
   projectRoot,
-  pythonInlineCode,
-  pythonReadsStdin,
   readPayload,
+  readsStdin,
   resolveRole,
-  scriptInlineCode,
-  scriptReadsStdin,
   segmentTokens,
   sessionCwd,
   shellSegments,
@@ -55,11 +53,6 @@ const WRITE_PROGRAMS = new Set([
   'out-file', 'copy-item', 'cpi', 'copy', 'move-item', 'mi', 'move', 'new-item', 'ni', 'rename-item',
   'rni', 'ren', 'rename', 'rimraf'
 ])
-// Inline code can write anything; scripts run by path (`bun run src/x.ts`) are fine.
-// Python (py, python, python3.N, pypy) is judged by isPythonProgram: its `-c` only counts
-// before the script, so `python run.py -c conf` is a script run.
-const INLINE_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'perl', 'ruby', 'php'])
-const INLINE_FLAG = /^(-e|-p|-c|-r|--eval|--print)$/
 // git subcommands that never change the working tree or the history.
 const GIT_READ = new Set([
   'status', 'diff', 'log', 'show', 'ls-files', 'ls-tree', 'rev-parse', 'rev-list', 'blame', 'grep',
@@ -120,18 +113,20 @@ if (escapes || !lanes.some(lane => matchesLane(rel, lane))) {
 
 allow()
 
+// The line and each command string handed to a shell in it (`bash -c "echo 1 > x"`).
 function shellWriteChannel(command) {
-  // Redirections are checked on the unquoted text because `>` may be glued to its target;
-  // `=>`, `->` and `<>` are not redirections.
-  const redirects = withoutQuotes(command).match(REDIRECT) ?? []
-  for (const redirect of redirects) {
-    if (!HARMLESS_REDIRECT.test(redirect.trim())) return `redirect ${redirect.trim().split(/\s+/)[0]}`
-  }
-  for (const segment of shellSegments(command)) {
-    // As written, and the way bash unescapes a backslash (`t\ee f` is `tee f`).
-    for (const unescape of escapeForms(segment)) {
-      const channel = segmentWriteChannel(segment, unescape)
-      if (channel !== null) return channel
+  for (const line of commandLines(command)) {
+    // Redirections are checked on the unquoted text because `>` may be glued to its target;
+    // `=>`, `->` and `<>` are not redirections.
+    const redirects = withoutQuotes(line).match(REDIRECT) ?? []
+    const written = redirects.map(redirect => redirect.trim()).find(r => !HARMLESS_REDIRECT.test(r))
+    if (written !== undefined) return `redirect ${written.split(/\s+/)[0]}`
+    for (const segment of shellSegments(line)) {
+      // As written, and the way bash unescapes a backslash (`t\ee f` is `tee f`).
+      for (const unescape of escapeForms(segment)) {
+        const channel = segmentWriteChannel(segment, unescape)
+        if (channel !== null) return channel
+      }
     }
   }
   return null
@@ -171,17 +166,11 @@ function segmentWriteChannel(segment, unescape) {
   return null
 }
 
-// Inline code through an interpreter writes anything: `node -e`, a bare `node` or `-` reading
-// stdin, Python's `-c`, an inline module, Python reading stdin (a heredoc, a pipe, `-`).
+// Inline code through an interpreter writes anything: `node -e`, `perl -lne`, Python's `-c` or
+// an inline module, `deno eval`, or a program read from stdin (a heredoc, a pipe, `-`). Scripts
+// run by path (`bun run src/x.ts`, `python run.py -c conf`) are fine.
 function interpreterChannel(program, args) {
-  if (INLINE_RUNTIMES.has(program)) {
-    // Attached spellings (`node -e'code'`, `--eval=code`) are inline code as well.
-    const flagged = args.some(arg => INLINE_FLAG.test(arg))
-    if (flagged || scriptInlineCode(args, 'erp') !== null || scriptReadsStdin(args)) {
-      return `${program} inline code`
-    }
-  }
-  if (isPythonProgram(program) && (pythonInlineCode(args) !== null || pythonReadsStdin(args))) {
+  if (inlineCode(program, args) !== null || readsStdin(program, args)) {
     return `${program} inline code`
   }
   return null

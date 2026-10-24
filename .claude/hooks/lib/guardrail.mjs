@@ -172,7 +172,8 @@ export function tokenize(text, unescape = false) {
       if (word !== null) tokens.push(word)
       word = null
     } else {
-      append(char)
+      // PowerShell reads a leading en dash, em dash or horizontal bar as `-` (`–Recurse`).
+      append(word === null && /[–—―]/.test(char) ? '-' : char)
     }
   }
   if (word !== null) tokens.push(word)
@@ -205,10 +206,58 @@ const WRAPPERS = new Set([
   'sudo', 'doas', 'env', 'nohup', 'time', 'command', 'exec', 'eval', 'xargs', 'nice', 'busybox',
   'timeout', 'stdbuf', 'caffeinate', 'npx', 'pnpx'
 ])
-// The wrappers whose short flags in FLAG_WITH_VALUE consume the next token (`sudo -u root`).
-const VALUE_FLAG_WRAPPERS = new Set(['sudo', 'doas', 'env', 'nice', 'xargs'])
-const FLAG_WITH_VALUE = /^-(u|g|p|C|h|r|t|T|I|L|n|P|d|s|E|S)$/
-const DURATION = /^\d+(\.\d+)?[smhd]?$/
+const flagSet = list => new Set(list.split(/\s+/).filter(Boolean))
+const NO_FLAGS = new Set()
+// The value flags of each wrapper, which consume the next token (`sudo -u root`, `timeout -s
+// KILL 5`); any other flag stands alone. From the GNU coreutils and findutils, sudo, doas, bash
+// and npm manuals, BSD spellings included. A flag missing here cannot hide the program from a
+// caller that judges the wrapper's tail (see commandTails).
+const SHELL_FLAGS = flagSet('-o -O +o +O --rcfile --init-file')
+const WRAPPER_FLAGS = {
+  sh: SHELL_FLAGS,
+  bash: SHELL_FLAGS,
+  zsh: SHELL_FLAGS,
+  dash: SHELL_FLAGS,
+  ksh: SHELL_FLAGS,
+  sudo: flagSet(
+    '-a --auth-type -c --login-class -C --close-from -D --chdir -g --group -p --prompt ' +
+      '-R --chroot -r --role -t --type -T --command-timeout -U --other-user -u --user'
+  ),
+  doas: flagSet('-a -C -u'),
+  // -S is left out: its value is a command line (see ENV_SPLIT).
+  env: flagSet('-u --unset -C --chdir -P -L -U'),
+  nice: flagSet('-n --adjustment'),
+  timeout: flagSet('-s --signal -k --kill-after'),
+  stdbuf: flagSet('-i --input -o --output -e --error'),
+  time: flagSet('-f --format -o --output'),
+  exec: flagSet('-a'),
+  caffeinate: flagSet('-t -w'),
+  xargs: flagSet(
+    '-a --arg-file -d --delimiter -E -I -J -L -n --max-args -P --max-procs -R -s --max-chars ' +
+      '-S --process-slot-var'
+  ),
+  npx: flagSet('-p --package -w --workspace --prefix'),
+  pnpx: flagSet('--package')
+}
+// `env -S "a b"` and `--split-string=…` split their value into env's own arguments.
+const ENV_SPLIT = /^(?:-S|--split-string=?)([\s\S]*)$/
+// fish runs the value of -C / --init-command as a command line of its own.
+const FISH_INIT = /^(?:-C|--init-command=?)([\s\S]*)$/
+// cmd runs what is glued to /c or /k as well (`/c"rmdir /s x"` reads `/crmdir /s x`).
+const CMD_GLUED = /^\/[ck]([\s\S]+)$/i
+// powershell and pwsh parameters that take a value. Any prefix of a name is that parameter
+// (`-ex Bypass`), and pwsh adds the aliases. -Command and -File take the rest of the line, so
+// the command after them is what gets judged.
+const POWERSHELL_VALUE_PARAMS = [
+  'executionpolicy', 'workingdirectory', 'outputformat', 'inputformat', 'windowstyle',
+  'configurationname', 'configurationfile', 'settingsfile', 'custompipename', 'psconsolefile',
+  'version'
+]
+const POWERSHELL_VALUE_ALIASES = new Set(['ep', 'wd', 'o', 'of', 'if', 'w', 'v'])
+const POWERSHELL_REST_PARAMS = ['command', 'file']
+const POWERSHELL_ENCODED_PARAMS = ['encodedcommand', 'encodedarguments']
+// timeout reads its duration with strtod, so `1e1`, `0x10` and `inf` are durations too.
+const DURATION = /^(\+?\.?\d|inf)/i
 // How many wrappers and runners are peeled before the program. A deeper nest is refused: an
 // analysis that stopped there would let `sudo` repeated past the limit hide any command.
 const MAX_WRAPPER_DEPTH = 8
@@ -221,23 +270,42 @@ export function segmentTokens(segment, unescape = false) {
   return analyzeSegment(segment, unescape).tokens
 }
 
-// What follows each package runner in the segment, flags included and unresolved. A runner
-// whose flag table is wrong or incomplete shifts the program by a token, so a caller that
-// must not miss a program can look at every later token (see block-destructive-bash).
-export function runnerTails(segment, unescape = false) {
+// What follows each wrapper and package runner in the segment, flags included and unresolved.
+// A flag table that is wrong or incomplete shifts the program by a token, so a caller that must
+// not miss a program can look at every later token (see block-destructive-bash).
+export function commandTails(segment, unescape = false) {
   return analyzeSegment(segment, unescape).tails
 }
 
-// Every later token after a package runner that names an interpreter, analysed as the start of
-// a command (the token lists, program first). A runner's flag table is best effort, so
+// Every later token after a wrapper or package runner that names an interpreter, analysed as
+// the start of a command (the token lists, program first). The flag tables are best effort, so
 // `uv run --newflag x python -c "…"` makes `x` the apparent program; a caller that judges
 // inline code, stdin and the environment looks at these views too, which fails closed.
 export function interpreterViews(segment, unescape = false) {
-  const isInterpreter = token => {
-    const program = programName(token)
-    return PYTHON_PROGRAM.test(program) || SCRIPT_RUNTIMES.has(program)
+  const isInterpreter = token => runtimeOf(programName(token)) !== null
+  return commandTails(segment, unescape).flatMap(tail => viewsOf(tail, unescape, isInterpreter))
+}
+
+// The command line and every command string handed to a shell inside it (`bash -c "cd x;
+// rm -rf y"`, `powershell -Command "…"`), behind a tail position too. Each one is split into
+// segments and judged like the line itself; a string is strictly shorter than its line, so
+// this ends.
+export function commandLines(command) {
+  const lines = [command]
+  for (let i = 0; i < lines.length; i += 1) {
+    for (const segment of shellSegments(lines[i])) {
+      for (const unescape of escapeForms(segment)) {
+        const { scripts, tails } = analyzeSegment(segment, unescape)
+        const tailScripts = tails.flatMap(tail =>
+          tail.flatMap((_, at) => analyzeTokens(tail.slice(at), unescape).scripts)
+        )
+        for (const line of [...scripts, ...tailScripts]) {
+          if (!lines.includes(line)) lines.push(line)
+        }
+      }
+    }
   }
-  return runnerTails(segment, unescape).flatMap(tail => viewsOf(tail, unescape, isInterpreter))
+  return lines
 }
 
 // Every position of a tail analysed as a command start, wrappers peeled, so `sh -c "rm -rf x"`
@@ -260,31 +328,28 @@ function analyzeSegment(segment, unescape) {
 }
 
 // Peels assignments, wrappers, runners and `python -m` until the real program is first.
-// `tails` holds the raw tokens after each runner's subcommand.
+// - `tails` holds the raw tokens after each wrapper and after each runner's subcommand.
+// - `scripts` holds each command string handed to a shell (see commandLines).
 function analyzeTokens(words, unescape) {
   let tokens = words
   const tails = []
+  const scripts = []
   // The flags of an `env` just peeled: with no program left it is a bare `env`, which prints the
   // environment, so the caller must still see it.
   let envFlags = null
   for (let depth = 0; depth <= MAX_WRAPPER_DEPTH; depth += 1) {
     while (tokens.length > 0 && /^[A-Za-z_]\w*=/.test(tokens[0])) tokens = tokens.slice(1)
     if (tokens.length === 0) {
-      return { tokens: envFlags === null ? [] : ['env', ...envFlags], tails }
+      return { tokens: envFlags === null ? [] : ['env', ...envFlags], tails, scripts }
     }
     const program = programName(tokens[0])
     const inner = unwrap(program, tokens, tails)
-    if (inner === null) return { tokens, tails }
-    // Drop the wrapper's own flags (`-lc`, `-NoProfile -Command`, `-u root`, `--`, cmd's `/c`).
-    const flags = []
-    let i = 0
-    while (i < inner.length && isWrapperFlag(program, inner[i])) {
-      flags.push(inner[i])
-      i += VALUE_FLAG_WRAPPERS.has(program) && FLAG_WITH_VALUE.test(inner[i]) ? 2 : 1
-    }
+    if (inner === null) return { tokens, tails, scripts }
+    const { flags, rest } = stripWrapperFlags(program, inner, unescape, scripts)
     envFlags = program === 'env' ? flags : null
-    tokens = inner.slice(i)
+    tokens = rest
     if (tokens.length > 0 && /\s/.test(tokens[0])) {
+      scripts.push(tokens[0])
       tokens = [...tokenize(tokens[0], unescape), ...tokens.slice(1)]
     }
   }
@@ -296,7 +361,7 @@ function analyzeTokens(words, unescape) {
 }
 
 // The tokens after `program` when it runs another one (a runner, `python -m`, a wrapper), or
-// null when it is the real program. A runner's raw tail is pushed to `tails`.
+// null when it is the real program. A runner's or a wrapper's raw tail is pushed to `tails`.
 function unwrap(program, tokens, tails) {
   if (Object.hasOwn(RUNNERS, program)) {
     const stripped = stripRunner(RUNNERS[program], tokens)
@@ -308,12 +373,81 @@ function unwrap(program, tokens, tails) {
   }
   // `python -m pytest` runs the module `pytest`; inline code and scripts stay as they are.
   if (PYTHON_PROGRAM.test(program)) return pythonModule(tokens.slice(1))
-  if (program === 'timeout' && DURATION.test(tokens[1] ?? '')) return tokens.slice(2)
-  return WRAPPERS.has(program) ? tokens.slice(1) : null
+  if (!WRAPPERS.has(program)) return null
+  tails.push(tokens.slice(1))
+  return tokens.slice(1)
+}
+
+// Drops a wrapper's own flags and their values (`-lc`, `-NoProfile -Command`, `-u root`, `--`,
+// cmd's `/c`) and timeout's duration. `flags` lists the flags without their values; a flag
+// whose value is a command line (fish's -C) adds the value to `scripts`.
+function stripWrapperFlags(program, inner, unescape, scripts) {
+  const flags = []
+  let i = 0
+  while (i < inner.length && isWrapperFlag(program, inner[i])) {
+    const flag = inner[i]
+    flags.push(flag)
+    i += 1
+    if (flag === '--') break
+    const glued = program === 'cmd' ? CMD_GLUED.exec(flag) : null
+    if (glued !== null) return { flags, rest: [glued[1], ...inner.slice(i)] }
+    const split = program === 'env' ? ENV_SPLIT.exec(flag) : null
+    const init = program === 'fish' ? FISH_INIT.exec(flag) : null
+    const valued = split ?? init
+    if (valued !== null) {
+      const attached = valued[1] !== ''
+      const value = attached ? valued[1] : (inner[i] ?? '')
+      if (!attached) i += 1
+      if (init !== null) {
+        scripts.push(value)
+        continue
+      }
+      // env reads escapes (`\_` is a space) and `${VAR}` in the string, which the shell
+      // tokenizer does not.
+      if (/\\|\$\{/.test(value)) {
+        block('env -S with a backslash escape or ${VAR} cannot be judged; blocking by default')
+      }
+      return { flags, rest: ['env', ...tokenize(value, unescape), ...inner.slice(i)] }
+    }
+    if (wrapperTakesValue(program, flag)) i += 1
+  }
+  if (program === 'timeout' && DURATION.test(inner[i] ?? '')) i += 1
+  return { flags, rest: inner.slice(i) }
 }
 
 function isWrapperFlag(program, token) {
-  return token.startsWith('-') || (program === 'cmd' && /^\/[a-z]$/i.test(token))
+  if (token.startsWith('-')) return true
+  // POSIX shells also take `+o name` and `+x`; cmd and powershell take `/c`, cmd `/e:on` too.
+  if (WRAPPER_FLAGS[program] === SHELL_FLAGS) return /^\+[A-Za-z]+$/.test(token)
+  if (program === 'cmd') return /^\/[a-z](:\w*)?$/i.test(token) || CMD_GLUED.test(token)
+  return isPowerShell(program) && /^\/[a-z]+(:\S*)?$/i.test(token)
+}
+
+function wrapperTakesValue(program, flag) {
+  if (isPowerShell(program)) return powershellTakesValue(flag)
+  const valueFlags = WRAPPER_FLAGS[program] ?? NO_FLAGS
+  // GNU getopt accepts any unambiguous prefix of a long option (`--sig KILL`).
+  const abbreviates = name => name.startsWith('--') && name.startsWith(flag)
+  if (/^--[^=]+$/.test(flag) && [...valueFlags].some(abbreviates)) return true
+  return readFlag(flag, valueFlags).takesValue
+}
+
+function isPowerShell(program) {
+  return program === 'powershell' || program === 'pwsh'
+}
+
+// A PowerShell parameter is named by any prefix (`-ex`), or by `-name:value` with its value
+// attached. An encoded command cannot be inspected, so -EncodedCommand blocks.
+function powershellTakesValue(flag) {
+  const [name, ...attached] = flag.replace(/^(--?|\/)/, '').toLowerCase().split(':')
+  const prefixOf = params => name.length >= 2 && params.some(param => param.startsWith(name))
+  const encoded = name.startsWith('en') && prefixOf(POWERSHELL_ENCODED_PARAMS)
+  if (encoded || ['e', 'ec', 'ea'].includes(name)) {
+    block('powershell -EncodedCommand hides the command it runs; blocking by default')
+  }
+  if (attached.length > 0) return false
+  if (POWERSHELL_VALUE_ALIASES.has(name)) return true
+  return prefixOf(POWERSHELL_VALUE_PARAMS) && !prefixOf(POWERSHELL_REST_PARAMS)
 }
 
 // Package runners (`bun run pkg`, `uv run prog`, …) run the program named after their flags.
@@ -323,8 +457,6 @@ function isWrapperFlag(program, token) {
 //   --preview-features, --python-fetch), `npm exec --help`, and the poetry, pdm, hatch CLI docs.
 // - Left out on purpose: bun's -e/-p/--inspect* (optional values), npm's -c (a command string,
 //   re-tokenised) and -p (--parseable). pipx, pnpm and yarn have no table.
-const flagSet = list => new Set(list.split(/\s+/).filter(Boolean))
-const NO_FLAGS = new Set()
 const UV_GLOBAL =
   '--cache-dir --color --allow-insecure-host --directory --project --config-file ' +
   '--python-preference --preview-features --python-fetch'
@@ -428,35 +560,33 @@ function stripRunner(runner, tokens) {
   return { rest: runner.envPrefix ? stripHatchSelectors(rest) : rest, tail }
 }
 
-// Index of the first token after the flags from `start`; `--` ends them.
-// - A flag in `valueFlags` consumes the next token, unless written `--flag=value`.
-// - A short cluster is read by letter: `-qp 3.14` gives 3.14 to -p, `-pq` gives it `q`.
-// - `seen`, when given, collects the flag names met.
+// Index of the first token after the flags from `start`; `--` ends them. `seen`, when given,
+// collects the flag names met.
 function skipFlags(tokens, start, valueFlags, seen) {
   let i = start
   while (i < tokens.length && tokens[i].startsWith('-') && tokens[i] !== '-') {
     const flag = tokens[i]
     i += 1
     if (flag === '--') break
-    if (flag.includes('=')) {
-      seen?.add(flag.slice(0, flag.indexOf('=')))
-      continue
-    }
-    if (valueFlags.has(flag)) {
-      seen?.add(flag)
-      i += 1
-    } else if (/^-[A-Za-z]{2,}$/.test(flag)) {
-      const letters = [...flag.slice(1)]
-      const first = letters.findIndex(letter => valueFlags.has(`-${letter}`))
-      for (const letter of letters.slice(0, first === -1 ? letters.length : first + 1)) {
-        seen?.add(`-${letter}`)
-      }
-      if (first === letters.length - 1) i += 1
-    } else {
-      seen?.add(flag)
-    }
+    const { names, takesValue } = readFlag(flag, valueFlags)
+    for (const name of names) seen?.add(name)
+    if (takesValue) i += 1
   }
   return i
+}
+
+// The flag names in one token and whether the next token is their value.
+// - A flag in `valueFlags` takes the next token, unless written `--flag=value`.
+// - A short cluster is read by letter: `-qp 3.14` gives 3.14 to -p, `-pq` gives it `q`.
+function readFlag(flag, valueFlags) {
+  if (flag.includes('=')) return { names: [flag.slice(0, flag.indexOf('='))], takesValue: false }
+  if (valueFlags.has(flag)) return { names: [flag], takesValue: true }
+  if (!/^[-+][A-Za-z]{2,}$/.test(flag)) return { names: [flag], takesValue: false }
+  const sign = flag[0]
+  const letters = [...flag.slice(1)]
+  const first = letters.findIndex(letter => valueFlags.has(sign + letter))
+  const read = letters.slice(0, first === -1 ? letters.length : first + 1)
+  return { names: read.map(letter => sign + letter), takesValue: first === letters.length - 1 }
 }
 
 // `hatch run +py=3.10 -version=9000 test:pytest`: matrix selectors, then `env:program`.
@@ -478,9 +608,23 @@ const PYTHON_INLINE_MODULES = new Set([
 ])
 // The subset that is a REPL: with no argument it reads its program from stdin.
 const PYTHON_REPL_MODULES = new Set(['code', 'pdb', 'asyncio', 'ipython'])
-// Programs that run code handed to them inline or on stdin; the views of an unresolved runner
-// tail look for these.
-const SCRIPT_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'perl', 'ruby', 'php'])
+// Programs that run code handed to them inline or on stdin, and the language they read; the
+// views of an unresolved tail look for these.
+const SCRIPT_RUNTIMES = new Map([
+  ['node', 'node'], ['bun', 'node'], ['deno', 'node'], ['tsx', 'node'], ['ts-node', 'node'],
+  ['perl', 'perl'], ['ruby', 'ruby'], ['php', 'php']
+])
+// The flag that hands a runtime its code, which is attached to it or follows it:
+// - node and its kin: -e, -p, -pe, --eval, --print (`-e'code'`, `--eval=code`).
+// - perl and ruby: -e (perl's -E too), alone or ending a cluster such as -lne. Only switches
+//   without an attached value may precede it, so `-MTest::More` names a module.
+// - php: -r, and -B, -R, -E, which run code around each input line.
+const INLINE_FLAG = {
+  node: /^(?:--(?:eval|print)(?:=([\s\S]*))?|-(?:pe|ep)|-[ep]([\s\S]*))$/,
+  perl: /^-[acfnpsStTuUvwWXl0-9]*?[eE]([\s\S]*)$/,
+  ruby: /^-[acdhlnpsvwyUW0-9]*?e([\s\S]*)$/,
+  php: /^-[rRBE]([\s\S]*)$/
+}
 // Flags that mean an interpreter is not reading a program from stdin: version and help, a code
 // argument (handled elsewhere), node's test and run modes.
 const NO_STDIN_FLAG =
@@ -488,6 +632,31 @@ const NO_STDIN_FLAG =
 
 export function isPythonProgram(program) {
   return PYTHON_PROGRAM.test(program)
+}
+
+// The language a program interprets: 'python', 'node' (node, bun, deno, tsx, ts-node), 'perl',
+// 'ruby' or 'php'; null for any other program.
+export function runtimeOf(program) {
+  if (PYTHON_PROGRAM.test(program)) return 'python'
+  return SCRIPT_RUNTIMES.get(program) ?? null
+}
+
+// The code an interpreter call runs from its command line (`''` when it is inline but the code
+// is missing), or null when there is none. Everything after the flag counts, which errs towards
+// judging more text.
+export function inlineCode(program, args) {
+  const runtime = runtimeOf(program)
+  if (runtime === 'python') return pythonInlineCode(args)
+  if (runtime === null) return null
+  if (program === 'deno' && args[0] === 'eval') return args.slice(1).join(' ').trim()
+  return scriptInlineCode(args, runtime)
+}
+
+// True when an interpreter reads its program from stdin (a `-`, a heredoc, a pipe, a REPL).
+export function readsStdin(program, args) {
+  const runtime = runtimeOf(program)
+  if (runtime === 'python') return pythonReadsStdin(args)
+  return runtime !== null && scriptReadsStdin(args)
 }
 
 // Redirections are not arguments: `python - <<EOF`, `python < in.py`, `python 2>err`.
@@ -574,11 +743,10 @@ export function scriptReadsStdin(rawArgs) {
   return args.every(arg => arg.startsWith('-') && !NO_STDIN_FLAG.test(arg))
 }
 
-// The code of `node -e <code>`, `-p`, `--eval`, `--print`, including the attached spellings
-// (`-e'code'`, `--eval=code`), or null when the call is not inline. `letters` names the
-// short flags that count: `ep` for node and bun, `erp` for perl, ruby and php too.
-export function scriptInlineCode(args, letters = 'ep') {
-  const inline = new RegExp(`^(?:--(?:eval|print)(?:=(.*))?|-(?:pe|ep)|-[${letters}](.*))$`)
+// The code after the runtime's inline flag (see INLINE_FLAG), code over several lines included,
+// or null when the call is not inline.
+export function scriptInlineCode(args, runtime = 'node') {
+  const inline = INLINE_FLAG[runtime]
   for (let i = 0; i < args.length; i += 1) {
     const match = inline.exec(args[i])
     if (match !== null) return [match[1] ?? match[2] ?? '', ...args.slice(i + 1)].join(' ').trim()
