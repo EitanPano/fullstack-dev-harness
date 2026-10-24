@@ -71,8 +71,10 @@ a product is chosen at the bootstrap and recorded in `.fullstack/catalog.yaml`.
   bootstrap clones the catalog, so these are harness prerequisites whatever the stack. Node
   also runs the harness scripts and the hooks. A package's own tools (uv for a Python
   backend) come from its `template.yaml` `tools` and are checked at the bootstrap.
-- Docker Compose: the deployment target (one image per package) and the host of local
-  infrastructure such as the database.
+- Docker Compose: the deployment target and the host of local infrastructure such as the
+  database. One image per deployable, by deploy mode: `single` is one image (the server
+  serves a single-page app's built files; Compose 2.35.0 or newer), `split` is one per
+  package. A server-rendered frontend is always `split`.
 
 **Packages and commands**
 
@@ -115,7 +117,8 @@ when the project has one) for local work. Never run a scaffolder inside an exist
 
 ## Architecture
 
-Two deployable packages and one generated contract between them.
+Two packages and one generated contract between them. The deploy mode (`deployment` skill;
+recorded in `.doc/architecture.md › Deployment`) decides whether they ship as one image or two.
 
 **Server package**
 
@@ -137,7 +140,8 @@ Two deployable packages and one generated contract between them.
 
 **Frontend package**
 
-- A routing-only app directory. `feature/<name>/` holds `ui/`, a data layer and `model`.
+- A routing-only app directory. `feature/<name>/` holds `ui/`, a data layer and `model`
+  (the data layer is `server/` in a server-rendered frontend and `api/` in a single-page app).
   `shared/` is product-agnostic and never imports a feature. A feature never imports another
   feature's `ui/`; lift to `shared/` or pass props.
 - The typed client, generated from the server's contract, lives in `lib/api/` and is
@@ -222,6 +226,7 @@ A task is done only when every item holds and the stage report shows the evidenc
 | `database` | Choosing the engine; adding or changing a table, collection, index, migration or data-access file |
 | `code-review` | Reviewing a change: the checklist, severities and report format |
 | `cutting-a-release` | Choosing a version number or tagging a release |
+| `deployment` | Choosing or switching the deploy mode (`single`, `split`), setting `TRUST_PROXY`, scaling, or serving the frontend from a static host |
 
 ## Product and domain
 

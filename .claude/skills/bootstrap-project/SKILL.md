@@ -35,10 +35,21 @@ Auth (the shipped default and the roles marker describe code that will not exist
 ```
 - Auth: none. The product has no accounts and every endpoint is public. Adding accounts is
   a planned change; a scaffold with the `auth` flag on is the reference.
-- Client model: the frontend's server is the backend's client (no browser fetch). CORS is off
-  unless `CORS_ORIGINS` is set. Rate limits key on the client address, so the frontend
-  forwards `X-Forwarded-For` and the backend runs with `TRUST_PROXY` set.
+- Client model: <!-- FILL: by frontend kind, set in section 5 once the stack is chosen -->
 ```
+
+The frontend kind is known only after section 2, so section 5 replaces the Client model
+marker (here, and in the Auth section of a product with accounts) with the line for the
+chosen frontend:
+
+- Server-rendered (Next): the frontend's server is the backend's client (no browser
+  fetch). CORS is off unless `CORS_ORIGINS` is set. Rate limits key on the client
+  address, so the frontend forwards `X-Forwarded-For` and the backend runs with
+  `TRUST_PROXY` set.
+- Single-page app (React): the browser calls `/api` on the page's own origin (the
+  server in `single`, the frontend image's proxy in `split`), so there is no CORS and no
+  API URL in the bundle. Rate limits key on the client address, so `TRUST_PROXY` is the
+  hop count in front of the server (`false` in `single` locally, `1` in `split`).
 
 Stop when the "Ready to plan" checklist in the product definition is satisfied. Do not
 start the scaffold while a marker remains in a section the checklist names.
@@ -54,7 +65,21 @@ summary) and ask which one. For the chosen stack, Read `<catalog>/stacks/<id>/st
 (its `packages:` list: a `template` path and a `dir` each) and each package's
 `<catalog>/<template path>/template.yaml`. Ask every flag the templates declare (show its
 `summary` and `default`) and every capability that lists providers. Map the answers to
-`--flag <name>=<true|false>` and `--capability <kind>=<provider>`. Ask the database
+`--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
+
+Ask the deploy mode only when the chosen stack has a server and its frontend's
+`template.yaml` declares `static` (a single-page app such as React). Put the tradeoff in
+two lines and map the answer to `--deploy <single|split>`:
+
+- `single` (the default): one container and one port; the server serves the built
+  frontend and the API, so there is no CORS and no frontend container. Needs Docker
+  Compose 2.35.0 or newer (`docker compose version`); an older client fails without
+  naming the cause. Name the floor to the user.
+- `split`: a static-server image per frontend that proxies `/api` to the server, for
+  separate scaling or hosting of the frontend.
+
+A frontend without `static` (Next) is always `split`: do not ask and pass no `--deploy`.
+The `deployment` skill moves the project between modes later. Ask the database
 provider here when the template lists one (`capabilities.database.providers`). When the
 user named an engine in section 1 that the template lists, the provider fixes the client
 library (the package's `AGENTS.md › Adding the data layer` names it): tell the user and
@@ -115,8 +140,15 @@ scaffold is a catalog bug: say so explicitly, name the template and version from
 provenance file, and record it in the final message.
 
 Then start each package's `dev` command and open the frontend's `http.health` path on its
-`http.port`: the page must reach the server (for a Next.js frontend, the API version pill
+`http.port` (a Next frontend on its port; an SPA's dev server on its `http.port`, which
+proxies `/api` to the server): the page must reach the server (the API version pill
 proves the typed client reaches it).
+
+For the app check, run `docker compose --profile app up --build --wait` at the root and
+stop it with `docker compose --profile app down`. In `single` the check is one container
+on the server's port (no frontend container in `docker compose ps -a`): `/` returns the
+page and `/api/health` answers there. In `split` it is one container per package, reached
+through the frontend's port.
 
 A fresh server package has: health, the commented reference module, and authentication when
 the `auth` flag is on. Its store is either the in-memory store (nothing survives a restart
@@ -134,7 +166,12 @@ for a named engine, or `- [ ] add the data layer | stack:backend` when the answe
 first line is the first in-scope capability from the product definition; without one it is
 the next line. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
 `Stack` row of the components table in `.doc/architecture.md` from `.fullstack/catalog.yaml`:
-the stack id and, per package, its directory, template and version. When a provider was
+the stack id and, per package, its directory, template and version. Fill the Auth Client
+model line for the frontend kind (section 1). Fill `.doc/architecture.md › Operational
+Concerns › Deployment`: the deploy mode (the top-level `deploy:` of
+`.fullstack/catalog.yaml`; "split" when the file has no `deploy:`, a catalog before v1.2.0)
+and the `TRUST_PROXY` hop count (the template default locally: `false` in `single`, 1 in
+`split`; the production value is the user's to decide, see the `deployment` skill). When a provider was
 passed, fill the Data store section from what was generated: engine and version from the
 provider service's image in `docker-compose.yml` (or the package's `AGENTS.md › Adding the
 data layer`), the client library and the local service (the provider's Compose service and

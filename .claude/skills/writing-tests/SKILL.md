@@ -62,8 +62,9 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
   in-memory store before each test. The `database` skill defines the test database.
 - Frontend: unit tests cover components, loaders and actions. Components get props and are
   asserted through roles and text. Loaders and actions run with the API stubbed at the
-  network boundary; no test starts the server. A client leaf that receives a server action
-  as a prop is tested with a fake action and a mocked toast library.
+  network boundary; no test starts the server. A client leaf that receives the package's action
+  (a Next server action or an SPA route action; see its `AGENTS.md › Tests`) as a prop
+  is tested with a fake action and a mocked toast library.
 - Frontend e2e: one test per user journey, with an accessibility scan on every new page.
   Locate by role and label, never CSS selectors. A journey that needs data starts from an
   API call in the test's setup, never from the development database's contents.

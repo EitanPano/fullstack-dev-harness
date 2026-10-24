@@ -88,8 +88,9 @@ provider payloads in a response.
   has a loading state and an error boundary. Their messages are user-safe.
 - A loader returns a value for an expected failure (`{ reachable: false, reason }`), so
   the page renders a state instead of throwing.
-- A server action returns the action result the package's `AGENTS.md › Errors` names
-  (`ok: false` with an error) for validation and domain failures, shown by its toast library,
+- The package's action (a Next server action or an SPA route action) returns the action
+  result its `AGENTS.md › Errors` names for validation and domain failures, shown by its
+  toast library,
   specific to the action that failed, with a recovery hint (retry, fix the field, sign in
   again).
 - Never show a raw error message from the server in the UI; map the status to a message
