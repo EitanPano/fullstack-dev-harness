@@ -6,16 +6,17 @@ import { test } from 'node:test'
 
 import { shellVerdict } from './harness.mjs'
 
-const label = options => (options?.role ? ` [${options.role}]` : '')
+const label = options =>
+  `${options?.role ? ` [${options.role}]` : ''}${options?.tool ? ` (${options.tool})` : ''}`
 const show = command => JSON.stringify(command)
 
 const blocks = (command, options) =>
-  test(`blocks: ${show(command)}${label(options)}${options?.tool ? ` (${options.tool})` : ''}`, () => {
+  test(`blocks: ${show(command)}${label(options)}`, () => {
     assert.equal(shellVerdict(command, options).blocked, true, 'expected a block')
   })
 
 const passes = (command, options) =>
-  test(`passes: ${show(command)}${label(options)}${options?.tool ? ` (${options.tool})` : ''}`, () => {
+  test(`passes: ${show(command)}${label(options)}`, () => {
     const verdict = shellVerdict(command, options)
     assert.equal(verdict.blocked, false, `unexpected block by ${verdict.hook}: ${verdict.stderr}`)
   })
@@ -81,13 +82,14 @@ for (const command of [
 ]) {
   blocks(command, { tool: 'PowerShell' })
 }
-passes('powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check.ps1', { tool: 'PowerShell' })
+for (const role of [undefined, 'backend']) {
+  passes('powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check.ps1', {
+    role,
+    tool: 'PowerShell'
+  })
+}
 passes('pwsh -NoProfile -Command "Get-ChildItem"', { tool: 'PowerShell' })
 passes('powershell -ExecutionPolicy Bypass -Command "bun run check"', { tool: 'PowerShell' })
-passes('powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check.ps1', {
-  role: 'backend',
-  tool: 'PowerShell'
-})
 
 // P0 in the secret hook: inline code and environment dumps behind a wrapper's value flag.
 for (const command of [
