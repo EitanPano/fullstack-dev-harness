@@ -212,6 +212,8 @@ test('I1: interpreterViews judges every later interpreter after an unknown runne
   assert.deepEqual(views, [['python', '-c', 'print(1)']])
   assert.deepEqual(lib.interpreterViews('uv run poe check'), [])
   assert.deepEqual(lib.interpreterViews('npm --prefix backend exec node -e 1'), [['node', '-e', '1']])
+  // A view with no program left (`bun run` alone) is dropped, not handed to the hooks as [].
+  assert.deepEqual(lib.interpreterViews('uv run --newflag x bun run'), [])
 })
 
 test('I2: env behind a wrapper or runner stays an env call', () => {

@@ -6,29 +6,21 @@
 import path from 'node:path'
 import process from 'node:process'
 
-export const ALLOW = 0
-export const BLOCK = 2
-
 export function block(message) {
   console.error(`[guardrail] ${message}`)
-  process.exit(BLOCK)
+  process.exit(2)
 }
 
 export function allow() {
-  process.exit(ALLOW)
+  process.exit(0)
 }
 
 export async function readPayload() {
-  process.on('uncaughtException', error => {
-    block(`hook crashed, blocking by default: ${error?.message ?? error}`)
-  })
-  process.on('unhandledRejection', reason => {
-    block(`hook crashed, blocking by default: ${reason?.message ?? reason}`)
-  })
+  const crash = error => block(`hook crashed, blocking by default: ${error?.message ?? error}`)
+  process.on('uncaughtException', crash).on('unhandledRejection', crash)
 
   let input = ''
   for await (const chunk of process.stdin) input += chunk
-
   if (input.trim() === '') block('empty hook payload, blocking by default')
 
   let payload
@@ -37,21 +29,23 @@ export async function readPayload() {
   } catch {
     block('unreadable hook payload (invalid JSON), blocking by default')
   }
-
   if (!isPlainObject(payload)) block('hook payload is not an object, blocking by default')
-  if (!isPlainObject(payload.tool_input)) block('hook payload has no tool_input, blocking by default')
-
+  if (!isPlainObject(payload.tool_input)) {
+    block('hook payload has no tool_input, blocking by default')
+  }
   return payload
+}
+
+function isPlainObject(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 // The sub-agent role, or null in the interactive session. Claude Code sends the agent's
 // frontmatter `name` as `agent_type`; AGENT_ROLE in the environment is an override for a
 // headless driver. `agent_type` wins when both are present.
 export function resolveRole(payload) {
-  for (const candidate of [payload.agent_type, process.env.AGENT_ROLE]) {
-    if (typeof candidate === 'string' && candidate !== '') return candidate
-  }
-  return null
+  const isRole = value => typeof value === 'string' && value !== ''
+  return [payload.agent_type, process.env.AGENT_ROLE].find(isRole) ?? null
 }
 
 // The project root the hook should measure paths against. CLAUDE_PROJECT_DIR is set by
@@ -89,8 +83,6 @@ export function toProjectRelative(rawPath, root, base = root) {
   return { rel, escapes }
 }
 
-// Shell command helpers shared by the Bash|PowerShell hooks.
-
 // The shell command of a payload ('' for a tool that has none). A Bash or PowerShell call
 // whose command is not a string cannot be inspected, so it blocks.
 export function commandOf(payload) {
@@ -105,117 +97,6 @@ export function commandOf(payload) {
 // Operators that start a new command, matched only outside quotes.
 const SEGMENT_OPERATORS = ['&&', '||', '|', ';', '&', '\n', '\r', '$(', '`', '(', ')']
 
-// Programs that run another program: the real program is what follows their flags.
-const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'pwsh', 'powershell', 'cmd'])
-const PREFIXES = new Set([
-  'sudo', 'doas', 'env', 'nohup', 'time', 'command', 'exec', 'eval', 'xargs', 'nice', 'busybox',
-  'timeout', 'stdbuf', 'caffeinate', 'npx', 'pnpx'
-])
-
-// Package runners (`bun run pkg`, `uv run prog`, …) run the program named after their flags.
-// - The tables list value flags, which consume the next token; otherwise
-//   `uv run --directory backend rm` reads `backend` as the program.
-// - Best effort, from uv 0.12.23 and bun 1.4 `--help` (plus uv's hidden --python-preference,
-//   --preview-features, --python-fetch), `npm exec --help`, and the poetry, pdm, hatch CLI docs.
-// - Left out on purpose: bun's -e/-p/--inspect* (optional values), npm's -c (a command string,
-//   re-tokenised) and -p (--parseable). pipx, pnpm and yarn have no table.
-const flagSet = list => new Set(list.split(/\s+/).filter(Boolean))
-const UV_COMMON =
-  '-w --with --with-editable --with-requirements --python-platform --index --default-index ' +
-  '-i --index-url --extra-index-url -f --find-links --index-strategy --keyring-provider ' +
-  '-P --upgrade-package --upgrade-group --resolution --prerelease --prerelease-package ' +
-  '--fork-strategy --exclude-newer --exclude-newer-package --no-sources-package ' +
-  '--reinstall-package --link-mode -C --config-setting --config-settings-package ' +
-  '--no-build-isolation-package --no-build-package --no-binary-package --cache-dir ' +
-  '--refresh-package --color -p --python --allow-insecure-host --directory --project ' +
-  '--config-file --env-file --python-preference --preview-features --python-fetch'
-const UV_RUN_FLAGS = flagSet(
-  `${UV_COMMON} --extra --no-extra --group --no-group --only-group --no-editable-package --package`
-)
-const UV_TOOL_FLAGS = flagSet(
-  `${UV_COMMON} --from -c --constraints -b --build-constraints --overrides --torch-backend`
-)
-const UV_GLOBAL_FLAGS = flagSet(
-  '--cache-dir --color --allow-insecure-host --directory --project --config-file ' +
-    '--python-preference --preview-features --python-fetch'
-)
-const BUN_RUN_FLAGS = flagSet(
-  '--elide-lines -F --filter --shell --watch-kill-signal -r --preload --require --import ' +
-    '--cpu-prof-name --cpu-prof-dir --cpu-prof-interval --heap-prof-name --heap-prof-dir ' +
-    '--heap-prof-interval --install --port --conditions --fetch-preconnect ' +
-    '--max-http-header-size --dns-result-order --redirect-warnings --disable-warning --title ' +
-    '--unhandled-rejections --console-depth --user-agent --cron-title --cron-period ' +
-    '--main-fields --extension-order --tsconfig-override -d --define --drop --feature -l ' +
-    '--loader --jsx-factory --jsx-fragment --jsx-import-source --jsx-runtime --env-file ' +
-    '--cwd -c --config'
-)
-const BUNX_FLAGS = flagSet('-p --package')
-const NPM_FLAGS = flagSet('--package -w --workspace --script-shell')
-const NO_FLAGS = new Set()
-
-// A runner entry:
-// - `global` and `flags`: value flags before and after the subcommand words (`path`).
-// - `envPrefix`: the program may carry a `name:` prefix (hatch).
-// - `module`: -m/--module runs `python -m <module>`. `stdin`: what reads a script after `-`.
-const sub = (path, flags, options = {}) => ({ path, flags, ...options })
-const RUNNERS = {
-  bun: {
-    global: BUN_RUN_FLAGS,
-    subs: [sub(['x'], BUNX_FLAGS), sub(['run'], BUN_RUN_FLAGS, { stdin: 'bun' })]
-  },
-  bunx: { global: BUNX_FLAGS, subs: [sub([], BUNX_FLAGS)] },
-  npm: {
-    global: NPM_FLAGS,
-    subs: [sub(['exec'], NPM_FLAGS), sub(['run'], NPM_FLAGS), sub(['x'], NPM_FLAGS)]
-  },
-  pnpm: {
-    global: NO_FLAGS,
-    subs: [sub(['dlx'], NO_FLAGS), sub(['exec'], NO_FLAGS), sub(['run'], NO_FLAGS)]
-  },
-  yarn: { global: NO_FLAGS, subs: [sub(['dlx'], NO_FLAGS), sub(['run'], NO_FLAGS)] },
-  uv: {
-    global: UV_GLOBAL_FLAGS,
-    subs: [
-      sub(['run'], UV_RUN_FLAGS, { module: true, stdin: 'python' }),
-      sub(['tool', 'run'], UV_TOOL_FLAGS)
-    ]
-  },
-  uvx: { global: UV_TOOL_FLAGS, subs: [sub([], UV_TOOL_FLAGS)] },
-  poetry: { global: flagSet('-C --directory -P --project'), subs: [sub(['run'], NO_FLAGS)] },
-  pipx: { global: NO_FLAGS, subs: [sub(['run'], NO_FLAGS)] },
-  pdm: {
-    global: NO_FLAGS,
-    subs: [sub(['run'], flagSet('-p --project -k --skip --venv --env --env-file --working-dir'))]
-  },
-  hatch: {
-    global: flagSet('-e --env -p --project --data-dir --cache-dir --config'),
-    subs: [sub(['run'], NO_FLAGS)],
-    envPrefix: true
-  }
-}
-
-// `python`, `python3`, `python314`, `python3.14t`, `py`, `pyw`, `pypy3`, `ipython`, … (a `.exe`
-// suffix is gone by now).
-const PYTHON_PROGRAM = /^(pyw?|pythonw?(\d+(\.\d+)?[a-z]*)?|pypy\d*(\.\d+)?|ipython\d*)$/
-// Modules that run code handed to them as an argument or from stdin (`ipython` stands for
-// IPython too: module names are compared in lower case).
-const PYTHON_INLINE_MODULES = new Set([
-  'timeit', 'cprofile', 'profile', 'trace', 'code', 'pdb', 'runpy', 'asyncio', 'ipython'
-])
-// The subset that is a REPL: with no argument it reads its program from stdin.
-const PYTHON_REPL_MODULES = new Set(['code', 'pdb', 'asyncio', 'ipython'])
-// Programs that run code handed to them inline or on stdin; the views of an unresolved runner
-// tail look for these.
-const SCRIPT_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'perl', 'ruby', 'php'])
-// Flags that mean an interpreter is not reading a program from stdin: version and help, a code
-// argument (handled elsewhere), node's test and run modes.
-const NO_STDIN_FLAG =
-  /^(-[vVhcep]|--(version|help|test.*|check|run.*|eval.*|print.*|inspect.*|v8-options|completion-bash))$/
-
-// Flags that consume the next token.
-const FLAG_WITH_VALUE = /^-(u|g|p|C|h|r|t|T|I|L|n|P|d|s|E|S)$/
-const DURATION = /^\d+(\.\d+)?[smhd]?$/
-
 // Splits a command at operators that start a new command (&&, ||, |, ;, &, subshells),
 // leaving quoted strings intact so `node -e "f(process.env)"` stays one segment.
 export function shellSegments(command) {
@@ -224,45 +105,113 @@ export function shellSegments(command) {
   let quote = null
   for (let i = 0; i < command.length; i += 1) {
     const char = command[i]
-    if (quote !== null) {
-      current += char
-      if (char === '\\' && quote === '"' && i + 1 < command.length) {
-        current += command[i + 1]
-        i += 1
-      } else if (char === quote) {
-        quote = null
-      }
-      continue
-    }
-    // Outside quotes `\"` and `\'` are literal characters in bash, and so is a quote after
-    // PowerShell's backtick: they must not open a string that swallows the operators after
-    // them. `\\` is consumed as a pair so `\\"` still opens one.
-    if (char === '\\' && /^[\\"']$/.test(command[i + 1] ?? '')) {
-      current += char + command[i + 1]
+    const next = command[i + 1] ?? ''
+    // A backslash pairs with the next character inside double quotes and, outside quotes, before
+    // `\`, `"` or `'`: bash reads `\"` as a literal that must not open a string, and `\\"` as one.
+    const paired = quote === null ? /^[\\"']$/.test(next) : quote === '"' && next !== ''
+    if (char === '\\' && paired) {
+      current += char + next
       i += 1
-      continue
-    }
-    if ((char === '"' || char === "'") && command[i - 1] === '`') {
+    } else if (quote !== null) {
+      if (char === quote) quote = null
       current += char
-      continue
-    }
-    if (char === '"' || char === "'") {
-      quote = char
+    } else if (char === '"' || char === "'") {
+      // A quote after PowerShell's escaping backtick is a literal too.
+      if (command[i - 1] !== '`') quote = char
       current += char
-      continue
+    } else {
+      const operator = SEGMENT_OPERATORS.find(candidate => command.startsWith(candidate, i))
+      if (operator === undefined) {
+        current += char
+      } else {
+        segments.push(current)
+        current = ''
+        i += operator.length - 1
+      }
     }
-    const operator = SEGMENT_OPERATORS.find(candidate => command.startsWith(candidate, i))
-    if (operator !== undefined) {
-      segments.push(current)
-      current = ''
-      i += operator.length - 1
-      continue
-    }
-    current += char
   }
   segments.push(current)
   return segments.map(segment => segment.trim()).filter(segment => segment !== '')
 }
+
+// Shell word splitting for guard purposes: quotes are removed and quoted parts join their word
+// (`--flag=".env"` is `--flag=.env`); an unterminated quote runs to the end.
+// - Default: backslashes stay as written, so Windows paths survive.
+// - `unescape`: the bash reading, where `\x` outside quotes is `x` (see escapeForms).
+export function tokenize(text, unescape = false) {
+  const tokens = []
+  let word = null
+  let quote = null
+  const append = chars => (word = (word ?? '') + chars)
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i]
+    const next = text[i + 1] ?? ''
+    if (quote !== null) {
+      if (char === quote) {
+        quote = null
+      } else if (char === '\\' && quote === '"' && next !== '') {
+        append(char + next)
+        i += 1
+      } else {
+        append(char)
+      }
+    } else if (char === '\\' && unescape) {
+      if (next !== '') append(next)
+      i += 1
+    } else if (char === '\\' && /^[\\"';&|<>()$`]$/.test(next)) {
+      // `\` makes a quote or operator literal (`\"` opens no string) and otherwise stays, so
+      // `backend\.env` keeps its word. `\ ` still splits: over-splitting errs to blocking, and a
+      // PowerShell path ending in `\` must not merge with the `-Recurse` after it.
+      append(next === '\\' ? '\\\\' : next)
+      i += 1
+    } else if ((char === '"' || char === "'") && text[i - 1] !== '`') {
+      // After PowerShell's escaping backtick a quote is literal and falls through to the word.
+      quote = char
+      word ??= ''
+    } else if (/\s/.test(char)) {
+      if (word !== null) tokens.push(word)
+      word = null
+    } else {
+      append(char)
+    }
+  }
+  if (word !== null) tokens.push(word)
+  return tokens
+}
+
+// The command with quoted strings blanked, for scans that must not see string contents.
+export function withoutQuotes(command) {
+  // An escaped character outside quotes (`\"`) is skipped first so it cannot open a string.
+  return command.replace(/\\[\s\S]|"(?:[^"\\]|\\.)*"|'[^']*'/g, match =>
+    match.startsWith('\\') ? match : '""'
+  )
+}
+
+// The `unescape` values a caller must judge: as written (Windows paths keep backslashes) and,
+// when there is a backslash, the bash reading (`rm \-rf x` is `rm -rf x`). A command is refused
+// when either reading is.
+export function escapeForms(segment) {
+  return segment.includes('\\') ? [false, true] : [false]
+}
+
+export function programName(token) {
+  const base = token.replace(/^["']|["']$/g, '').split(/[\\/]/).pop() ?? ''
+  return base.replace(/\.(exe|cmd|bat)$/i, '').toLowerCase()
+}
+
+// Programs that run another program, shells first: the real program is what follows their flags.
+const WRAPPERS = new Set([
+  'sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'pwsh', 'powershell', 'cmd',
+  'sudo', 'doas', 'env', 'nohup', 'time', 'command', 'exec', 'eval', 'xargs', 'nice', 'busybox',
+  'timeout', 'stdbuf', 'caffeinate', 'npx', 'pnpx'
+])
+// The wrappers whose short flags in FLAG_WITH_VALUE consume the next token (`sudo -u root`).
+const VALUE_FLAG_WRAPPERS = new Set(['sudo', 'doas', 'env', 'nice', 'xargs'])
+const FLAG_WITH_VALUE = /^-(u|g|p|C|h|r|t|T|I|L|n|P|d|s|E|S)$/
+const DURATION = /^\d+(\.\d+)?[smhd]?$/
+// How many wrappers and runners are peeled before the program. A deeper nest is refused: an
+// analysis that stopped there would let `sudo` repeated past the limit hide any command.
+const MAX_WRAPPER_DEPTH = 8
 
 // Tokens of one segment with surrounding quotes removed; leading NAME=value assignments,
 // wrappers (sudo, env, timeout, bash -lc, powershell -NoProfile -Command, …) and package
@@ -279,95 +228,62 @@ export function runnerTails(segment, unescape = false) {
   return analyzeSegment(segment, unescape).tails
 }
 
-// How many wrappers and runners are peeled before the program. A deeper nest is refused: an
-// analysis that stopped there would let `sudo` repeated past the limit hide any command.
-const MAX_WRAPPER_DEPTH = 8
-
 // Every later token after a package runner that names an interpreter, analysed as the start of
 // a command (the token lists, program first). A runner's flag table is best effort, so
 // `uv run --newflag x python -c "…"` makes `x` the apparent program; a caller that judges
 // inline code, stdin and the environment looks at these views too, which fails closed.
 export function interpreterViews(segment, unescape = false) {
-  const views = []
-  for (const tail of analyzeSegment(segment, unescape).tails) {
-    for (let i = 0; i < tail.length; i += 1) {
-      const program = programName(tail[i])
-      if (PYTHON_PROGRAM.test(program) || SCRIPT_RUNTIMES.has(program)) {
-        views.push(analyzeTokens(tail.slice(i), unescape).tokens)
-      }
-    }
+  const isInterpreter = token => {
+    const program = programName(token)
+    return PYTHON_PROGRAM.test(program) || SCRIPT_RUNTIMES.has(program)
   }
-  return views
+  return runnerTails(segment, unescape).flatMap(tail => viewsOf(tail, unescape, isInterpreter))
 }
 
 // Every position of a tail analysed as a command start, wrappers peeled, so `sh -c "rm -rf x"`
 // behind a runner or in a container reads as `rm -rf x`. The tail came from a best-effort flag
 // table or none (a container runtime), so judging every position fails closed.
 export function tailViews(tail, unescape = false) {
-  const views = []
-  for (let i = 0; i < tail.length; i += 1) {
-    const { tokens } = analyzeTokens(tail.slice(i), unescape)
-    if (tokens.length > 0) views.push(tokens)
-  }
-  return views
+  return viewsOf(tail, unescape, () => true)
 }
 
-function analyzeSegment(segment, unescape = false) {
+// The analysis of `tail` from each position whose token passes `startsAt`; a view left with no
+// program (`bun run` with nothing after it) has nothing to judge and is dropped.
+function viewsOf(tail, unescape, startsAt) {
+  return tail
+    .map((token, i) => (startsAt(token) ? analyzeTokens(tail.slice(i), unescape).tokens : []))
+    .filter(view => view.length > 0)
+}
+
+function analyzeSegment(segment, unescape) {
   return analyzeTokens(tokenize(segment, unescape), unescape)
 }
 
-// The `unescape` values a caller must judge: as written (Windows paths keep backslashes) and,
-// when there is a backslash, the bash reading (`rm \-rf x` is `rm -rf x`). A command is refused
-// when either reading is.
-export function escapeForms(segment) {
-  return segment.includes('\\') ? [false, true] : [false]
-}
-
-function analyzeTokens(words, unescape = false) {
+// Peels assignments, wrappers, runners and `python -m` until the real program is first.
+// `tails` holds the raw tokens after each runner's subcommand.
+function analyzeTokens(words, unescape) {
   let tokens = words
   const tails = []
-  // Set when the last thing stripped was `env`: with no program left it is a bare `env`, which
-  // prints the environment, so the caller must still see it.
-  let pendingEnv = null
-  for (let guard = 0; guard <= MAX_WRAPPER_DEPTH; guard += 1) {
+  // The flags of an `env` just peeled: with no program left it is a bare `env`, which prints the
+  // environment, so the caller must still see it.
+  let envFlags = null
+  for (let depth = 0; depth <= MAX_WRAPPER_DEPTH; depth += 1) {
     while (tokens.length > 0 && /^[A-Za-z_]\w*=/.test(tokens[0])) tokens = tokens.slice(1)
     if (tokens.length === 0) {
-      return { tokens: pendingEnv === null ? tokens : ['env', ...pendingEnv], tails }
+      return { tokens: envFlags === null ? [] : ['env', ...envFlags], tails }
     }
-    pendingEnv = null
     const program = programName(tokens[0])
-    const runner = Object.hasOwn(RUNNERS, program) ? RUNNERS[program] : undefined
-    if (runner !== undefined) {
-      const stripped = stripRunner(runner, tokens)
-      if (stripped === null) return { tokens, tails }
-      tails.push(stripped.tail)
-      // No `rest`: the subcommand sits behind a flag the table does not know. The tail is
-      // recorded for the callers that judge every later token, and the tokens stay as written.
-      if (stripped.rest === null) return { tokens, tails }
-      tokens = stripped.rest
-    } else if (PYTHON_PROGRAM.test(program)) {
-      // `python -m pytest` runs the module `pytest`; inline code and scripts stay as they are.
-      const module = pythonModule(tokens.slice(1))
-      if (module === null) return { tokens, tails }
-      tokens = module
-    } else if (SHELLS.has(program) || PREFIXES.has(program)) {
-      tokens = tokens.slice(1)
-      if (program === 'timeout' && tokens.length > 0 && DURATION.test(tokens[0])) {
-        tokens = tokens.slice(1)
-      }
-    } else {
-      return { tokens, tails }
-    }
+    const inner = unwrap(program, tokens, tails)
+    if (inner === null) return { tokens, tails }
     // Drop the wrapper's own flags (`-lc`, `-NoProfile -Command`, `-u root`, `--`, cmd's `/c`).
-    const takesValue = ['sudo', 'doas', 'env', 'nice', 'xargs'].includes(program)
-    const dropped = []
-    while (tokens.length > 0 && isWrapperFlag(program, tokens[0])) {
-      const flag = tokens[0]
-      tokens = tokens.slice(1)
-      dropped.push(flag)
-      if (FLAG_WITH_VALUE.test(flag) && takesValue) tokens = tokens.slice(1)
+    const flags = []
+    let i = 0
+    while (i < inner.length && isWrapperFlag(program, inner[i])) {
+      flags.push(inner[i])
+      i += VALUE_FLAG_WRAPPERS.has(program) && FLAG_WITH_VALUE.test(inner[i]) ? 2 : 1
     }
-    if (program === 'env') pendingEnv = dropped
+    envFlags = program === 'env' ? flags : null
+    tokens = inner.slice(i)
     if (tokens.length > 0 && /\s/.test(tokens[0])) {
       tokens = [...tokenize(tokens[0], unescape), ...tokens.slice(1)]
     }
@@ -379,19 +295,112 @@ function analyzeTokens(words, unescape = false) {
   )
 }
 
+// The tokens after `program` when it runs another one (a runner, `python -m`, a wrapper), or
+// null when it is the real program. A runner's raw tail is pushed to `tails`.
+function unwrap(program, tokens, tails) {
+  if (Object.hasOwn(RUNNERS, program)) {
+    const stripped = stripRunner(RUNNERS[program], tokens)
+    if (stripped === null) return null
+    // A null `rest`: the subcommand sits behind a flag the table does not know. The tail is
+    // recorded for the callers that judge every later token, and the tokens stay as written.
+    tails.push(stripped.tail)
+    return stripped.rest
+  }
+  // `python -m pytest` runs the module `pytest`; inline code and scripts stay as they are.
+  if (PYTHON_PROGRAM.test(program)) return pythonModule(tokens.slice(1))
+  if (program === 'timeout' && DURATION.test(tokens[1] ?? '')) return tokens.slice(2)
+  return WRAPPERS.has(program) ? tokens.slice(1) : null
+}
+
 function isWrapperFlag(program, token) {
   return token.startsWith('-') || (program === 'cmd' && /^\/[a-z]$/i.test(token))
+}
+
+// Package runners (`bun run pkg`, `uv run prog`, …) run the program named after their flags.
+// - The tables list value flags, which consume the next token; otherwise
+//   `uv run --directory backend rm` reads `backend` as the program.
+// - Best effort, from uv 0.12.23 and bun 1.4 `--help` (plus uv's hidden --python-preference,
+//   --preview-features, --python-fetch), `npm exec --help`, and the poetry, pdm, hatch CLI docs.
+// - Left out on purpose: bun's -e/-p/--inspect* (optional values), npm's -c (a command string,
+//   re-tokenised) and -p (--parseable). pipx, pnpm and yarn have no table.
+const flagSet = list => new Set(list.split(/\s+/).filter(Boolean))
+const NO_FLAGS = new Set()
+const UV_GLOBAL =
+  '--cache-dir --color --allow-insecure-host --directory --project --config-file ' +
+  '--python-preference --preview-features --python-fetch'
+const UV_COMMON =
+  `${UV_GLOBAL} -w --with --with-editable --with-requirements --python-platform --index ` +
+  '--default-index -i --index-url --extra-index-url -f --find-links --index-strategy ' +
+  '--keyring-provider -P --upgrade-package --upgrade-group --resolution --prerelease ' +
+  '--prerelease-package --fork-strategy --exclude-newer --exclude-newer-package ' +
+  '--no-sources-package --reinstall-package --link-mode -C --config-setting ' +
+  '--config-settings-package --no-build-isolation-package --no-build-package ' +
+  '--no-binary-package --refresh-package -p --python --env-file'
+const UV_RUN_FLAGS = flagSet(
+  `${UV_COMMON} --extra --no-extra --group --no-group --only-group --no-editable-package --package`
+)
+const UV_TOOL_FLAGS = flagSet(
+  `${UV_COMMON} --from -c --constraints -b --build-constraints --overrides --torch-backend`
+)
+const BUN_RUN_FLAGS = flagSet(
+  '--elide-lines -F --filter --shell --watch-kill-signal -r --preload --require --import ' +
+    '--cpu-prof-name --cpu-prof-dir --cpu-prof-interval --heap-prof-name --heap-prof-dir ' +
+    '--heap-prof-interval --install --port --conditions --fetch-preconnect ' +
+    '--max-http-header-size --dns-result-order --redirect-warnings --disable-warning --title ' +
+    '--unhandled-rejections --console-depth --user-agent --cron-title --cron-period ' +
+    '--main-fields --extension-order --tsconfig-override -d --define --drop --feature -l ' +
+    '--loader --jsx-factory --jsx-fragment --jsx-import-source --jsx-runtime --env-file ' +
+    '--cwd -c --config'
+)
+const BUNX_FLAGS = flagSet('-p --package')
+const NPM_FLAGS = flagSet('--package -w --workspace --script-shell')
+
+// A runner entry; an omitted flag table means no value flags.
+// - `global` and `flags`: value flags before and after the subcommand words (`path`).
+// - `envPrefix`: the program may carry a `name:` prefix (hatch).
+// - `module`: -m/--module runs `python -m <module>`. `stdin`: what reads a script after `-`.
+const sub = (path, flags = NO_FLAGS, options = {}) => ({ path, flags, ...options })
+const RUNNERS = {
+  bun: {
+    global: BUN_RUN_FLAGS,
+    subs: [sub(['x'], BUNX_FLAGS), sub(['run'], BUN_RUN_FLAGS, { stdin: 'bun' })]
+  },
+  bunx: { global: BUNX_FLAGS, subs: [sub([], BUNX_FLAGS)] },
+  npm: {
+    global: NPM_FLAGS,
+    subs: [sub(['exec'], NPM_FLAGS), sub(['run'], NPM_FLAGS), sub(['x'], NPM_FLAGS)]
+  },
+  pnpm: { subs: [sub(['dlx']), sub(['exec']), sub(['run'])] },
+  yarn: { subs: [sub(['dlx']), sub(['run'])] },
+  uv: {
+    global: flagSet(UV_GLOBAL),
+    subs: [
+      sub(['run'], UV_RUN_FLAGS, { module: true, stdin: 'python' }),
+      sub(['tool', 'run'], UV_TOOL_FLAGS)
+    ]
+  },
+  uvx: { global: UV_TOOL_FLAGS, subs: [sub([], UV_TOOL_FLAGS)] },
+  poetry: { global: flagSet('-C --directory -P --project'), subs: [sub(['run'])] },
+  pipx: { subs: [sub(['run'])] },
+  pdm: {
+    subs: [sub(['run'], flagSet('-p --project -k --skip --venv --env --env-file --working-dir'))]
+  },
+  hatch: {
+    global: flagSet('-e --env -p --project --data-dir --cache-dir --config'),
+    subs: [sub(['run'])],
+    envPrefix: true
+  }
 }
 
 // Splits a runner call into `rest` (program first, flags stripped) and `tail` (raw tokens after
 // the subcommand); null for a non-runner call (`bun install`, `uv sync`). When an unknown flag
 // shifted the subcommand, `rest` is null and only `tail` is reported.
 function stripRunner(runner, tokens) {
-  let i = skipFlags(tokens, 1, runner.global)
   const subAt = at =>
     runner.subs.find(candidate =>
       candidate.path.every((word, offset) => tokens[at + offset]?.toLowerCase() === word)
     )
+  let i = skipFlags(tokens, 1, runner.global ?? NO_FLAGS)
   const found = subAt(i)
   if (found === undefined) {
     for (let at = 1; at < tokens.length; at += 1) {
@@ -403,21 +412,20 @@ function stripRunner(runner, tokens) {
   i += found.path.length
   const tail = tokens.slice(i)
   const seen = new Set()
-  const flagsStart = i
-  i = skipFlags(tokens, i, found.flags, seen)
-  let rest = tokens.slice(i)
-  const moduleValue = tokens.slice(flagsStart, i).find(token => token.startsWith('--module='))
+  const end = skipFlags(tokens, i, found.flags, seen)
+  let rest = tokens.slice(end)
+  const moduleValue = tokens.slice(i, end).find(token => token.startsWith('--module='))
   // uv's own Python channels: `-m/--module <mod>` runs `python -m <mod>` and a leading `-`
   // hands a script on stdin to the interpreter. Rewriting them lets the Python analysis judge
   // them, inline modules and stdin included.
-  if (found.module === true && moduleValue !== undefined) {
+  if (found.module && moduleValue !== undefined) {
     rest = ['python', '-m', moduleValue.slice('--module='.length), ...rest]
-  } else if (found.module === true && (seen.has('-m') || seen.has('--module'))) {
+  } else if (found.module && (seen.has('-m') || seen.has('--module'))) {
     rest = ['python', '-m', ...rest]
   } else if (found.stdin !== undefined && rest[0] === '-') {
     rest = [found.stdin, ...rest]
   }
-  return { rest: runner.envPrefix === true ? stripHatchSelectors(rest) : rest, tail }
+  return { rest: runner.envPrefix ? stripHatchSelectors(rest) : rest, tail }
 }
 
 // Index of the first token after the flags from `start`; `--` ends them.
@@ -460,6 +468,24 @@ function stripHatchSelectors(tokens) {
   return rest
 }
 
+// `python`, `python3`, `python314`, `python3.14t`, `py`, `pyw`, `pypy3`, `ipython`, … (a `.exe`
+// suffix is gone by now).
+const PYTHON_PROGRAM = /^(pyw?|pythonw?(\d+(\.\d+)?[a-z]*)?|pypy\d*(\.\d+)?|ipython\d*)$/
+// Modules that run code handed to them as an argument or from stdin (`ipython` stands for
+// IPython too: module names are compared in lower case).
+const PYTHON_INLINE_MODULES = new Set([
+  'timeit', 'cprofile', 'profile', 'trace', 'code', 'pdb', 'runpy', 'asyncio', 'ipython'
+])
+// The subset that is a REPL: with no argument it reads its program from stdin.
+const PYTHON_REPL_MODULES = new Set(['code', 'pdb', 'asyncio', 'ipython'])
+// Programs that run code handed to them inline or on stdin; the views of an unresolved runner
+// tail look for these.
+const SCRIPT_RUNTIMES = new Set(['node', 'bun', 'deno', 'tsx', 'ts-node', 'perl', 'ruby', 'php'])
+// Flags that mean an interpreter is not reading a program from stdin: version and help, a code
+// argument (handled elsewhere), node's test and run modes.
+const NO_STDIN_FLAG =
+  /^(-[vVhcep]|--(version|help|test.*|check|run.*|eval.*|print.*|inspect.*|v8-options|completion-bash))$/
+
 export function isPythonProgram(program) {
   return PYTHON_PROGRAM.test(program)
 }
@@ -476,11 +502,10 @@ function withoutRedirections(args) {
 }
 
 // Reads how the interpreter was invoked, the way Python parses its own command line:
-//   { kind: 'inline', code }        -c <code> (also attached, or in a cluster such as -Ic)
+//   { kind: 'inline', code }         -c <code> (also attached, or in a cluster such as -Ic)
 //   { kind: 'module', module, rest } -m <module>
-//   { kind: 'script' }               a script path comes first
 //   { kind: 'stdin' }                `-`, or nothing to run at all (stdin or a REPL)
-//   { kind: 'none' }                 --version, -h, …
+//   { kind: 'other' }                a script path first, or --version, -h, …
 // Only options before the script count, so `python run.py -c conf` is a script run.
 function parsePython(rawArgs) {
   const args = withoutRedirections(rawArgs)
@@ -488,30 +513,31 @@ function parsePython(rawArgs) {
     const arg = args[i]
     if (arg === '-') return { kind: 'stdin' }
     if (arg === '--') continue
-    if (/^--(version|help)$/.test(arg)) return { kind: 'none' }
+    if (/^--(version|help)$/.test(arg)) return { kind: 'other' }
     if (arg.startsWith('--')) {
       if (arg === '--check-hash-based-pycs') i += 1
       continue
     }
-    if (!arg.startsWith('-')) return { kind: 'script' }
+    if (!arg.startsWith('-')) return { kind: 'other' }
     for (let k = 1; k < arg.length; k += 1) {
-      const letter = arg[k]
       const attached = arg.slice(k + 1)
-      if (letter === 'c') {
-        return { kind: 'inline', code: attached !== '' ? attached : (args[i + 1] ?? '') }
+      const value = attached !== '' ? attached : (args[i + 1] ?? '')
+      if (arg[k] === 'c') return { kind: 'inline', code: value }
+      if (arg[k] === 'm') {
+        return { kind: 'module', module: value, rest: args.slice(attached !== '' ? i + 1 : i + 2) }
       }
-      if (letter === 'm') {
-        const module = attached !== '' ? attached : (args[i + 1] ?? '')
-        return { kind: 'module', module, rest: args.slice(attached !== '' ? i + 1 : i + 2) }
-      }
-      if (letter === 'W' || letter === 'X') {
+      if (arg[k] === 'W' || arg[k] === 'X') {
         if (attached === '') i += 1
         break
       }
-      if (/^V+$|^h$/.test(arg.slice(k))) return { kind: 'none' }
+      if (/^V+$|^h$/.test(arg.slice(k))) return { kind: 'other' }
     }
   }
   return { kind: 'stdin' }
+}
+
+function runsModule(parsed, modules) {
+  return parsed.kind === 'module' && modules.has(parsed.module.toLowerCase())
 }
 
 // The module tokens of `python [flags] -m <module> …` (the module name first), or null when
@@ -519,8 +545,7 @@ function parsePython(rawArgs) {
 function pythonModule(args) {
   const parsed = parsePython(args)
   if (parsed.kind !== 'module' || parsed.module === '') return null
-  if (PYTHON_INLINE_MODULES.has(parsed.module.toLowerCase())) return null
-  return [parsed.module, ...parsed.rest]
+  return runsModule(parsed, PYTHON_INLINE_MODULES) ? null : [parsed.module, ...parsed.rest]
 }
 
 // The code an interpreter call executes from its command line (`''` when it is inline but
@@ -529,10 +554,7 @@ function pythonModule(args) {
 export function pythonInlineCode(args) {
   const parsed = parsePython(args)
   if (parsed.kind === 'inline') return parsed.code
-  if (parsed.kind === 'module' && PYTHON_INLINE_MODULES.has(parsed.module.toLowerCase())) {
-    return parsed.rest.join(' ')
-  }
-  return null
+  return runsModule(parsed, PYTHON_INLINE_MODULES) ? parsed.rest.join(' ') : null
 }
 
 // True when the interpreter reads its program from stdin (`python -`, `python <<EOF`,
@@ -540,12 +562,8 @@ export function pythonInlineCode(args) {
 // pipe and not in the arguments.
 export function pythonReadsStdin(args) {
   const parsed = parsePython(args)
-  if (parsed.kind === 'stdin') return true
-  return (
-    parsed.kind === 'module' &&
-    PYTHON_REPL_MODULES.has(parsed.module.toLowerCase()) &&
-    parsed.rest.length === 0
-  )
+  const repl = runsModule(parsed, PYTHON_REPL_MODULES) && parsed.rest.length === 0
+  return parsed.kind === 'stdin' || repl
 }
 
 // The same for node, bun, deno and the other script runtimes: a `-` argument, or no program to
@@ -560,79 +578,10 @@ export function scriptReadsStdin(rawArgs) {
 // (`-e'code'`, `--eval=code`), or null when the call is not inline. `letters` names the
 // short flags that count: `ep` for node and bun, `erp` for perl, ruby and php too.
 export function scriptInlineCode(args, letters = 'ep') {
-  const short = new RegExp(`^-[${letters}](.*)$`)
+  const inline = new RegExp(`^(?:--(?:eval|print)(?:=(.*))?|-(?:pe|ep)|-[${letters}](.*))$`)
   for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i]
-    if (/^--(eval|print)$/.test(arg) || /^-(pe|ep)$/.test(arg)) return args.slice(i + 1).join(' ')
-    const long = /^--(?:eval|print)=(.*)$/.exec(arg)
-    if (long !== null) return [long[1], ...args.slice(i + 1)].join(' ')
-    const attached = short.exec(arg)
-    if (attached !== null) return [attached[1], ...args.slice(i + 1)].join(' ').trim()
+    const match = inline.exec(args[i])
+    if (match !== null) return [match[1] ?? match[2] ?? '', ...args.slice(i + 1)].join(' ').trim()
   }
   return null
-}
-
-export function programName(token) {
-  const base = token.replace(/^["']|["']$/g, '').split(/[\\/]/).pop() ?? ''
-  return base.replace(/\.(exe|cmd|bat)$/i, '').toLowerCase()
-}
-
-// Shell word splitting for guard purposes: quotes are removed and quoted parts join their word
-// (`--flag=".env"` is `--flag=.env`); an unterminated quote runs to the end.
-// - Default: backslashes stay as written, so Windows paths survive.
-// - `unescape`: the bash reading, where `\x` outside quotes is `x` (see escapeForms).
-export function tokenize(text, unescape = false) {
-  const tokens = []
-  let word = null
-  let quote = null
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i]
-    if (quote !== null) {
-      if (char === quote) {
-        quote = null
-      } else {
-        word += char
-        if (char === '\\' && quote === '"' && i + 1 < text.length) {
-          word += text[i + 1]
-          i += 1
-        }
-      }
-    } else if (unescape && char === '\\') {
-      if (i + 1 < text.length) {
-        word = (word ?? '') + text[i + 1]
-        i += 1
-      }
-    } else if (char === '\\' && /^[\\"';&|<>()$`]$/.test(text[i + 1] ?? '')) {
-      // `\` makes a quote or operator literal (`\"` opens no string) and otherwise stays, so
-      // `backend\.env` keeps its word. `\ ` still splits: over-splitting errs to blocking, and a
-      // PowerShell path ending in `\` must not merge with the `-Recurse` after it.
-      const next = text[i + 1]
-      word = (word ?? '') + (next === '\\' ? '\\\\' : next)
-      i += 1
-    } else if ((char === '"' || char === "'") && text[i - 1] === '`') {
-      word = (word ?? '') + char // PowerShell's escaped quote
-    } else if (char === '"' || char === "'") {
-      quote = char
-      word ??= ''
-    } else if (/\s/.test(char)) {
-      if (word !== null) tokens.push(word)
-      word = null
-    } else {
-      word = (word ?? '') + char
-    }
-  }
-  if (word !== null) tokens.push(word)
-  return tokens
-}
-
-// The command with quoted strings blanked, for scans that must not see string contents.
-export function withoutQuotes(command) {
-  // An escaped character outside quotes (`\"`) is skipped first so it cannot open a string.
-  return command.replace(/\\[\s\S]|"(?:[^"\\]|\\.)*"|'[^']*'/g, match =>
-    match.startsWith('\\') ? match : '""'
-  )
-}
-
-function isPlainObject(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
