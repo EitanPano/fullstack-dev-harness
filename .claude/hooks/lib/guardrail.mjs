@@ -1,15 +1,8 @@
-// Shared contract for every PreToolUse guardrail hook in this directory.
-//
-// A guardrail must refuse what it cannot inspect. Claude Code treats a hook that exits 0,
-// crashes, or prints nothing as "go ahead" unless the settings entry has
-// `"onFailure": "block"`, so the hooks here converge on two outcomes only:
-//   exit 0  — allow (the hook has nothing to say about this call)
-//   exit 2  — block (stderr carries the reason; Claude Code shows it to the agent)
-// Anything unreadable — empty stdin, invalid JSON, no `tool_input` — blocks.
-//
-// readPayload() also installs process-level handlers so a bug in a hook after parsing
-// still exits 2. A failure before readPayload() (for example a syntax error in the hook
-// file itself) is covered by `onFailure: "block"` in .claude/settings.json.
+// Shared code of the PreToolUse guardrail hooks: payload I/O, path helpers and shell parsing.
+// The hooks fail closed:
+// - exit 0 allows, exit 2 blocks with the reason on stderr; an unreadable payload blocks.
+// - readPayload() makes a crash after parsing block. A crash before it (a syntax error) is
+//   covered by `onFailure: "block"` in .claude/settings.json.
 import path from 'node:path'
 import process from 'node:process'
 
@@ -76,11 +69,9 @@ export function sessionCwd(payload) {
   return typeof cwd === 'string' && path.isAbsolute(cwd) ? cwd : null
 }
 
-// Claude Code rewrites some path spellings before it opens a file: it trims whitespace,
-// expands a leading `~` to the home directory and, on Windows, turns `/c/...` into `C:\...`.
-// The hooks do not copy that logic (it is unversioned runtime behaviour); a role agent must
-// spell paths plainly or be refused. Refusing is the fail-closed choice: if the runtime's
-// rules change, a plain path still means the same thing to both sides.
+// Claude Code rewrites some spellings before opening a file (surrounding whitespace, a leading
+// `~`, `/c/...` on Windows). The hooks refuse them rather than copy that unversioned logic, so
+// a plain path means the same thing to both sides.
 export function isCanonicalPath(rawPath) {
   if (rawPath !== rawPath.trim()) return false
   if (rawPath.startsWith('~')) return false
@@ -88,10 +79,9 @@ export function isCanonicalPath(rawPath) {
   return true
 }
 
-// Resolves rawPath (relative paths against `base`, the session cwd) and expresses it
-// relative to root with forward slashes. `escapes` is true when the target is the root
-// itself or lies outside it, which no role may ever write to. Traversal such as
-// `frontend/../backend/x.ts` collapses to its real target before any prefix comparison.
+// rawPath relative to root with forward slashes, a relative one resolved against `base` (the
+// session cwd), so `frontend/../backend/x.ts` collapses first. `escapes` is true for the root
+// itself or anything outside it, which no role may write.
 export function toProjectRelative(rawPath, root, base = root) {
   const absolute = path.resolve(base, rawPath)
   const rel = path.relative(root, absolute).split(path.sep).join('/')
@@ -122,43 +112,13 @@ const PREFIXES = new Set([
   'timeout', 'stdbuf', 'caffeinate', 'npx', 'pnpx'
 ])
 
-// Package runners: `bun run pkg`, `uv run prog`, `npm exec pkg`, … run the named program.
-// A runner's flags that take a value must consume it, in `--flag value` and `--flag=value`
-// spelling, or the value would be mistaken for the program (`uv run --directory backend rm`).
-// An unlisted value flag still shifts the program by one token: the table is a best effort
-// over the runner's documented flags, not a parser.
-//
-// Sources (value flags only; boolean flags need no entry):
-// - uv 0.12.23, `uv run --help`, `uv tool run --help`, `uvx --help`, `uv --help` (global).
-//   `uv run`: --extra --no-extra --group --no-group --only-group --no-editable-package
-//   --env-file -w/--with --with-editable --with-requirements --package --python-platform
-//   --index --default-index -i/--index-url --extra-index-url -f/--find-links --index-strategy
-//   --keyring-provider -P/--upgrade-package --upgrade-group --resolution --prerelease
-//   --prerelease-package --fork-strategy --exclude-newer --exclude-newer-package
-//   --no-sources-package --reinstall-package --link-mode -C/--config-setting
-//   --config-settings-package --no-build-isolation-package --no-build-package
-//   --no-binary-package --cache-dir --refresh-package --color -p/--python
-//   --allow-insecure-host --directory --project --config-file, plus three flags that
-//   `--help` hides and uv still accepts, before and after the subcommand:
-//   --python-preference --preview-features --python-fetch. `uv run -m/--module` and `-s` are
-//   boolean; `-m` runs `python -m <module>` and a leading `-` reads a script from stdin.
-//   `uv tool run` / `uvx` replace --extra … --package with --from, -c/--constraints,
-//   -b/--build-constraints, --overrides, --torch-backend. `uv` global: --cache-dir --color
-//   --allow-insecure-host --directory --project --config-file.
-// - bun 1.4, `bun run --help` (every `=<val>` flag except the optional-value --inspect* and
-//   -e/-p, which stay out so inline code keeps its current handling) and `bunx --help`
-//   (-p/--package).
-// - npm, `npm exec --help` and `npm run --help`: --package, -w/--workspace, --script-shell.
-//   `-c/--call` is deliberately absent: its value is a command string that is re-tokenised.
-//   (`-p` is npm's --parseable, not --package.)
-// - poetry, https://python-poetry.org/docs/cli/ (global options): -C/--directory, -P/--project;
-//   `poetry run` takes no option of its own.
-// - pdm, https://pdm-project.org/latest/reference/cli/ (`pdm run`): -p/--project, -k/--skip,
-//   --venv, --env, --env-file, --working-dir.
-// - hatch, https://hatch.pypa.io/latest/cli/reference/ (root options): -e/--env, -p/--project,
-//   --data-dir, --cache-dir, --config. `hatch run test:cmd` prefixes the program with an
-//   environment name and may lead with `+key=value` matrix selectors.
-// - pipx, pnpm and yarn: not installed and no citable page, so they are simple runners.
+// Package runners (`bun run pkg`, `uv run prog`, …) run the program named after their flags.
+// - The tables list value flags, which consume the next token; otherwise
+//   `uv run --directory backend rm` reads `backend` as the program.
+// - Best effort, from uv 0.12.23 and bun 1.4 `--help` (plus uv's hidden --python-preference,
+//   --preview-features, --python-fetch), `npm exec --help`, and the poetry, pdm, hatch CLI docs.
+// - Left out on purpose: bun's -e/-p/--inspect* (optional values), npm's -c (a command string,
+//   re-tokenised) and -p (--parseable). pipx, pnpm and yarn have no table.
 const flagSet = list => new Set(list.split(/\s+/).filter(Boolean))
 const UV_COMMON =
   '-w --with --with-editable --with-requirements --python-platform --index --default-index ' +
@@ -193,10 +153,10 @@ const BUNX_FLAGS = flagSet('-p --package')
 const NPM_FLAGS = flagSet('--package -w --workspace --script-shell')
 const NO_FLAGS = new Set()
 
-// path: the subcommand words; flags: value flags that may follow it; global: value flags
-// that may precede it. `envPrefix`: the program may carry a `name:` prefix (hatch).
-// `module`: a boolean -m/--module flag runs `python -m <module>`. `stdin`: the program a
-// leading `-` hands the script to (`uv run -` reads a Python script from stdin).
+// A runner entry:
+// - `global` and `flags`: value flags before and after the subcommand words (`path`).
+// - `envPrefix`: the program may carry a `name:` prefix (hatch).
+// - `module`: -m/--module runs `python -m <module>`. `stdin`: what reads a script after `-`.
 const sub = (path, flags, options = {}) => ({ path, flags, ...options })
 const RUNNERS = {
   bun: {
@@ -344,11 +304,9 @@ function analyzeSegment(segment, unescape = false) {
   return analyzeTokens(tokenize(segment, unescape), unescape)
 }
 
-// The two readings a caller must judge: the tokens as written (Windows paths such as
-// `backend\README.md` keep their backslashes) and, when the segment has a backslash, the bash
-// reading where a backslash before any character is that character (`rm \-rf x` is
-// `rm -rf x`, `cat .\env` is `cat .env`). A command is refused when either one is. The
-// result is the list of `unescape` arguments to pass to the functions in this file.
+// The `unescape` values a caller must judge: as written (Windows paths keep backslashes) and,
+// when there is a backslash, the bash reading (`rm \-rf x` is `rm -rf x`). A command is refused
+// when either reading is.
 export function escapeForms(segment) {
   return segment.includes('\\') ? [false, true] : [false]
 }
@@ -413,12 +371,9 @@ function isWrapperFlag(program, token) {
   return token.startsWith('-') || (program === 'cmd' && /^\/[a-z]$/i.test(token))
 }
 
-// The tokens after a runner's subcommand and its flags (`rest`, with the program first) and
-// the raw tokens after the subcommand (`tail`), or null when this is not a runner
-// invocation (`bun install`, `uv sync`, `uv --version`). When the subcommand is not where the
-// flag table says (a flag it does not know shifted it) but appears later, `rest` is null and
-// only the `tail` after it is reported: the table cannot be trusted to strip, and a caller
-// that judges every later token still sees the program.
+// Splits a runner call into `rest` (program first, flags stripped) and `tail` (raw tokens after
+// the subcommand); null for a non-runner call (`bun install`, `uv sync`). When an unknown flag
+// shifted the subcommand, `rest` is null and only `tail` is reported.
 function stripRunner(runner, tokens) {
   let i = skipFlags(tokens, 1, runner.global)
   const subAt = at =>
@@ -453,11 +408,10 @@ function stripRunner(runner, tokens) {
   return { rest: runner.envPrefix === true ? stripHatchSelectors(rest) : rest, tail }
 }
 
-// Skips flags from `start`; a flag listed in `valueFlags` consumes its value unless it
-// already carries one (`--flag=value`). A short cluster (`-qp 3.14`) is read letter by
-// letter: a value flag as its last letter takes the next token, one earlier takes the rest
-// of the cluster as its value. `--` ends the flags. `seen`, when given, collects the flag
-// names met (a cluster contributes its letters up to the first value flag).
+// Index of the first token after the flags from `start`; `--` ends them.
+// - A flag in `valueFlags` consumes the next token, unless written `--flag=value`.
+// - A short cluster is read by letter: `-qp 3.14` gives 3.14 to -p, `-pq` gives it `q`.
+// - `seen`, when given, collects the flag names met.
 function skipFlags(tokens, start, valueFlags, seen) {
   let i = start
   while (i < tokens.length && tokens[i].startsWith('-') && tokens[i] !== '-') {
@@ -611,12 +565,10 @@ export function programName(token) {
   return base.replace(/\.(exe|cmd|bat)$/i, '').toLowerCase()
 }
 
-// Shell word splitting for guard purposes: whitespace outside quotes separates words, quote
-// characters are removed, and quoted and unquoted parts of one word join (`--flag=".env"` is
-// `--flag=.env`, `-c'code here'` is `-ccode here`). Backslashes are kept as written, so
-// Windows paths survive. An unterminated quote runs to the end. With `unescape`, the bash
-// reading: outside quotes a backslash is dropped and the next character kept as it is, and a
-// trailing backslash vanishes (see `escapeForms`).
+// Shell word splitting for guard purposes: quotes are removed and quoted parts join their word
+// (`--flag=".env"` is `--flag=.env`); an unterminated quote runs to the end.
+// - Default: backslashes stay as written, so Windows paths survive.
+// - `unescape`: the bash reading, where `\x` outside quotes is `x` (see escapeForms).
 export function tokenize(text, unescape = false) {
   const tokens = []
   let word = null
@@ -639,12 +591,9 @@ export function tokenize(text, unescape = false) {
         i += 1
       }
     } else if (char === '\\' && /^[\\"';&|<>()$`]$/.test(text[i + 1] ?? '')) {
-      // Outside quotes a backslash makes a quote or an operator character literal (`\"` is a
-      // plain `"`, not the start of a string). Before whitespace or anything else it stays as
-      // written, so a Windows path such as `backend\.env` or `C:\dir\ -r` keeps its words.
-      // Whitespace is deliberately not literal: over-splitting in bash only turns words into
-      // apparent flags (it errs to blocking), and PowerShell paths ending in `\` must not
-      // merge with the `-Recurse` after them.
+      // `\` makes a quote or operator literal (`\"` opens no string) and otherwise stays, so
+      // `backend\.env` keeps its word. `\ ` still splits: over-splitting errs to blocking, and a
+      // PowerShell path ending in `\` must not merge with the `-Recurse` after it.
       const next = text[i + 1]
       word = (word ?? '') + (next === '\\' ? '\\\\' : next)
       i += 1

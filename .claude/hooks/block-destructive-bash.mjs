@@ -1,20 +1,11 @@
 #!/usr/bin/env node
-// PreToolUse guardrail on Bash|PowerShell: blocks destructive shell commands before they
-// run. Hooks fire in every permission mode, so this holds even where no permission prompt
-// would have appeared.
-//
-// The command is split into segments (&&, ||, |, ;, &, subshells) and each segment is
-// tokenised with wrappers and package runners stripped (sudo, env, bash -lc, bunx, bun x,
-// npx, powershell -Command, …), so intent is matched on the program and its flags rather
-// than on one spelling. `echo "rm -r x"` is not a deletion and is allowed; `sh -c "rm -r x"`
-// and `find . -exec rm -r {} +` are and are blocked. SQL keyword rules apply only when an SQL
-// client is in the command, so `grep truncate src/` and a commit message are not caught.
-//
-// Layering: the `Bash(...)` / `PowerShell(...)` rules in `permissions.deny` are a separate
-// prefix-matched layer that Claude Code evaluates regardless of what this hook returns.
-// Keep both.
-//
-// Access to env/secret FILES is handled by block-secret-file-access.mjs.
+// PreToolUse guardrail on Bash|PowerShell: blocks destructive commands in every permission mode.
+// - Rules match the program and its flags after wrappers, runners and container exec are
+//   peeled, so `echo "rm -r x"` passes and `docker compose exec db psql …` is a psql call.
+// - Database text rules (SQL, redis, mongosh) apply only when that client is in the command.
+//   Script files handed to a client (`psql -f x.sql`) are not inspected.
+// - `permissions.deny` in settings.json is a separate layer; secret files are
+//   block-secret-file-access.mjs.
 import {
   allow,
   block,

@@ -1,26 +1,11 @@
 #!/usr/bin/env node
-// PreToolUse guardrail on Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell: keeps each
-// role agent inside its write lane. The prompts in .claude/agents/*.md only *ask* an agent
-// to stay in its lane; this hook is what makes that hold, in every permission mode.
-//
-// How the role arrives: inside a sub-agent, Claude Code puts the agent's frontmatter `name`
-// in every hook payload as `agent_type`. `AGENT_ROLE` in the environment is an override for
-// a headless driver. No role at all (the interactive main session) means this hook has
-// nothing to say.
-//
-// Fail closed: a role that is set but has no lane here cannot Edit/Write at all. A renamed
-// agent or a typo must surface as a block, never as silent freedom. Such a role may still
-// run read-only shell commands (Claude Code's built-in Explore and Plan agents arrive this
-// way). To admit a new agent type, add a lane below; `'*'` means unrestricted.
-//
-// Shell write channels: a role agent could also change files through Bash (`>`, `tee`,
-// `sed -i`, `cp`, `rm`, `git checkout`, `node -e`, `Set-Content`, …), which this hook cannot
-// map to a lane. Those are refused for role sessions; the agent uses Edit/Write, which the
-// lane check sees, and leaves git writes to the driver. Scripts that write as a side effect
-// (`bun run format`, `bun add`) are not shell channels and stay allowed.
-//
-// WRITE_LANES is the single owner of "which role may write where". The agent prompts repeat
-// the lanes in prose for the agent's benefit; if they ever disagree, this table wins.
+// PreToolUse guardrail on Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell: keeps each role
+// agent in its write lane. The role is the payload's `agent_type` (or AGENT_ROLE for a headless
+// driver); none means the interactive session, which this hook leaves alone.
+// - Fail closed: a role with no lane below cannot Edit/Write, but may run read-only commands.
+// - Shell write channels (`>`, `tee`, `cp`, `rm`, `node -e`, git writes, …) are refused for role
+//   agents, since only Edit/Write paths map to a lane. Scripts like `bun run format` pass.
+// - WRITE_LANES owns who writes where; the agent prompts repeat it and lose on conflict.
 import process from 'node:process'
 
 import {

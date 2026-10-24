@@ -15,4 +15,5 @@ package follows its own `AGENTS.md` and its `format` command.
   `singleQuote: true`, `printWidth: 100`. The harness has no formatter script.
 - Plain ESM JavaScript on Node built-ins, no dependencies and no build step. Named exports.
   Small files with one responsibility.
-- Comments say why, not what. No commented-out code.
+- Comments say why, not what, in two or three sentences at most; use bullets when they read
+  better. No commented-out code.

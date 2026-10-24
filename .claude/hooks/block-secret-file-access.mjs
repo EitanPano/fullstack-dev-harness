@@ -1,21 +1,10 @@
 #!/usr/bin/env node
-// PreToolUse guardrail on every tool (the `*` matcher is deliberate): hard-blocks access to
-// secret files whichever tool names them in a path field or a shell command — Read, Edit,
-// Write, NotebookEdit, Bash, PowerShell, and any MCP tool with a path field — and blocks
-// commands that dump the environment. `permissions.deny` covers only the tool+pattern
-// pairs listed there and cannot look inside a command string; this hook inspects the
-// target of every call.
-//
-// What is inspected, and what is not on purpose:
-// - Fields that NAME a target (file_path, path, notebook_path, paths[], file_paths[]),
-//   trimmed the way the file tools trim them, and every token of a shell `command`.
-// - Raw tokens as well as wrapper-stripped ones (`uv run --env-file .env x`), and the quoted
-//   strings of inline code (`python -c "open('.env')"`, `node -e`).
-// - Not a Write's `content` and not a Grep `pattern`: docs, templates and searches
-//   legitimately mention env files. Scanning content made the hook unable to edit itself.
-// - Secret names are matched as file names (an extension or a dot-file), so a directory or
-//   word called `secret` is not one. `.env.example`, `.env.sample` and `.env.template` are
-//   committed template content and are allowed.
+// PreToolUse guardrail on every tool (`*`): blocks any call that names a secret file or dumps
+// the environment, which `permissions.deny` cannot see inside a command string.
+// - Inspected: path fields, every shell token (raw and wrapper-stripped) and the quoted
+//   strings of inline code (`python -c "open('.env')"`).
+// - Not inspected: a Write's `content` or a Grep `pattern`, which legitimately mention env files.
+// - Secrets match as file names, so a word `secret` passes; `.env.example|sample|template` pass.
 import {
   allow,
   block,
