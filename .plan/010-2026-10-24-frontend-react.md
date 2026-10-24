@@ -4,7 +4,12 @@ Status: active
 Owner: Eitan
 Last updated: 2026-10-24
 Approval: Eitan, 2026-10-24 ("initiate the new plan"), with the Open Questions' recommendations;
-ADR 0003 is approved separately at G1. Direction set in conversation on 2026-10-24:
+ADR 0003 is approved separately at G1.
+G1 (2026-10-24): ADR 0003 accepted (catalog 8c04d08). It binds over this plan's decision summaries.
+Its deltas: React Router 8.5.0 instead of 7; OQ4 is the `service:` context with a build-only
+(`scale: 0`) frontend service, which needs Compose 2.35.0 or later, not 2.17; a new catalog task N1
+fixes `next`'s ESLint zones (7 of 11 seeded violations missed) and audits `bun-express`'s.
+Direction set in conversation on 2026-10-24:
 
 - Milestone 5 follows ADR 0001 › Delivery order.
 - A project with an SPA starts as one container and can move to another topology later, when
@@ -604,8 +609,8 @@ Template gates run in a generated case with `--keep`, never inside a raw `base/`
 
 1. G0. Then cut `feat/frontend-react` in both repositories.
 2. A0 alongside S1 and H1. Then G1.
-3. T1.
-4. T2 alongside S2.
+3. T1, with N1 and R1 alongside in their own catalog worktrees.
+4. T2 alongside S2 (S2 after N1).
 5. R1, then R2.
 6. T3.
 
