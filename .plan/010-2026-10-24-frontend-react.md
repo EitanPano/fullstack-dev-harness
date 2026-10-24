@@ -1,6 +1,6 @@
 # frontend/react (Vite SPA), the single and split deploy modes, the react stacks, catalog v1.2.0
 
-Status: active
+Status: done
 Owner: Eitan
 Last updated: 2026-10-24
 Approval: Eitan, 2026-10-24 ("initiate the new plan"), with the Open Questions' recommendations;
@@ -631,3 +631,15 @@ Each task gets a Sonnet review against ADR 0003 and the ledger.
   sections (V04). A
   generated project is standalone: switching its deploy mode back is the `deployment` skill
   run in reverse, and no data changes.
+
+## As built
+
+- Catalog v1.2.0 tagged on `main` f0e73b7 (PR #6 into `dev`, the parity-test fix #8, `dev` → `main` #7). What
+  shipped differently from the decisions is in ADR 0003 › As built.
+- Harness: PR #10 into `dev`, `dev` → `main` #11; this lock bump (H4) follows.
+- Beyond the plan: task N1 (the `next` ESLint zones, G1); a final-review fix wave per repository; a docs fix after the
+  V35 drill (each template's `AGENTS.md › Deployment` carries both modes' exact lines, guarded by a test) and a reverse
+  drill (split → single). V35 ran both directions.
+- Proof: catalog 22/22 cases locally and 24/24 CI checks on the PR; V30–V37 in the harness; hooks 1188/1188.
+- Follow-ups: the final catalog review's Minors M6–M14; a static `withApp` case runs its e2e twice (dev flow and
+  container); `down` also removes the database container (volume kept) is not stated in the skill.
