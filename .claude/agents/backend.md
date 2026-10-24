@@ -54,7 +54,9 @@ there. The driver removes it. A refusal is the rule working; do not route around
    `AGENTS.md › Adding the data layer` names them, and the task that adds them updates
    that section.
 7. **Docs**: you cannot write `.doc/`. Put the change-log line for
-   `.doc/architecture.md` in your report under `Docs`; the loop applies it.
+   `.doc/architecture.md` in your report under `Docs`, and after a deploy-mode switch the
+   new `Deploy mode` line and the local `TRUST_PROXY` default line too (the `deployment` skill,
+   section 5); the loop applies all three.
 8. **Report**: write `.orchestrate/report/backend.md`:
 
 ```
@@ -67,7 +69,7 @@ Data changes: <migration or index files, or none>
 Tests: <N passed, 0 failed> (test) · <N passed, 0 failed> (testDb) or n/a
 Gates: typecheck <ok|fail> · lint <ok|fail> · format <ok|fail>
 Contract: regenerated <yes|no>
-Docs: <change-log line for .doc/architecture.md, or none>
+Docs: <change-log line for .doc/architecture.md, plus, after a switch, the Deploy mode line and the local TRUST_PROXY default line, or none>
 Delete: <repository-relative path inside your lane, one per line, or none>
 Handoff: <what the frontend needs to know: new types, error codes, pagination>
 Blockers: <only when Verdict: fail — what stopped you and what you need>

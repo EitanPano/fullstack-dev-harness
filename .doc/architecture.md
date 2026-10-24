@@ -11,8 +11,8 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 
 | Component | Responsibility | Runs as |
 | --- | --- | --- |
-| `frontend/` | Pages, server components, server actions; calls the API on the server side | The frontend's container, port 3000 |
-| `backend/` | HTTP API, validation, business rules, persistence | The server's container, port 4000 |
+| `frontend/` | Pages and routes. Server-rendered (Next): its server calls the API. Single-page app (React): static files, the browser calls `/api` on its own origin | Server-rendered: the frontend's container. SPA: the server's container (`single`) or the frontend's static-server container (`split`). Ports: `.fullstack/catalog.yaml` |
+| `backend/` | HTTP API, validation, business rules, persistence; serves the SPA's files in `single` | The server's container; port in `.fullstack/catalog.yaml` |
 | Stack | The packages and their templates | <!-- FILL: written by the bootstrap from .fullstack/catalog.yaml: stack id; per package its directory, template and version --> |
 | Data store | System of record | <!-- FILL: the compose service and port of the engine chosen under Data Store --> |
 
@@ -21,8 +21,8 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 ## Data Flow
 
 1. A browser request reaches a route in the frontend's routing layer.
-2. The page calls a feature loader in `feature/<name>/server/`, which calls the API through
-   the typed API client.
+2. The page calls its feature's data layer (`server/` in a server-rendered frontend, `api/`
+   in a single-page app), which calls the API through the typed API client.
 3. The module's router declares the endpoint's gates and names the handler; validation is
    declared once, from the module's request schema (a `validate` middleware in Express, the
    handler's typed parameters in FastAPI; see `backend/AGENTS.md › Adding a module`). The
@@ -30,7 +30,7 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
    through the module's service (and, across a module boundary, another module's
    controller), publishes events and sends the response in the schema's shape; failures
    leave as the error envelope.
-4. Mutations go through server actions in the same feature directory and revalidate the
+4. Mutations go through the same data layer (the frontend's actions) and refresh the
    affected route.
 
 5. Events: a controller publishes through the server's event service; a subscriber in
@@ -81,10 +81,14 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
   cookies; a bearer header wins over the cookie. The access token stays valid until it
   expires, even after logout, and its role claim is trusted: the stated tradeoff of a
   stateless token.
-- Client model: the frontend's server is the backend's client (no browser fetch), so the
-  backend stays client-agnostic. CORS is off unless `CORS_ORIGINS` is set. A rate-limiter
-  key is `rl:<name>:<sha256(subject)>`, so no address or target sits in the store in clear.
-  A refresh with neither cookie nor body token answers 400.
+- Client model: <!-- FILL: written by the bootstrap per frontend kind. Server-rendered: the
+  frontend's server is the backend's client (no browser fetch). The template does not forward
+  `X-Forwarded-For` yet, so the frontend auth task must add it, with the backend running
+  with `TRUST_PROXY` set; otherwise every caller shares one rate-limit key. SPA: the
+  browser calls `/api` on the page's own origin, no CORS, `TRUST_PROXY` is the hop count in
+  front of the server -->
+- A rate-limiter key is `rl:<name>:<sha256(subject)>`, so no address or target sits in the
+  store in clear. A refresh with neither cookie nor body token answers 400.
 - OTP: 6 digits, 10 minutes, 5 attempts, single use; attempts are counted before the code
   is compared. Purpose `login` works only for an existing active account and answers 202
   for an unknown target, with delivery detached, so the OTP endpoints do not disclose
@@ -98,9 +102,6 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
   `AGENTS.md › Authentication`). The handler resolves the caller and passes it to the
   controller's rules, which decide authority (who may touch which record); the service
   never does.
-- The frontend's server is the API client, so the frontend auth task must forward
-  `X-Forwarded-For` and the backend runs with `TRUST_PROXY` set; otherwise rate limiting
-  sees one address.
 - <!-- FILL: the roles and scope rule beyond `user`/`admin`, or "every signed-in user is equal" -->
 
 ## External Dependencies
@@ -133,9 +134,17 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
 - Replicas: the template runs as exactly one instance until the data-layer and cache tasks
   (users, sessions, rate limits and the bus live in one process); after them `JOBS_ENABLED`
   must be true on exactly one replica.
-- Deployment: one image per package from the two Dockerfiles, both running as a
-  non-root user; `docker compose --profile app up --build` runs the stack locally.
-  <!-- FILL: the production target (which host, how secrets are injected). -->
+- Deployment: images run as a non-root user; `docker compose --profile app up --build`
+  runs the stack locally.
+  - Deploy mode: <!-- FILL: single | split. `single`: one image, the server serves the
+    SPA's files; `split`: one image per package. Written by the bootstrap from
+    `.fullstack/catalog.yaml` `deploy:`, or "split" when it has none (a catalog before
+    v1.2.0), or "n/a" when the stack has no frontend or no server. The `deployment` skill
+    changes it; this line wins over provenance. -->
+  - `TRUST_PROXY` hop count: local default <!-- FILL: written by the bootstrap: `false` in
+    `single`, 1 in `split` -->; production <!-- FILL: the production value, decided with the
+    host: 1 behind a PaaS edge, 2 behind a CDN and a load balancer -->
+  - <!-- FILL: the production target (which host, how secrets are injected). -->
 - Data migrations: <!-- FILL: who runs the server's `migrate` command in production and when, once the data layer exists; with a provider chosen at the bootstrap, answer it at the bootstrap -->
 
 ## Change Log
