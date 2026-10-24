@@ -29,9 +29,9 @@ matrix.
 
 Deploy modes: a stack with a server and a single-page app asks `single` (the default: one
 container, the server serves the built frontend and the API on one port, no CORS; needs Docker
-Compose 2.35.0 or newer) or `split` (one container per package, the frontend image proxies
-`/api`). A Next stack is always `split`. The `deployment` skill moves a project between the
-modes.
+Compose; the `deployment` skill states the floor) or `split` (one container per package,
+the frontend image proxies `/api`). A Next stack is always `split`. The `deployment`
+skill moves a project between the modes.
 
 ## Prerequisites
 

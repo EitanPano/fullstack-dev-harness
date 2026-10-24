@@ -17,8 +17,8 @@ Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in orde
 user one question at a time and replace the marker with their answer. Keep answers in
 their words; suggest a default only when they ask. Do the same for `.doc/architecture.md`
 (Data store, Data Model, Data migrations, API versioning, Auth, External Dependencies,
-Deployment) and
-`.doc/glossary.md` (one row per entity named in the scope).
+Deployment, except its `Deploy mode` and `TRUST_PROXY` lines, which section 5 fills once the
+stack is chosen) and `.doc/glossary.md` (one row per entity named in the scope).
 
 The Data store question is the `database` skill's: engine, client library, or decide
 later. Record the answer as given (the engine the user names, or "decide later", plus the
@@ -44,8 +44,9 @@ chosen frontend:
 
 - Server-rendered (Next): the frontend's server is the backend's client (no browser
   fetch). CORS is off unless `CORS_ORIGINS` is set. Rate limits key on the client
-  address, so the frontend forwards `X-Forwarded-For` and the backend runs with
-  `TRUST_PROXY` set.
+  address, and the template does not forward `X-Forwarded-For` yet: the frontend auth task
+  must add it, with the backend running with `TRUST_PROXY` set, or every caller shares one
+  rate-limit key.
 - Single-page app (React): the browser calls `/api` on the page's own origin (the
   server in `single`, the frontend image's proxy in `split`), so there is no CORS and no
   API URL in the bundle. Rate limits key on the client address, so `TRUST_PROXY` is the
@@ -72,9 +73,8 @@ Ask the deploy mode only when the chosen stack has a server and its frontend's
 two lines and map the answer to `--deploy <single|split>`:
 
 - `single` (the default): one container and one port; the server serves the built
-  frontend and the API, so there is no CORS and no frontend container. Needs Docker
-  Compose 2.35.0 or newer (`docker compose version`); an older client fails without
-  naming the cause. Name the floor to the user.
+  frontend and the API, so there is no CORS and no frontend container. Needs the Docker
+  Compose floor the `deployment` skill states (section 1); name it to the user.
 - `split`: a static-server image per frontend that proxies `/api` to the server, for
   separate scaling or hosting of the frontend.
 
@@ -86,6 +86,9 @@ library (the package's `AGENTS.md › Adding the data layer` names it): tell the
 confirm. On a yes, pass `--capability database=<id>`; the data-layer backlog line is then
 NOT written, because the generator wired the engine. On a no, pass no capability and write
 the data-layer backlog line.
+
+Before accepting `single`, run `docker compose version` against that floor. When the
+client is older, say so and offer `split` or an upgrade; do not scaffold `single`.
 
 Before scaffolding, check each chosen template's `tools` (name and minimum version, from
 its `template.yaml`) against the machine, for example `uv --version` for a Python backend.
@@ -100,7 +103,8 @@ outside the working tree on purpose.
 ## 3. Scaffold
 
 ```bash
-node scripts/bootstrap.mjs --stack <id> --name <project-name> [--flag k=v]… [--capability k=v]…
+node scripts/bootstrap.mjs --stack <id> --name <project-name> \
+  [--flag k=v]… [--capability k=v]… [--deploy single|split]
 ```
 
 It creates the packages the stack lists, under the directories the stack names; a merged
@@ -139,13 +143,18 @@ cause (not the gate), re-run it, and tell the user what was wrong. A failing gat
 scaffold is a catalog bug: say so explicitly, name the template and version from the
 provenance file, and record it in the final message.
 
-Then start each package's `dev` command and open the frontend's `http.health` path on its
+Then start each package's `dev` command (an SPA's server first, as the frontend's
+`AGENTS.md` says) and open the frontend's `http.health` path on its
 `http.port` (a Next frontend on its port; an SPA's dev server on its `http.port`, which
 proxies `/api` to the server): the page must reach the server (the API version pill
 proves the typed client reaches it).
 
-For the app check, run `docker compose --profile app up --build --wait` at the root and
-stop it with `docker compose --profile app down`. In `single` the check is one container
+For the app check, first export in the shell a throwaway value for every secret the server's
+`.env.example` lists, and with a provider its `DATABASE_URL` (never in a file): the server
+refuses to start in production without them. Use a fresh `-p <name>`, because a reused
+project name reuses its volumes. Run `docker compose --profile app up --build --wait` at the
+root and stop it with `docker compose --profile app down` (same `-p`); with a provider the
+`<dir>-migrate` one-shot service runs the migrations first. In `single` the check is one container
 on the server's port (no frontend container in `docker compose ps -a`): `/` returns the
 page and `/api/health` answers there. In `split` it is one container per package, reached
 through the frontend's port.
@@ -170,12 +179,13 @@ the stack id and, per package, its directory, template and version. Fill the Aut
 model line for the frontend kind (section 1). Fill `.doc/architecture.md › Operational
 Concerns › Deployment`: the deploy mode (the top-level `deploy:` of
 `.fullstack/catalog.yaml`; "split" when the file has no `deploy:`, a catalog before v1.2.0)
-and the `TRUST_PROXY` hop count (the template default locally: `false` in `single`, 1 in
-`split`; the production value is the user's to decide, see the `deployment` skill). When a provider was
-passed, fill the Data store section from what was generated: engine and version from the
-provider service's image in `docker-compose.yml` (or the package's `AGENTS.md › Adding the
-data layer`), the client library and the local service (the provider's Compose service and
-its connection variable) from the package's `AGENTS.md › Adding the data layer` and
+and the local `TRUST_PROXY` default (`false` in `single`, 1 in `split`). Leave the
+production `TRUST_PROXY` marker: the value is the user's to decide (the `deployment` skill).
+When a provider was passed, fill the Data store section from what was generated: engine
+and version from the provider service's image in `docker-compose.yml` (or the package's
+`AGENTS.md › Adding the data layer`), the client library and the local service (the
+provider's Compose service and its connection variable) from the package's
+`AGENTS.md › Adding the data layer` and
 `.fullstack/catalog.yaml`.
 
 ## 6. Branch, commit gate and hand over

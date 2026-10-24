@@ -261,7 +261,8 @@ function printNextSteps() {
     )
     console.log("    then the server package's migrate and testDb (see .fullstack/catalog.yaml).")
   }
-  printDeploySteps(readProvenance(path.join(root, '.fullstack', 'catalog.yaml')))
+  const withProvider = args.capabilities.length > 0 || args.answers !== undefined
+  printDeploySteps(readProvenance(path.join(root, '.fullstack', 'catalog.yaml')), withProvider)
   console.log('  Where a package declares testE2e, install its browser')
   console.log('    (its AGENTS.md › Tests says how) and run it.')
   console.log(
@@ -270,11 +271,11 @@ function printNextSteps() {
   console.log('  Commit on chore/bootstrap once the gates are green.')
 }
 
-function printDeploySteps({ deploy, packages }) {
+function printDeploySteps({ deploy, packages }, withProvider) {
   const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
   if (frontend?.port !== undefined) {
-    console.log(`  The frontend's dev server runs at http://localhost:${frontend.port}.`)
+    console.log(`  Once started, the frontend dev server is at http://localhost:${frontend.port}.`)
   }
   const compose = 'docker compose --profile app up --build'
   if (deploy === 'single') {
@@ -283,6 +284,7 @@ function printDeploySteps({ deploy, packages }) {
       `  ${compose} runs one app container: the server serves the built frontend and the API on ` +
         `the server's port${url}; there is no frontend container.`,
     )
+    console.log('    It needs Docker Compose 2.35.0 or newer (check: docker compose version).')
   } else if (frontend?.port !== undefined) {
     console.log(
       `  ${compose} runs one container per package; reach the app through port ${frontend.port}.`,
@@ -292,6 +294,16 @@ function printDeploySteps({ deploy, packages }) {
   } else {
     console.log(`  ${compose} runs one container per package.`)
   }
+  console.log('    The server refuses to start in production without its secrets: export the ones')
+  console.log("    listed in the server's .env.example in your shell first (placeholders are fine")
+  console.log('    for a local proof; never put them in a file).')
+  if (withProvider) {
+    console.log('    With a database, also export its DATABASE_URL; a <dir>-migrate one-shot')
+    console.log('    service (docker-compose.yml) runs the migrations before the server starts.')
+  }
+  console.log('    Reusing a Compose project name reuses its volumes: pass a fresh -p <name> for a')
+  console.log('    clean proof.')
+  console.log('    Stop it with: docker compose --profile app down')
 }
 
 // `reason` carries the spawn error (a missing executable, say) so the failure names its cause.

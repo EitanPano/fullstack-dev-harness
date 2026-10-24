@@ -14,7 +14,7 @@ export function readProvenance(file) {
   let section = ''
   let pkg
   let inHttp = false
-  for (const line of text.split(/\r?\n/)) {
+  for (const line of text.replace(/^﻿/, '').split(/\r?\n/)) {
     const top = /^([A-Za-z]\w*):\s*(.*?)\s*$/.exec(line)
     if (top !== null) {
       section = top[1]
@@ -22,10 +22,16 @@ export function readProvenance(file) {
       continue
     }
     if (section !== 'packages') continue
-    const name = /^ {2}([\w.-]+):\s*$/.exec(line)
+    const name = /^ {2}(['"]?)([\w.-]+)\1:\s*$/.exec(line)
     if (name !== null) {
-      pkg = { name: name[1], template: '', port: undefined }
+      pkg = { name: name[2], template: '', port: undefined }
       result.packages.push(pkg)
+      inHttp = false
+      continue
+    }
+    // Any other package-level key must not leave its facts to the previous package.
+    if (/^ {2}\S/.test(line)) {
+      pkg = undefined
       inHttp = false
       continue
     }

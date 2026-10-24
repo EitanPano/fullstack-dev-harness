@@ -82,9 +82,11 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
   expires, even after logout, and its role claim is trusted: the stated tradeoff of a
   stateless token.
 - Client model: <!-- FILL: written by the bootstrap per frontend kind. Server-rendered: the
-  frontend's server is the backend's client (no browser fetch), it forwards `X-Forwarded-For`
-  and the backend runs with `TRUST_PROXY` set. SPA: the browser calls `/api` on the page's own
-  origin, no CORS, `TRUST_PROXY` is the hop count in front of the server -->
+  frontend's server is the backend's client (no browser fetch). The template does not forward
+  `X-Forwarded-For` yet, so the frontend auth task must add it, with the backend running
+  with `TRUST_PROXY` set; otherwise every caller shares one rate-limit key. SPA: the
+  browser calls `/api` on the page's own origin, no CORS, `TRUST_PROXY` is the hop count in
+  front of the server -->
 - A rate-limiter key is `rl:<name>:<sha256(subject)>`, so no address or target sits in the
   store in clear. A refresh with neither cookie nor body token answers 400.
 - OTP: 6 digits, 10 minutes, 5 attempts, single use; attempts are counted before the code
@@ -137,11 +139,11 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
   - Deploy mode: <!-- FILL: single | split. `single`: one image, the server serves the
     SPA's files; `split`: one image per package. Written by the bootstrap from
     `.fullstack/catalog.yaml` `deploy:`, or "split" when it has none (a catalog before
-    v1.2.0), or "n/a" when the stack has no frontend or no server. The `deployment` skill changes it; this line wins over
-    provenance. -->
-  - `TRUST_PROXY` hop count: <!-- FILL: the production value: 1 behind a PaaS edge, 2 behind
-    a CDN and a load balancer, and the template default locally (`false` in `single`, 1 in
-    `split`) -->
+    v1.2.0), or "n/a" when the stack has no frontend or no server. The `deployment` skill
+    changes it; this line wins over provenance. -->
+  - `TRUST_PROXY` hop count: local default <!-- FILL: written by the bootstrap: `false` in
+    `single`, 1 in `split` -->; production <!-- FILL: the production value, decided with the
+    host: 1 behind a PaaS edge, 2 behind a CDN and a load balancer -->
   - <!-- FILL: the production target (which host, how secrets are injected). -->
 - Data migrations: <!-- FILL: who runs the server's `migrate` command in production and when, once the data layer exists; with a provider chosen at the bootstrap, answer it at the bootstrap -->
 

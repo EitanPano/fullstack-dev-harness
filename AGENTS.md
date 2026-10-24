@@ -73,8 +73,8 @@ a product is chosen at the bootstrap and recorded in `.fullstack/catalog.yaml`.
   backend) come from its `template.yaml` `tools` and are checked at the bootstrap.
 - Docker Compose: the deployment target and the host of local infrastructure such as the
   database. One image per deployable, by deploy mode: `single` is one image (the server
-  serves a single-page app's built files; Compose 2.35.0 or newer), `split` is one per
-  package. A server-rendered frontend is always `split`.
+  serves a single-page app's built files; the `deployment` skill states the Compose
+  floor), `split` is one per package. A server-rendered frontend is always `split`.
 
 **Packages and commands**
 
@@ -106,10 +106,13 @@ them in the package's `AGENTS.md › Adding the data layer`, which that task upd
 them from that section.
 
 `docker compose --profile app up --build` at the repository root runs the whole stack from
-each package's Dockerfile. With a database, export the production secrets and the database
-URL the server's `.env.example` lists. If `docker-compose.yml` has a `<dir>-migrate` service
-(catalog v1.1.0 and later), `docker compose --profile app up --build` runs the migrations
-before the server; otherwise run the server package's `migrate` inside the stack first (its
+each package's Dockerfile. The server refuses to start in production without its secrets:
+export the production secrets the server's `.env.example` lists, and with a database its
+URL, in the shell (placeholders are fine for a local proof; never a file). Reusing a Compose
+project name reuses its volumes, so a clean proof passes a fresh `-p <name>`. If
+`docker-compose.yml` has a `<dir>-migrate` service (catalog v1.1.0 and later),
+`docker compose --profile app up --build` runs the migrations before the server; otherwise
+run the server package's `migrate` inside the stack first (its
 `AGENTS.md › Adding the data layer` says how). The `migrate` command stays for local
 development.
 `docker compose up -d --wait <service>` starts one infrastructure service (the database,
