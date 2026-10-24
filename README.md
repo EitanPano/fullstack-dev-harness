@@ -15,8 +15,7 @@ What you get after the bootstrap:
   database provider was chosen, its service. `--capability database=postgres` (the
   bootstrap passes it when you pick Postgres) wires the server to a `database` service with
   `db/init.sql`, a `DATABASE_URL`, migrations, and the `migrate` and `testDb` commands; the
-  catalog README is the reference for the matrix. A provider needs a catalog release that
-  lists it (v1.0.0 or later); `catalog.lock` still pins v0.1.1 until that release.
+  catalog README is the reference for the matrix.
 - Five role agents (orchestrator, backend, frontend, reviewer, qa), nine skills, and
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
   access to secret files.
@@ -24,8 +23,7 @@ What you get after the bootstrap:
 The catalog's stacks: `next-bun-express` is a layered Express 5 API on Bun with an `auth`
 flag, and a Next.js 16 frontend with a client typed from the server's contract;
 `next-python-fastapi` pairs the same frontend with a layered FastAPI API on Python managed by
-uv, and arrives with catalog v1.1.0 (`catalog.lock` must pin that release before the
-bootstrap offers it). The catalog README has the matrix.
+uv. The catalog README has the matrix.
 
 ## Prerequisites
 
