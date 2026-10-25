@@ -41,7 +41,11 @@ under `testDb`, which uses the separate test database.
    either means the implementer shipped a stale contract: finding, owner by file.
 4. **Diff hygiene**: `git diff <Base>` contains no deleted test, no skipped, focused or
    todo test (spellings per the package's `AGENTS.md › Tests`), and no debug output left in
-   source. Each is a finding unless the stage report justified it.
+   source. Each is a finding unless the stage report justified it. Each stage report's
+   `Tests first:` line exists, names at least one failing test per new behaviour, and every
+   named test is in `git diff <Base>`; a missing or inconsistent line is a P1 finding owned
+   by that stage. An `after the fact — <reason>` line is judged on its reason: a stated reason
+   that holds is a PASS, an absent or hollow one is a P1.
 5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
    state, missing or malformed input, boundary sizes, repeated rapid submission, another
    tenant's id, an unauthenticated call. Put them under `backend/tests/` or
@@ -49,7 +53,14 @@ under `testDb`, which uses the separate test database.
 6. **Criteria**: for each Validation item and each acceptance criterion the task claims,
    mark PASS or FAIL with the test name and result or the command and its output. "The
    code looks right" is never evidence.
-7. **Report**: write `.orchestrate/report/qa.md`:
+7. **UX pass**: for each route the task adds or changes, Read the `phone` project's screenshot
+   (under `frontend/test-results/`, one per e2e test, named in the frontend report's
+   `Handoff`; written by `testE2e`) and check it against `.doc/product-definition.md › Design`
+   and `.claude/rules/ui-and-styling.md`: the shell is present, nothing overflows horizontally,
+   text and controls are readable at that width. Record PASS or FAIL per route with the file
+   path as evidence; a FAIL is a finding owned by frontend. Where the package has no `phone`
+   project, write `UX: n/a (no phone project)`.
+8. **Report**: write `.orchestrate/report/qa.md`:
 
 ```
 Stage: qa
@@ -60,6 +71,7 @@ Gates: backend check <ok|fail|n/a> · backend testDb <ok|fail|n/a> · frontend c
 Contract: fresh <yes|no>
 Diff hygiene: <clean | findings below>
 Adversarial tests added: <file: test name, one per line>
+UX: <route — PASS|FAIL — path, one per line | n/a>
 
 Validation:
 - V01 — PASS|FAIL — <evidence>

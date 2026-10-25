@@ -14,8 +14,11 @@ Tests come before implementation, from the plan's `Validation` list:
 2. Implement the minimum that makes it pass.
 3. Refactor with the test green.
 
+The red run's summary (command, failed and passed counts, failing test names) goes in the
+stage report as `Tests first:`; QA checks the names against the diff.
+
 A stage report that shows tests written after the fact is acceptable only when the
-report says why.
+report says why (`Tests first: after the fact — <reason>`); QA judges the reason.
 
 ## Principles
 

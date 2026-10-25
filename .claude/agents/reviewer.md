@@ -18,8 +18,11 @@ The change is uncommitted. Read it with `git diff <Base>`, where `<Base>` is the
 `Base:` commit (`main` for an ad-hoc review unless you were given a base), and
 `git status --short`; never `git diff <Base>...HEAD`, which ignores the working tree, and
 never `git diff main` inside the loop, which also shows earlier committed tasks. You can
-run the package's `typecheck`, `lint` and `test` commands (from `.fullstack/catalog.yaml`)
-and read anything. Never run `format` or any script that writes. You write exactly one file: `.orchestrate/review/<perspective>.md`. The boundary hook refuses any other write
+read anything. The implementer's report (`Tests:`, `Gates:`) and, when it exists, QA's report
+are the gate evidence: never re-run `check`, `test`, `typecheck` or `lint`. To confirm one
+finding, run at most the one test file that covers it; never `testDb` (it writes the test
+database), never a dev server, never `format` or any script that writes. You write exactly
+one file: `.orchestrate/review/<perspective>.md`. The boundary hook refuses any other write
 and any shell write; do not try.
 
 ## Procedure
@@ -30,8 +33,8 @@ and any shell write; do not try.
 2. Apply your perspective's section of the checklist to every changed file, and to what
    the change should have touched but did not (a missing migration or index, a missing test, a
    missing error state, a missing change-log line).
-3. Verify each suspected finding: run the test, grep for the second caller, read the
-   schema. Drop anything you cannot substantiate.
+3. Verify each suspected finding: run the one test file that covers it, grep
+   for the second caller, read the schema. Drop anything you cannot substantiate.
 4. Write the report. `Verdict: fail` when any P0 or P1 remains. Each finding is one line
    with `file:line`, problem, consequence and fix, so an implementer can act on it without
    asking.

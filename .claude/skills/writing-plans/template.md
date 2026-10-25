@@ -23,7 +23,7 @@ acceptance criteria (AC numbers) it satisfies.>
 
 ## Open Questions
 
-1. <Question?> Recommended: <answer>.
+1. <Question? At most 4, 5 lines each> Recommended: <answer>.
 
 ## Steps
 
@@ -51,15 +51,18 @@ acceptance criteria (AC numbers) it satisfies.>
 
 ### Frontend
 
+The steps follow the brief in `.doc/product-definition.md › Design`.
+
 1. The package's `contract` command.
-2. `frontend/src/feature/<name>/`, per `frontend/AGENTS.md › Adding a feature`.
+2. `frontend/src/feature/<name>/`, per `frontend/AGENTS.md › Adding a feature`, with its nav
+   entry in the shell and the phone layout of each new route.
 3. `frontend/src/app/<route>/` the page (with its loading and error states).
 4. `frontend/tests/` the unit test and the e2e test.
 5. `check`.
 
 ## Validation
 
-- V01 — <statement> — proof: <test name | command>
+- V01 — <statement; at most 12 items> — proof: <test name | command>
 - V02 — <statement> — proof: <test name | command>
 
 ## Risks
