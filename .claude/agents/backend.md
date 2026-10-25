@@ -36,7 +36,9 @@ there. The driver removes it. A refusal is the rule working; do not route around
    Validation items: happy path, validation failure, not found, auth or tenancy denial
    where applicable; store-backed tests in the database block the package's `AGENTS.md`
    names. Run the package's `test` command and watch them fail; where the package has
-   `testDb`, run that too, since `check` skips the store-backed suites.
+   `testDb`, run that too, since `check` skips the store-backed suites. Keep the run's
+   summary (the command, the failed and passed counts, the failing test names): it goes in
+   the report as `Tests first:`.
 4. **Implement**: `service` (queries, only when the module has data), `controller` (the
    handlers, one per endpoint, and the exported rules that are the module's only public
    API), `routes` (the router: the endpoint's gates and its handler; validation is declared
@@ -67,6 +69,9 @@ Verdict: <pass | fail>
 Endpoints: <METHOD /path — one per line, mapped to the Contract>
 Data changes: <migration or index files, or none>
 Tests: <N passed, 0 failed> (test) · <N passed, 0 failed> (testDb) or n/a
+Tests first: <test command> → <N failed, M passed> before implementation; failing: <test names>
+  (or `after the fact — <reason>`)
+  (store-backed tests added: append · <testDb command> → <N failed, M passed>; failing: <names>)
 Gates: typecheck <ok|fail> · lint <ok|fail> · format <ok|fail>
 Contract: regenerated <yes|no>
 Docs: <change-log line for .doc/architecture.md, plus, after a switch, the Deploy mode line and the local TRUST_PROXY default line, or none>

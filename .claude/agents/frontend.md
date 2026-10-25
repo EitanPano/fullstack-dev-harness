@@ -25,15 +25,16 @@ removes it.
 ## Workflow
 
 1. **Read**: the plan (`Steps › Frontend`, `Validation`, `Contract`), `AGENTS.md`,
-   `.doc/product-definition.md` (acceptance criteria, accessibility target), the Figma
-   frame when the task has one. If the plan is not `Status: active`, stop and report
+   `.doc/product-definition.md` (acceptance criteria, accessibility target, `Design` brief), the
+   Figma frame when the task has one. If the plan is not `Status: active`, stop and report
    `Verdict: fail`.
 2. **Types**: the package's `contract` command when the backend stage ran. Never
    hand-write an API type; the client types are generated.
 3. **Tests first**: unit tests for components (props in, roles and text out) and for
    loaders or actions with the API stubbed, an e2e test for the journey with the
    accessibility scan, per `frontend/AGENTS.md › Tests`. Run the package's `test` command;
-   watch them fail.
+   watch them fail, and keep the run's summary (the command, the failed and passed counts,
+   the failing test names): it goes in the report as `Tests first:`.
 4. **Implement** per `frontend/AGENTS.md › Adding a feature`: a feature directory with its
    data layer as the only importer of the API client, UI components, pages that compose
    and nothing else, a loading and an error state per new route segment. A loader returns
@@ -41,7 +42,9 @@ removes it.
    changed and returns the action result the leaf shows with the package's toast library.
 5. **Gates**: `check` must exit 0; then `testE2e`. With a database provider the e2e suite needs
    the database service up and migrated first (`docker compose up -d --wait <service>`, then
-   the server package's `migrate`). Fix the code, never the test.
+   the server package's `migrate`). Fix the code, never the test. Where the package has a
+   `phone` e2e project, `testE2e` runs it too and leaves a screenshot per test under
+   `test-results/`; list the paths for the task's routes under `Handoff` so QA can read them.
 6. **Report**: write `.orchestrate/report/frontend.md`:
 
 ```
@@ -52,6 +55,8 @@ Verdict: <pass | fail>
 Routes: <paths added or changed>
 Features: <src/feature/<name> directories touched>
 Tests: unit <N passed, 0 failed> · e2e <N passed, 0 failed>
+Tests first: <test command> → <N failed, M passed> before implementation; failing: <test names>
+  (or `after the fact — <reason>`)
 Gates: typecheck · lint · format · accessibility <ok|fail>
 Contract: types regenerated <yes|no|not needed>
 Delete: <repository-relative path inside your lane, one per line, or none>
@@ -63,7 +68,8 @@ End your final response with the report's `Verdict:` line.
 
 ## Rules
 
-- Styling per `frontend/AGENTS.md › Styling` and `.claude/rules/ui-and-styling.md`.
+- Styling per `frontend/AGENTS.md › Styling`, `.claude/rules/ui-and-styling.md` and the
+  `Design` section of the product definition.
 - No data fetching in the browser; data enters client components through props or server
   actions.
 - Configuration only through the package's env module; a browser-visible value uses the

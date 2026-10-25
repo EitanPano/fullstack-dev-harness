@@ -42,6 +42,19 @@ holds a marker. Delete a marker only by replacing it with a decision.
 - Locale: <!-- FILL: single language (which) | multiple (which) -->
 - Data retention and privacy: <!-- FILL: anything the product must or must not keep -->
 
+## Design
+
+The brief every frontend task follows (`.claude/rules/ui-and-styling.md`); a `figma:<url>`
+backlog marker overrides it for one task.
+
+- Tone: <!-- FILL: two or three adjectives, e.g. calm, dense, playful -->
+- Reference apps: <!-- FILL: one to three products whose look is the target, or "none" -->
+- Colour seed: <!-- FILL: one primary hue and a neutral, as hex values or names -->
+- Type: <!-- FILL: the system font stack | a named font -->
+- Density: <!-- FILL: compact | comfortable -->
+- Primary viewport: <!-- FILL: phone first | desktop first; the breakpoints that matter -->
+- Dark mode: <!-- FILL: no | follows the system | a toggle -->
+
 ## Acceptance Criteria
 
 Each criterion must be provable by a test or a command. Keep the numbering stable; QA
@@ -54,7 +67,7 @@ reports against it.
 
 ## Ready to plan
 
-- [ ] No `FILL` marker remains in Purpose, Target Users, Product Scope, Auth and Tenancy or
+- [ ] No `FILL` marker remains in Purpose, Target Users, Product Scope, Auth and Tenancy, Design or
       Acceptance Criteria.
 - [ ] `.doc/architecture.md` has its data model and API sections filled.
 - [ ] `.doc/glossary.md` names every entity used above.

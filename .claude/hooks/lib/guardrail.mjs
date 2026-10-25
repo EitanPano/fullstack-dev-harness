@@ -134,6 +134,126 @@ export function shellSegments(command) {
   return segments.map(segment => segment.trim()).filter(segment => segment !== '')
 }
 
+// `rest` is the command without the bodies it strips; `code` holds every body kept for a raw scan.
+// A body is stripped only when it is terminated, is data (a quoted delimiter, or no `$(`, backtick
+// or `${` in it) and `mayStrip(line, at, body)` agrees: the caller knows which program reads it.
+// Quotes in a kept body do not protect a command substitution, so a caller scans it raw.
+// - The scan is sequential, like bash: quote state carries across the command lines, and a body
+//   is opaque (its quotes, such as an apostrophe in SQL, are never read).
+// - A command with `$'`, a backslash-newline continuation (bash joins the lines before it reads an
+//   operator) or a quote left open is not parsed at all: nothing is stripped, all of it is raw.
+export function splitHeredocBodies(command, mayStrip = () => true) {
+  const raw = { rest: '', code: [command], raw: true }
+  if (command.includes("$'") || /\\\r?\n/.test(command)) return raw
+  const lines = command.split('\n')
+  const kept = []
+  const code = []
+  let quote = null
+  for (let i = 0; i < lines.length; i += 1) {
+    kept.push(lines[i])
+    const scanned = scanQuotes(lines[i], quote)
+    quote = scanned.quote
+    const operators = heredocDelimiters(lines[i], scanned.blank)
+    // A quote still open after an operator line would move the body past this scan's view.
+    if (operators.length > 0 && quote !== null) return raw
+    let next = i + 1
+    for (const { word, stripTabs, quoted, at } of operators) {
+      const body = []
+      while (next < lines.length && !isTerminator(lines[next], word, stripTabs)) {
+        body.push(lines[next])
+        next += 1
+      }
+      const text = body.join('\n')
+      const data = quoted || !/\$\(|`|\$\{/.test(text)
+      // Asked even for a body that cannot be stripped, since the caller also learns from it.
+      const strip = mayStrip(lines[i], at, text)
+      if (!(next < lines.length && data && strip)) code.push(...body)
+      next += 1
+    }
+    i = next - 1
+  }
+  return quote === null ? { rest: kept.join('\n'), code } : raw
+}
+
+// One line with its quoted text (and the quotes) replaced by spaces, same length, and the quote
+// state at its end, given the state at its start. An escaped character outside quotes is kept.
+function scanQuotes(line, quote) {
+  let blank = ''
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i]
+    if (quote === null && char === '\\') {
+      blank += line.slice(i, i + 2)
+      i += 1
+    } else if (quote === null && (char === '"' || char === "'")) {
+      quote = char
+      blank += ' '
+    } else if (quote !== null) {
+      if (char === quote) quote = null
+      else if (char === '\\' && quote === '"') {
+        blank += ' '
+        i += 1
+      }
+      blank += ' '
+    } else {
+      blank += char
+    }
+  }
+  return { blank, quote }
+}
+
+function isTerminator(line, word, stripTabs) {
+  const text = line.replace(/\r$/, '')
+  return (stripTabs ? text.replace(/^\t+/, '') : text) === word
+}
+
+// A delimiter word ends at a shell word boundary; anything glued to it (`<<E"O"F`, `<<X+`) is
+// a different word than this scan reads, so the `<<` is not taken as a heredoc and its body
+// stays in the scan.
+const HEREDOC_OPERATOR =
+  /^<<(-?)[ \t]*(?:\\?([A-Za-z0-9_.-]+)|'([^']*)'|"([^"]*)")(?=[\s;&|<>()]|$)/
+
+// The heredoc operators of one line, in order, with their offsets. This must never see a heredoc
+// that bash does not, since the lines it then skips would run. So it stops at a comment, skips
+// arithmetic (`$((1<<2))`). `blank` is the line with quoted text blanked by blankQuotes over the
+// whole command, so `echo "<<X"` and a quote opened on an earlier line hide their `<<`; the
+// delimiter word is read from `line`, where a quoted word is still readable.
+function heredocDelimiters(line, blank) {
+  const found = []
+  for (let i = 0; i < blank.length; i += 1) {
+    if (blank[i] === '\\') {
+      i += 1
+    } else if (blank[i] === '#' && (i === 0 || /[\s;&|<>()]/.test(blank[i - 1]))) {
+      break
+    } else if (blank.startsWith('((', i)) {
+      let depth = 0
+      do {
+        if (blank[i] === '(') depth += 1
+        else if (blank[i] === ')') depth -= 1
+        i += 1
+      } while (i < blank.length && depth > 0)
+      i -= 1
+    } else if (blank.startsWith('<<', i)) {
+      if (blank[i + 2] === '<' || blank[i - 1] === '<') {
+        i += 2
+        continue
+      }
+      const match = HEREDOC_OPERATOR.exec(line.slice(i))
+      if (match !== null) {
+        found.push({
+          word: match[2] ?? match[3] ?? match[4],
+          stripTabs: match[1] === '-',
+          quoted: match[2] === undefined || match[0].includes('\\'),
+          at: i
+        })
+        i += match[0].length - 1
+      } else {
+        i += 1
+      }
+    }
+  }
+  return found
+}
+
 // Shell word splitting for guard purposes: quotes are removed and quoted parts join their word
 // (`--flag=".env"` is `--flag=.env`); an unterminated quote runs to the end.
 // - Default: backslashes stay as written, so Windows paths survive.

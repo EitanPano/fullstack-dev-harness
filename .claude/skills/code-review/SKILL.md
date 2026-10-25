@@ -56,8 +56,10 @@ error state, a change-log line).
 
 Every finding names `file:line`, quotes the problem in one line, states the consequence,
 and gives the fix. "Looks wrong" is not a finding; run the test or read the schema when
-in doubt. Run only commands that read: the package's `typecheck`, `lint` and `test` commands,
-`git diff`, never `format` or anything that writes.
+in doubt. The implementer's report (`Tests:`, `Gates:`) and QA's report, when it exists, are
+the gate evidence: do not re-run `check`, `test`, `typecheck` or `lint`. To confirm one
+finding, run at most the one test file that covers it. Never run `testDb` (it writes the test
+database), a dev server, `format` or anything that writes.
 
 ## Report
 

@@ -65,6 +65,21 @@ frontend agent consumes the generated types.
 - Generated artifacts belong in `.orchestrate/`. Never create a `docs/` directory.
 - Respect the task's markers: a `stack:frontend` task plans no backend work; a `stack:backend` task plans no frontend work.
 
+## Sizing a product task
+
+- A product task is one backlog line and its plan is sized for it. A plan whose `Stages:`
+  names no role agent (a harness plan) is exempt.
+- The scope is the backlog line and the acceptance criteria it names. Pagination, rate limits,
+  caching and other hardening an AC does not ask for go under `Out` as a proposed backlog line
+  (`- [ ] <title>`); the driver adds it to the backlog on the user's yes.
+- At most 12 `Validation` items and at most 4 `Open Questions` of at most 5 lines each. A
+  question with a conventional default is an Assumption, not a question.
+- `Steps` name files, one line each, with no code beyond the Contract table; rationale is one
+  line under Assumptions.
+- Target about 150 lines. Above 250, plan the first half and propose the rest as backlog
+  lines under `Out`, and say so in the response, above the plan-path line (the last line
+  stays the path).
+
 ## Superseding a plan
 
 Set the old plan to `Status: superseded` with a link to the replacing plan, and say in
