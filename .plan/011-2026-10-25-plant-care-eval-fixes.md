@@ -473,3 +473,18 @@ No product API changes; there is no Contract subsection.
   (python stack, bun stack-auth-off); V26 proven on `react-bun-express` single on Windows; the
   python-backed `--with-app` smoke waits on host port 8000 (the first eval's `plant-care-try`);
   P1 and P2 pending Eitan's commits and the tag.
+- P1 (2026-10-25, eval clone, branch `feat/app-shell-mobile-first` from the sync commit
+  55ffd32, task commit ecfc7bd; 23 min, about $10 on Sonnet with Opus reviewers): V30 holds
+  (plan 012 is 218 lines, 11 validation items, 3 open questions, `Stages: frontend, qa`, Base
+  55ffd32, the diff against Base is the task's 27 files only); V31 holds (`Tests first:` with
+  8 failing tests named, QA checked each against the diff, PASS); V33 holds in letter (no
+  reviewer ran a package gate; QA's UX pass read the `/` and not-found phone screenshots) but
+  QA looked at 2 of 11 screenshots; V32 holds for the eval's three commands and every
+  sub-agent refusal was a write channel (inline node and python, `sed -i`, redirects) except
+  one new class: `git check-ignore` is refused for reviewers (read-only; a follow-up). Gates:
+  frontend `check` 133 tests, `testE2e` 22/22 on chromium and phone; one fix round (the
+  implementer's `format ok` claim was wrong). Follow-ups the run surfaced: re-run `check` last
+  after a doc edit (frontend agent); no scratch files in the tree and relative `Delete:` paths;
+  the e2e data rule for a product without a delete endpoint (OQ6 again); QA to read one
+  screenshot per viewport and scheme the plan names; a delegated-approval clause and a P2
+  disposition step in the dev loop; `git check-ignore` in the hooks' git read list.
