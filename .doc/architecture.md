@@ -66,6 +66,7 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
 
 ## Auth
 
+<!-- auth-start -->
 - Default a product starts from (shipped, change by plan): JWT access token, 15 min,
   stateless. Refresh JWT stored hashed in a session, rotated on use, sliding 30 d with a
   90 d cap, and a replayed token revokes all the caller's sessions. A replay inside the 30 s
@@ -81,12 +82,17 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
   cookies; a bearer header wins over the cookie. The access token stays valid until it
   expires, even after logout, and its role claim is trusted: the stated tradeoff of a
   stateless token.
+<!-- auth-end -->
+<!-- noauth: - Auth: none. The product has no accounts and every endpoint is public. -->
+<!-- noauth:   Adding accounts is a planned change; a scaffold with the `auth` flag on is the -->
+<!-- noauth:   reference. -->
 - Client model: <!-- FILL: written by the bootstrap per frontend kind. Server-rendered: the
   frontend's server is the backend's client (no browser fetch). The template does not forward
   `X-Forwarded-For` yet, so the frontend auth task must add it, with the backend running
   with `TRUST_PROXY` set; otherwise every caller shares one rate-limit key. SPA: the
   browser calls `/api` on the page's own origin, no CORS, `TRUST_PROXY` is the hop count in
   front of the server -->
+<!-- auth-start -->
 - A rate-limiter key is `rl:<name>:<sha256(subject)>`, so no address or target sits in the
   store in clear. A refresh with neither cookie nor body token answers 400.
 - OTP: 6 digits, 10 minutes, 5 attempts, single use; attempts are counted before the code
@@ -103,6 +109,7 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
   controller's rules, which decide authority (who may touch which record); the service
   never does.
 - <!-- FILL: the roles and scope rule beyond `user`/`admin`, or "every signed-in user is equal" -->
+<!-- auth-end -->
 
 ## External Dependencies
 
@@ -132,8 +139,8 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
   order and exits 0, or exits 1 after 10 s if draining hangs.
 - Errors: the envelope and status table in the `error-handling` skill.
 - Replicas: the template runs as exactly one instance until the data-layer and cache tasks
-  (users, sessions, rate limits and the bus live in one process); after them `JOBS_ENABLED`
-  must be true on exactly one replica.
+  (rate limits, the cache and the bus, and sessions when the product has accounts, live in
+  one process); after them `JOBS_ENABLED` must be true on exactly one replica.
 - Deployment: images run as a non-root user; `docker compose --profile app up --build`
   runs the stack locally.
   - Deploy mode: <!-- FILL: single | split. `single`: one image, the server serves the
@@ -152,12 +159,4 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
 Date-stamped notes for architecture changes: new routes, auth boundaries, data-model
 changes, external dependencies. Newest first.
 
-- 2026-10-22: module shape a product starts from: routes (router), controller (rules,
-  handlers, public API, transactions), schema, service (queries); catalog template
-  bun-express 2.0.0.
-- 2026-10-21: plan 005; layered backend (config, api, models, middleware, services,
-  infra); authentication, rate limiting, communication, scheduler and pub/sub ship;
-  readiness body key is `dependencies`.
-- 2026-10-21: plan 004; controllers are the module's public API; route adapters run
-  middleware and validation; modules cross only through controllers.
 - <!-- FILL: YYYY-MM-DD — initial architecture accepted -->

@@ -13,15 +13,17 @@
 // Steps: prerequisites → read the lock → locate the catalog (cache clone checked against the
 // locked commit, or a local override) → check the catalog's schemaVersion → install the
 // catalog tools → (`--fetch` prints the index and stops) → refuse a second run → generate →
-// verify `.fullstack/catalog.yaml`. `--skip-install` maps to the generator's
-// `--skip-post-generate`. Environment: FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag
-// wins) and FULLSTACK_TEMPLATES_CACHE (cache root, default ~/.cache/fullstack-templates).
+// verify `.fullstack/catalog.yaml` → clear the harness's own history. `--skip-install` maps
+// to the generator's `--skip-post-generate`. Environment: FULLSTACK_TEMPLATES_DIR (same as
+// `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE (cache root, default
+// ~/.cache/fullstack-templates).
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { authFlagFrom, clearHarnessHistory } from './history.mjs'
 import { readProvenance } from './provenance.mjs'
 
 const SUPPORTED_SCHEMA_VERSION = 1
@@ -96,6 +98,23 @@ function main() {
   step('Verifying .fullstack/catalog.yaml')
   if (!existsSync(provenance) || statSync(provenance).size === 0) {
     fail('the generator did not write a non-empty .fullstack/catalog.yaml')
+  }
+
+  step("Clearing the harness's own history")
+  let cleared
+  try {
+    cleared = clearHarnessHistory(root, { auth: authFlagFrom(provenance) })
+  } catch (error) {
+    fail(
+      `clearing the harness's own history failed: ${error.message}. The scaffold is in place; ` +
+        'fix the marker, then run `node scripts/history.mjs <root> [--auth=false]`',
+    )
+  }
+  for (const file of cleared.removedPlans) console.log(`  removed ${file}`)
+  for (const file of cleared.keptPlans) console.log(`  kept (not tracked or modified) ${file}`)
+  for (const file of cleared.docs) console.log(`  resolved the auth markers in ${file}`)
+  if (cleared.removedPlans.length + cleared.keptPlans.length + cleared.docs.length === 0) {
+    console.log('  nothing to clear')
   }
 
   printNextSteps()
