@@ -35,8 +35,10 @@ removed lists it under `Delete:` in its stage report; the driver removes it (sec
 - The working tree is clean and the branch is not `main`. A tree left dirty by the
   bootstrap means its commit gate was never answered: ask the user to approve that
   commit. Any other uncommitted change: list it and stop; never stash or discard it.
-- `.doc/product-definition.md` has no `FILL` marker in Scope, Users, Auth or Acceptance
-  Criteria. If it does, stop and ask the user to finish the bootstrap.
+- `.doc/product-definition.md` has no `FILL` marker in Scope, Users, Auth, Design (when the
+  stack has a frontend) or Acceptance Criteria, and the three boxes of its `## Ready to plan`
+  are ticked. If a marker remains or a box is open, the bootstrap did not finish: stop and ask
+  the user to finish it.
 
 ## 1. Pick the task and branch
 
@@ -54,6 +56,13 @@ the paths of the existing plans, and this instruction:
 > Write the implementation plan for this task per the `writing-plans` skill and its
 > template. Status: draft. Base: the commit given. Include the Contract section when the
 > task touches the API. Print the plan path on the last line.
+
+Before showing the plan, count: `grep -c '^- V[0-9]' <plan>` (at most 12), the numbered items
+under Open Questions (at most 4) and `wc -l` (at most 250). Over a cap: re-dispatch the
+orchestrator once with "bring the plan within the caps of writing-plans › Sizing a product
+task, or split the task and propose the rest as backlog lines". Over again: show the plan with
+the counts and let the user decide. A plan that proposes backlog lines under `Out`: add them
+to the queue only on the user's yes.
 
 Then stop and ask the user to review the plan file. The user approves by editing
 `Status: draft` to `Status: active` (and answering the Open Questions in the file). Do not
@@ -82,6 +91,9 @@ figma URL if any. The agent runs the package's `contract` command first when the
 implements, runs `check` and `testE2e`, and writes
 `.orchestrate/report/frontend.md`.
 
+Both implementer reports carry a `Tests first:` line (the red run, or `after the fact —
+<reason>`); QA fails the stage without it and judges the reason.
+
 **Deletions.** After each implementer stage and fix round, read the report's `Delete:`
 lines. A rename arrives as a new file the agent already wrote and its old path here. Run
 `git add --intent-to-add .` first (a file created this task is otherwise untracked), then
@@ -105,6 +117,7 @@ perspective:
 | `simplicity` | Unnecessary abstraction, dead code, over-configuration, readability |
 | `operations` | Migrations, env variables, Docker, observability, rollback |
 
+Reviewers read the implementers' reports as the gate evidence and run no package gate.
 Each writes `.orchestrate/review/<perspective>.md` with P0/P1/P2 findings per the
 `code-review` skill. Collect every P0 and P1 across the five reports.
 

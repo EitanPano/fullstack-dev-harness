@@ -25,7 +25,9 @@ import {
   segmentTokens,
   sessionCwd,
   shellSegments,
+  splitHeredocBodies,
   toProjectRelative,
+  tokenize,
   withoutQuotes
 } from './lib/guardrail.mjs'
 
@@ -50,13 +52,14 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 const WRITE_PROGRAMS = new Set([
   'tee', 'cp', 'mv', 'rsync', 'install', 'ln', 'dd', 'truncate', 'touch', 'patch', 'rm', 'unlink',
   'rmdir', 'rd', 'del', 'erase', 'remove-item', 'ri', 'set-content', 'sc', 'add-content', 'ac',
-  'out-file', 'copy-item', 'cpi', 'copy', 'move-item', 'mi', 'move', 'new-item', 'ni', 'rename-item',
-  'rni', 'ren', 'rename', 'rimraf'
+  'out-file', 'copy-item', 'cpi', 'copy', 'move-item', 'mi', 'move', 'new-item', 'ni',
+  'rename-item', 'rni', 'ren', 'rename', 'rimraf'
 ])
 // git subcommands that never change the working tree or the history.
 const GIT_READ = new Set([
   'status', 'diff', 'log', 'show', 'ls-files', 'ls-tree', 'rev-parse', 'rev-list', 'blame', 'grep',
-  'describe', 'fetch', 'remote', 'shortlog', 'cat-file', 'merge-base', 'name-rev', 'var', 'version', 'help'
+  'describe', 'fetch', 'remote', 'shortlog', 'cat-file', 'hash-object', 'merge-base', 'name-rev',
+  'var', 'version', 'help'
 ])
 const GIT_LIST_FLAG = /^(-a|-r|-v|-vv|--list|--show-current|-l|--all|--contains|--merged|--no-merged)$/
 // Global options that may precede the subcommand. Any other one is refused, `-c` above all:
@@ -68,6 +71,16 @@ const GIT_GLOBAL_FLAG = /^(--no-pager|-P|--paginate|-p|--literal-pathspecs|--no-
 const REDIRECT = /(?<![=<\-])(?:\d|&|\*)?>{1,2}\s*(?:&[\d-]+(?=[\s;|&()<>]|$)|[^\s;|&()<>]*)/g
 // Redirections that do not write a file.
 const HARMLESS_REDIRECT = /^(\d?>&[\d-]+|(\d|&|\*)?>{1,2}\s*(\/dev\/null|\$null|nul))$/i
+// psql meta-commands that take a file or a `|command`.
+const PSQL_FILE_META = new Set([
+  '\\o', '\\out', '\\w', '\\write', '\\g', '\\gx', '\\s', '\\lo_export'
+])
+// A meta-command that pipes to a program (`\o |cmd`, `select 1 \g |cmd`) makes the body code.
+const PSQL_PIPE_META = /\\(?:out|gx|write|o|g|w)\b[^\n]*\|/
+// Docker and Compose `exec` flags that take a value, so it is not read as the container.
+const EXEC_VALUE_FLAGS = new Set([
+  '-u', '--user', '-e', '--env', '-w', '--workdir', '--env-file', '--index', '--detach-keys'
+])
 
 // Windows file systems are case-insensitive, so FRONTEND/ is frontend/ there and nowhere else.
 const fold = process.platform === 'win32' ? value => value.toLowerCase() : value => value
@@ -117,14 +130,22 @@ allow()
 function shellWriteChannel(command) {
   for (const line of commandLines(command)) {
     // Redirections are checked on the unquoted text because `>` may be glued to its target;
-    // `=>`, `->` and `<>` are not redirections.
-    const redirects = withoutQuotes(line).match(REDIRECT) ?? []
+    // `=>`, `->` and `<>` are not redirections. A heredoc body leaves the scan only when the
+    // program reading it is known to treat it as data; the rest is scanned raw, since quotes
+    // do not hide a `$(…)` write inside it.
+    // psql meta-commands are judged on body lines only, where psql may read them; a body whose
+    // reader is not `cat` is a candidate, which also covers a front end this scan cannot peel.
+    const bodyLines = []
+    const split = splitHeredocBodies(line, (at, pos, body) => bodyIsData(at, pos, body, bodyLines))
+    const { rest, code } = split
+    if (split.raw && line.includes('<<')) bodyLines.push(...line.split('\n'))
+    const redirects = [withoutQuotes(rest), ...code].join('\n').match(REDIRECT) ?? []
     const written = redirects.map(redirect => redirect.trim()).find(r => !HARMLESS_REDIRECT.test(r))
     if (written !== undefined) return `redirect ${written.split(/\s+/)[0]}`
     for (const segment of shellSegments(line)) {
       // As written, and the way bash unescapes a backslash (`t\ee f` is `tee f`).
       for (const unescape of escapeForms(segment)) {
-        const channel = segmentWriteChannel(segment, unescape)
+        const channel = segmentWriteChannel(segment, unescape, bodyLines)
         if (channel !== null) return channel
       }
     }
@@ -132,13 +153,66 @@ function shellWriteChannel(command) {
   return null
 }
 
-function segmentWriteChannel(segment, unescape) {
+// An allowlist, not a denylist of shells: a body is data only for `cat`, which prints it, and
+// `psql`, which runs it as SQL, with nothing piped on from the operator or substituted into
+// another command (`eval "$(cat <<EOF …)"`). Any other reader (a shell, an interpreter, `make`,
+// `at`, `ssh`, `mysql`, …) may execute it.
+function bodyIsData(line, at, body, bodyLines) {
+  const before = line.slice(0, at).replace(/\d?>&[\d-]+/g, ' ')
+  const reader = heredocReader(tokenize(shellSegments(before).at(-1) ?? ''))
+  if (reader !== 'cat') bodyLines.push(...body.split('\n'))
+  if (withoutQuotes(line.slice(at)).includes('|')) return false
+  if (/\$\(|`/.test(before)) return false
+  return reader === 'cat' || (reader === 'psql' && !PSQL_PIPE_META.test(body))
+}
+
+// The program that reads a heredoc, after leading assignments and the `docker compose exec`,
+// `docker exec` and `kubectl exec … --` front ends. A flag this table misses makes a value look
+// like the program, which is not `cat` or `psql`, so the body stays in the scan.
+function heredocReader(tokens) {
+  let at = tokens.findIndex(token => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token))
+  if (at === -1) return null
+  const program = programName(tokens[at])
+  if (program === 'kubectl') {
+    // Whatever follows `--` is the command, so no value flag before it can shift the reader.
+    const dashes = tokens.indexOf('--')
+    if (dashes === -1 || !tokens.slice(at, dashes).includes('exec')) return null
+    return programName(tokens[dashes + 1] ?? '')
+  }
+  if (program !== 'docker' && program !== 'docker-compose') return program
+  at = tokens.indexOf('exec', at)
+  if (at === -1) return null
+  at += 1
+  while (tokens[at]?.startsWith('-')) at += EXEC_VALUE_FLAGS.has(tokens[at]) ? 2 : 1
+  return programName(tokens[at + 1] ?? '')
+}
+
+// psql meta-commands that write a file or run a command: `\!` runs one; `\o`, `\w`, `\g` and
+// `\gx` take a file or a `|command` and may sit after a statement (`select 1 \g out.txt`).
+function psqlMetaChannel(segment, tokens) {
+  if (tokens[0]?.startsWith('\\!')) {
+    // The text is a whole command line to the shell psql starts, so judge it like one; it is
+    // strictly shorter than the segment, so the recursion ends.
+    return shellWriteChannel(segment.slice(segment.indexOf('\\!') + 2))
+  }
+  const takesFile = (token, i) => PSQL_FILE_META.has(token) && tokens[i + 1] !== undefined
+  const at = tokens.findIndex(takesFile)
+  return at === -1 ? null : `psql ${tokens[at]}`
+}
+
+function segmentWriteChannel(segment, unescape, bodyLines) {
   const tokens = segmentTokens(segment, unescape)
   if (tokens.length === 0) return null
+  if (!unescape && bodyLines.some(bodyLine => bodyLine.includes(segment))) {
+    const meta = psqlMetaChannel(segment, tokens)
+    if (meta !== null) return meta
+  }
   const program = programName(tokens[0])
   const args = tokens.slice(1)
   if (WRITE_PROGRAMS.has(program)) return program
-  if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) return 'sed -i'
+  if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) {
+    return 'sed -i'
+  }
   const inline = interpreterChannel(program, args)
   if (inline !== null) return inline
   // A runner's flag table is best effort: an unlisted flag can make its value the apparent
@@ -154,6 +228,8 @@ function segmentWriteChannel(segment, unescape) {
     const { sub, rest } = git
     // `git diff --output=<file>` and `git log --output <file>` write despite a read subcommand.
     if (rest.some(arg => /^--output(=|$)/.test(arg))) return `git ${sub} --output`
+    // `-w` stores the object in the repository; without it hash-object only prints the hash.
+    if (sub === 'hash-object' && rest.some(arg => /^-[^-]*w/.test(arg))) return 'git hash-object -w'
     const listOnly = rest.every(arg => GIT_LIST_FLAG.test(arg))
     const ok =
       GIT_READ.has(sub) ||

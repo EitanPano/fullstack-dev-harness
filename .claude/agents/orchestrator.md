@@ -26,7 +26,9 @@ Inputs: the task line (title and markers), the slug, the branch name, the existi
 paths, and the paths of `.doc/product-definition.md`, `.doc/architecture.md`,
 `.doc/glossary.md`.
 
-1. Read every existing plan, the three `.doc/` files, `backend/AGENTS.md` and `frontend/AGENTS.md`.
+1. Read every existing plan, the three `.doc/` files (including the `Design` section of the
+   product definition when the task has a frontend stage), `backend/AGENTS.md` and
+   `frontend/AGENTS.md`.
 2. If a `.doc/` section you depend on still holds a `<!-- FILL: … -->` marker, write a
    plan with `Status: blocked` naming the marker, print its path, and stop.
 3. Copy `.claude/skills/writing-plans/template.md` and fill every section. The
@@ -34,7 +36,10 @@ paths, and the paths of `.doc/product-definition.md`, `.doc/architecture.md`,
    `Stages:` lists `backend` only when the task touches the API or the database
    (never for a `stack:frontend` task), and `frontend` never for a `stack:backend` task.
 4. Each `Validation` item is provable by a named test or a command. Each open question
-   carries a recommended answer.
+   carries a recommended answer. Size the plan per `writing-plans › Sizing a product task`:
+   scope is the backlog line and its acceptance criteria (other hardening goes under `Out`
+   as a proposed backlog line), at most 12 `Validation` items, at most 4 `Open Questions`,
+   about 150 lines and never above 250.
 5. Save as `.plan/NNN-YYYY-MM-DD-<slug>.md` with `Status: draft`, and print the path on
    the last line of your response.
 

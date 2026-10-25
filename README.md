@@ -44,20 +44,24 @@ skill moves a project between the modes.
   local checkout with `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`).
 - Docker with Compose v2 for the compose stack and the database you choose.
 - On Linux, the frontend package's `AGENTS.md › Tests` names the browser install.
+- `.gitattributes` checks the text files out with LF on every host.
 
 ## Clone checklist
 
 1. Create a repository from this template (or `git clone` and remove the remote).
 2. Open it in Claude Code and accept the workspace trust dialog. Until you do, Claude Code
-   ignores the `permissions.allow` list in `.claude/settings.json` (the hooks still run),
-   so a headless `claude -p` run in a fresh clone falls back to its permission mode for
-   every command. Check that the hooks run: ask Claude to run `cat ~/.netrc` and expect a
-   refusal that names the guardrail (a refusal of `.env` alone could come from the
-   permission rules even with dead hooks).
-3. Run `/bootstrap-project`. It walks the product forms in `.doc/`, fetches the catalog, asks
-   which stack and which flags and capabilities its templates declare, scaffolds the
-   packages, runs every gate, writes the first backlog lines, and asks to commit the scaffold
-   (including `.fullstack/catalog.yaml`). Budget 15 minutes, most of it installs.
+   ignores the `permissions.allow` list in `.claude/settings.json` (the hooks still run), so
+   a headless `claude -p` run in a fresh clone falls back to its permission mode for every
+   command. A headless `claude -p` run also stops background agents after ten minutes unless
+   `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` is set in its environment. Check that the hooks
+   run: ask Claude to run `cat ~/.netrc` and expect a refusal that names the guardrail (a
+   refusal of `.env` alone could come from the permission rules even with dead hooks).
+3. Run `/bootstrap-project`. It walks the product forms in `.doc/`, fetches the catalog,
+   asks which stack and which flags and capabilities its templates declare, scaffolds the
+   packages, removes the harness's own plans from `.plan/` (a product's first plan is `001`),
+   resolves the auth text in `.doc/`, runs every gate, writes the first backlog lines, and
+   asks to commit the scaffold (including `.fullstack/catalog.yaml`). Budget 15 minutes,
+   most of it installs.
 4. Run `/dev-loop` for the first task; it starts from a clean tree, so commit the scaffold
    first. Approve the plan by editing its `Status:` line; review the reports in
    `.orchestrate/` before you commit.
@@ -134,6 +138,10 @@ A project scaffolded before the catalog has no `.fullstack/catalog.yaml`, and it
 `backend/AGENTS.md` lacks the sections the new agents point at, so it stays on the
 pre-catalog harness (the last commit before this change). The pointers in the harness name
 sections of the catalog version the lock pinned when the project was generated.
+
+A project updated to this harness ticks the boxes of `## Ready to plan` in
+`.doc/product-definition.md` that hold and fills its `Design` section before the next loop;
+the dev loop refuses to start otherwise.
 
 To try an unreleased catalog, use `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`.
 

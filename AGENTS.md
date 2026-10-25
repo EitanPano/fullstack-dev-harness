@@ -44,7 +44,7 @@ them.
 | `CLAUDE.md` | Loads this file into Claude Code | Humans |
 | `.doc/` | Product definition, architecture, glossary (fill-in forms) | Humans, with the bootstrap skill |
 | `.plan/000-backlog.md` | The task queue | Humans and the dev loop |
-| `.plan/NNN-YYYY-MM-DD-*.md` | Implementation plans, one per task | Orchestrator |
+| `.plan/NNN-YYYY-MM-DD-*.md` | Implementation plans, one per task; the bootstrap removes the harness's own before the first product plan | Orchestrator |
 | `.claude/agents/` | Role definitions: orchestrator, backend, frontend, reviewer, qa | Humans |
 | `.claude/skills/` | Procedures loaded on demand | Humans |
 | `.claude/rules/` | Conventions: code style, naming, UI and styling, git workflow; loaded with this file | Humans |
@@ -199,7 +199,8 @@ A task is done only when every item holds and the stage report shows the evidenc
 1. The `check` command of every package the task touched exits 0, and `testDb` where that
    package has one, with none skipped.
 2. Every new behaviour has a unit test for the happy path and at least one failure or empty
-   path. Every user journey the task adds has an e2e test where the stack has a frontend.
+   path, and the stage report shows the red run (its `Tests first:` line). Every user journey
+   the task adds has an e2e test where the stack has a frontend.
 3. No test was deleted, skipped or focused. The spellings (for example `.skip` and `.only`
    in TypeScript; `pytest.mark.skip`, `skipif`, `xfail`, or `-k` and `--deselect` in a gate
    command in Python) are listed in the package's `AGENTS.md › Tests`. A removed test is named and
