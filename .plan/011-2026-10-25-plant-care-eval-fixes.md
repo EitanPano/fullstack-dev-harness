@@ -1,6 +1,6 @@
 # Harness fixes from the plant-care eval, the UI baseline, catalog v1.3.0
 
-Status: active
+Status: done
 Status set by the session on Eitan's delegation ("do your recommendations, GO", 2026-10-25).
 Owner: Eitan
 Last updated: 2026-10-25
@@ -451,7 +451,7 @@ No product API changes; there is no Contract subsection.
 - Removing `.gitattributes` restores `autocrlf` behaviour; the index was never rewritten.
 - The hook change reverts to the 1188-case behaviour; no data or product is involved.
 
-## As built (2026-10-25, uncommitted; rulings R1–R18 in the ledger)
+## As built (2026-10-25; rulings R1–R18 in the ledger)
 
 - D1: the bootstrap deletes only plan files tracked at HEAD and unmodified, prints what it kept,
   resolves both `.doc/` texts before touching anything, and `history.mjs` has a CLI for
@@ -471,8 +471,8 @@ No product API changes; there is no Contract subsection.
 - D7: the IPv6 /64 subject is the RFC 5952 compressed network string in both servers.
 - Proofs: V20 ok; V21 for the react and next default cases and both `alone` cases; V25 subset
   (python stack, bun stack-auth-off); V26 proven on `react-bun-express` single on Windows; the
-  python-backed `--with-app` smoke waits on host port 8000 (the first eval's `plant-care-try`);
-  P1 and P2 pending Eitan's commits and the tag.
+  python-backed `--with-app` smoke passed once the first eval's `plant-care-try` project was
+  stopped (914 backend tests, e2e 10/10 against the container); P1 and P2 below.
 - P1 (2026-10-25, eval clone, branch `feat/app-shell-mobile-first` from the sync commit
   55ffd32, task commit ecfc7bd; 23 min, about $10 on Sonnet with Opus reviewers): V30 holds
   (plan 012 is 218 lines, 11 validation items, 3 open questions, `Stages: frontend, qa`, Base
@@ -488,3 +488,26 @@ No product API changes; there is no Contract subsection.
   the e2e data rule for a product without a delete endpoint (OQ6 again); QA to read one
   screenshot per viewport and scheme the plan names; a delegated-approval clause and a P2
   disposition step in the dev loop; `git check-ignore` in the hooks' git read list.
+- P2 (2026-10-25, fresh clone of `chore/catalog-v1.3.0` renamed `main`, remote removed, empty
+  template cache; 6 min, 53 turns, $0.74 on Sonnet): V34 holds. The bootstrap cloned v1.3.0 and
+  the provenance matches the lock; `.plan/` holds only the backlog (001–011 removed); `.doc/` has
+  no auth marker or row, the Auth body is the `none` text, the only dated change-log line is the
+  product's, the one `FILL` left is the production `TRUST_PROXY` marker; `Design` filled, three
+  boxes ticked, all three files `i/lf w/lf`. Gates: `check` 632 + 65, `migrate`, `testDb` 707 with
+  none skipped, `testE2e` 10/10 (chromium 5, phone 5) on the generated shell; the dev-server stop
+  recipe freed both ports first time; the app check ran one container with the migrate one-shot
+  and a clean `down`; the scaffold was committed on `chore/bootstrap`. Refusals: the clone
+  checklist's secret-file probe (true) and a notes heredoc whose text named that file (the text
+  rule). One self-recovered hiccup: the first `testE2e` exited 9 silently right after the browser
+  install and left the dev servers listening; a cold re-run passed twice. Follow-ups: the react
+  template's `webServer` should surface that failure and not reuse leaked servers (catalog);
+  `bootstrap-project` §4 should name Compose's "variable is not set" warnings and §5 which `FILL`
+  markers may remain; the Compose `name:` comes from `--name`, so two clones of one product share
+  a dev database (P2 recreated the first eval's container on the same volume); `claude -p` in an
+  untrusted workspace ignores the settings allow list (hooks still run); the bootstrap's "Done.
+  Next" prints the poe task name where `AGENTS.md` says `testDb`.
+- Release (2026-10-25): PRs #14 and catalog #9 merged into `dev`, then catalog #10 → `main`
+  f1f38e7 tagged `v1.3.0` (release published) and harness #15 → `main` 2c27ce3; H5 on
+  `chore/catalog-v1.3.0` (77c4e1c, PR #16 into `dev`) with the empty-cache `--fetch` proof. The
+  hooks worktree is gone; branch `fix/plant-care-eval-hooks` and the eval Docker volumes are
+  Eitan's to remove.
