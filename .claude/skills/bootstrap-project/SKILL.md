@@ -15,7 +15,8 @@ each chosen template's own tools.
 
 Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in order, ask the
 user one question at a time and replace the marker with their answer. Keep answers in
-their words; suggest a default only when they ask. Do the same for `.doc/architecture.md`
+their words; suggest a default only when they ask. The `Design` section is part of this walk;
+a product with no frontend answers it "n/a". Do the same for `.doc/architecture.md`
 (Data store, Data Model, Data migrations, API versioning, Auth, External Dependencies,
 Deployment, except its `Deploy mode` and `TRUST_PROXY` lines, which section 5 fills once the
 stack is chosen) and `.doc/glossary.md` (one row per entity named in the scope).
@@ -29,18 +30,15 @@ and the generator wires it; the Data store section is then filled from what was 
 
 The Auth question decides a flag: a product with no accounts (Auth: none) is scaffolded
 with `--flag auth=false`; any other answer keeps the server template's authentication (its
-`auth` flag on, the default). For `none`, replace the whole body of `.doc/architecture.md`
-Auth (the shipped default and the roles marker describe code that will not exist) with:
-
-```
-- Auth: none. The product has no accounts and every endpoint is public. Adding accounts is
-  a planned change; a scaffold with the `auth` flag on is the reference.
-- Client model: <!-- FILL: by frontend kind, set in section 5 once the stack is chosen -->
-```
+`auth` flag on, the default). The Auth section of `.doc/architecture.md` carries `auth`
+markers that the scaffold resolves (section 3): under `none` it keeps the "Auth: none" text
+and drops the shipped default and the roles marker, which describe code that will not
+exist. For `none`, leave the marked text alone and do not answer the FILL markers inside an
+`<!-- auth-start -->` block. The glossary's marked auth rows (`session`, `caller`, `OTP`,
+`target`) are removed by the scaffold under `none` and kept otherwise, so do not edit them.
 
 The frontend kind is known only after section 2, so section 5 replaces the Client model
-marker (here, and in the Auth section of a product with accounts) with the line for the
-chosen frontend:
+marker in the Auth section with the line for the chosen frontend:
 
 - Server-rendered (Next): the frontend's server is the backend's client (no browser
   fetch). CORS is off unless `CORS_ORIGINS` is set. Rate limits key on the client
@@ -115,7 +113,9 @@ none was chosen). When a provider was chosen it also adds the provider's service
 `db/` with the database init script, and the connection variable in the server's
 `.env.example`. It installs each package and runs its `contract` and `format`
 commands. It refuses to run twice. A failure before the move leaves nothing to clean: the
-generator stages the output and moves it into place all or nothing (a failed move is rolled back).
+generator stages the output and moves it into place all or nothing (a failed move is rolled
+back). The clearing step runs after the move, so a failure there leaves the scaffold in place
+and the message names the recovery (`node scripts/history.mjs <root> [--auth=false]`).
 
 ## 4. Verify, in this order
 
@@ -149,12 +149,27 @@ Then start each package's `dev` command (an SPA's server first, as the frontend'
 proxies `/api` to the server): the page must reach the server (the API version pill
 proves the typed client reaches it).
 
+Stop the dev servers by port. On Windows a `--reload` server leaves its child holding the port
+after the parent is stopped, and the port's owner is then the dead reloader, so stop the owner
+and its children (replace 8000 with the package's port):
+
+```powershell
+$o = (Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess | Select-Object -Unique; Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -in $o -or $_.ParentProcessId -in $o } | ForEach-Object { Stop-Process -Id $_.ProcessId }
+```
+
+On Linux and macOS: `lsof -ti :<port> | xargs -r kill`. Confirm the port is free before the app
+check: `Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction SilentlyContinue`
+(Windows) or `lsof -i :<port> -sTCP:LISTEN` (Linux, macOS) prints nothing.
+
 For the app check, first export in the shell a throwaway value for every secret the server's
 `.env.example` lists, and with a provider its `DATABASE_URL` (never in a file): the server
 refuses to start in production without them. Use a fresh `-p <name>`, because a reused
-project name reuses its volumes. Run `docker compose --profile app up --build --wait` at the
-root and stop it with `docker compose --profile app down` (same `-p`); with a provider the
-`<dir>-migrate` one-shot service runs the migrations first. In `single` the check is one container
+project name reuses its volumes. With a provider, run `docker compose stop database` first
+(the dev project's service; the app project publishes the same loopback port). Run
+`docker compose --profile app up --build --wait` at the root and stop it with
+`docker compose --profile app down` (same `-p`). With a provider, the `<dir>-migrate` one-shot
+service runs the migrations first. Run `docker compose start database` afterwards, even when
+the app check failed. In `single` the check is one container
 on the server's port (no frontend container in `docker compose ps -a`): `/` returns the
 page and `/api/health` answers there. In `split` it is one container per package, reached
 through the frontend's port.
@@ -188,9 +203,16 @@ provider's Compose service and its connection variable) from the package's
 `AGENTS.md › Adding the data layer` and
 `.fullstack/catalog.yaml`.
 
+End by replacing the Change Log's FILL line in `.doc/architecture.md` with
+`- <YYYY-MM-DD>: initial architecture accepted; <stack id>, deploy <mode>, <engine or in-memory store>.`
+Later entries go above it (newest first). Tick the three boxes of `## Ready to plan` in
+`.doc/product-definition.md` once each holds; the dev loop refuses to start while one is open.
+
 ## 6. Branch, commit gate and hand over
 
-Create `chore/bootstrap` (never commit on `main`) and summarise what exists. Then ask the
+Create `chore/bootstrap` (never commit on `main`) and summarise what exists, including what
+the scaffold removed, as the bootstrap printed it: the harness's own plans (`.plan/001–…`;
+a product's first plan is `001`) and the auth text (under Auth none). Then ask the
 user whether to commit the scaffold as `chore(bootstrap): scaffold <project-name>`,
 including `.fullstack/catalog.yaml`; the dev loop starts only from a clean tree, so the
 first task waits for this commit. Commit only on their yes, then point them to `/dev-loop`
