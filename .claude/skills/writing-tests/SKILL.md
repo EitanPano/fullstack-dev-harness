@@ -20,8 +20,8 @@ stage report as `Tests first:`; QA checks the names against the diff.
 The gate is `node scripts/verify.mjs --plan <plan>`: contract freshness, `check`, `testDb`
 where the package has it, `testE2e` and the diff checks, written to
 `.orchestrate/<slug>/verify.json`. An implementer runs it with `--package <dir>` (partial),
-with the Bash tool's `run_in_background: true`, since it can outlive a foreground timeout;
-the driver's full run is the evidence. QA runs only its own new test files with the package's
+in the foreground with `timeout: 600000`, and never ends its turn while it runs; the driver
+runs the full run in the background, and that run is the evidence. QA runs only its own new test files with the package's
 test runner; the next full `verify` covers them.
 
 A stage report that shows tests written after the fact is acceptable only when the

@@ -39,9 +39,11 @@ informational) and never satisfies `--reuse`. A partial run reads only its selec
 directories, so a sibling's concurrent edit does not fail it. A full run also records
 `security: { triggered, paths }` in `verify.json`.
 
-`verify` can outlive the Bash tool's timeout. Run it, and tell every implementer to run it,
-with the Bash tool's `run_in_background: true`, and wait for the completion notification;
-never with a foreground timeout.
+`verify` can outlive the Bash tool's timeout. The driver runs its full run with the Bash
+tool's `run_in_background: true` and waits for the completion notification. A role agent
+runs its partial run in the foreground with `timeout: 600000` and never ends its turn while a
+command it started is still running: a sub-agent that ends its turn is finished, and a
+headless run has nothing left to resume it.
 
 Role agents cannot delete files (the hooks refuse it). They list a file to remove under
 `Delete:` in their report; the driver removes it (sections 3 and 4).
