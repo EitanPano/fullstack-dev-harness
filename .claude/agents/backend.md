@@ -41,10 +41,10 @@ A refusal is the rule working; do not route around it.
    change ships what `Adding the data layer` and the `database` skill require, in the same
    task.
 5. **Gates**: `node scripts/verify.mjs --plan <plan> --package backend` until it exits 0. It
-   is a partial run (`verify-partial.json`); the driver's full run is the evidence. It can
-   outlive the Bash tool's timeout: run it with `run_in_background: true` and wait for the
-   completion notification, never with a foreground timeout. Fix the code, never the test or
-   the gate. When the task changed the data model, also run the package's `migrate` against
+   is a partial run (`verify-partial.json`); the driver's full run is the evidence. Run it in
+   the foreground with `timeout: 600000`, never in the background: ending your turn while it
+   runs ends your stage. A partial run that needs more than ten minutes is a blocker for your
+   report. Fix the code, never the test or the gate. When the task changed the data model, also run the package's `migrate` against
    the development database; it must apply cleanly. When this task adds the data layer, name
    the Compose service `database` (`verify` starts it by that name).
 6. **Report**: write `.orchestrate/<slug>/backend.md`:
