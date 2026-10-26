@@ -1,3 +1,7 @@
+---
+paths: ["frontend/**"]
+---
+
 # UI and styling
 
 Applies to every frontend package.

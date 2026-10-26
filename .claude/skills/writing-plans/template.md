@@ -15,64 +15,62 @@ acceptance criteria (AC numbers) it satisfies.>
 ## Scope
 
 - In: <capabilities, one per line>
-- Out: <what is explicitly not part of this task>
+- Out: <what is explicitly not part of this task; proposed backlog lines as `- [ ] <title>`>
 
 ## Assumptions
 
-- <decision taken from .doc/ or an earlier plan, with the file that records it>
+- <one line, at most 6: a decision taken from .doc/ or an earlier plan, with the file>
 
 ## Open Questions
 
-1. <Question? At most 4, 5 lines each> Recommended: <answer>.
+1. <Question? At most 3, 5 lines each> Recommended: <answer>.
 
-## Steps
+## Contract
 
-### Contract
+<Only when the API changes.>
 
 | Endpoint | Request | Response | Errors |
 | --- | --- | --- | --- |
 | `GET /api/<entity>/{id}` | `params.id: string` | `{ id, …, createdAt }` | 404 |
 
+## UX
+
+<Only when there is a frontend stage. Per route: its primary action; its loading, empty and
+error states; its phone layout. No copy strings.>
+
+- `/<route>` — <primary action> — loading: <…> · empty: <…> · error: <…> — phone: <…>
+
+## Steps
+
+One line per module or feature; no copy strings, no code.
+
 ### Backend
 
-1. Models: `backend/src/models/<entity>/` (the entity's types, and the data-model source
-   or migration as the engine requires, per `backend/AGENTS.md › Adding the data layer`
-   and the `database` skill).
-2. `backend/src/api/<entity>/` `schema`: <request and response schemas, contract
-   registration>.
-3. `service` (queries, when the module has data), `controller` (handlers and exported
-   rules, the module's only public API), `routes` (the router).
-4. The module's mount line and registration line, per `backend/AGENTS.md › Adding a
-   module`.
-5. The package's `contract` command.
-6. `backend/tests/` <entity> tests: happy path, validation failure, not found (the
-   store-backed ones in the database block).
-7. `check`; `testDb` when a database block exists.
+1. `backend/src/models/<entity>/` — the entity's types and the data-model source or migration.
+2. `backend/src/api/<entity>/` — `schema`, `service`, `controller`, `routes`, mount and
+   contract registration.
+3. `backend/tests/` — <entity> tests, store-backed ones in the database block.
 
 ### Frontend
 
-The steps follow the brief in `.doc/product-definition.md › Design`.
-
-1. The package's `contract` command.
-2. `frontend/src/feature/<name>/`, per `frontend/AGENTS.md › Adding a feature`, with its nav
-   entry in the shell and the phone layout of each new route.
-3. `frontend/src/app/<route>/` the page (with its loading and error states).
-4. `frontend/tests/` the unit test and the e2e test.
-5. `check`.
+1. `frontend/src/feature/<name>/` — <what it holds>, with its nav entry in the shell.
+2. `frontend/src/app/<route>/` — the page, with its loading and error states.
+3. `frontend/tests/` — the unit test and the e2e test.
 
 ## Validation
 
-- V01 — <statement; at most 12 items> — proof: <test name | command>
-- V02 — <statement> — proof: <test name | command>
+- V01 — <statement (AC<n>); at most 8 items> — proof: <test name | command>
+- V02 — <statement (AC<n>)> — proof: <test name | command>
 
 ## Risks
 
 - <risk> — <mitigation>
 
-## Rollout Order
-
-backend → frontend → review → qa
-
 ## Rollback
 
-<What to revert and in which order; whether the data change is reversible.>
+<Only when a migration or a data change ships: what to revert, in which order, and whether the
+data change is reversible. Delete this section otherwise.>
+
+## Changes during the task
+
+<Empty at the start; the driver records a plan edit made during the task, with the date.>

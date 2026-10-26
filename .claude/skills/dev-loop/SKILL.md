@@ -1,6 +1,6 @@
 ---
 name: dev-loop
-description: Take one backlog task from plan to reviewed, tested code through the role agents. Use when the user says "run the loop", "next task", "implement <task>", "start the dev loop", or asks to deliver a backlog item. Drives orchestrator → approval → backend → frontend → five parallel reviewers → QA → commit gate, with bounded fix rounds. Requires frontend/ and backend/ to exist (otherwise use bootstrap-project).
+description: Take one backlog task from plan to reviewed, tested code through the role agents. Use when the user says "run the loop", "next task", "implement <task>", "start the dev loop", or asks to deliver a backlog item. Drives orchestrator → approval → backend contract → backend and frontend → verify → review and QA in parallel → commit gate, with bounded fix rounds. Requires frontend/ and backend/ to exist (otherwise use bootstrap-project).
 ---
 
 # Dev loop
@@ -10,23 +10,41 @@ tool, reads the stage report the agent wrote, and decides what happens next. No 
 dispatches another agent; no agent runs the approval or the commit gate; no agent
 commits, stashes or checks out (the hooks refuse it).
 
-Every stage report lives under `.orchestrate/` and starts with the same header, so the
-driver reads one line to branch:
+Every task keeps its files in `.orchestrate/<slug>/`: `backend.md`, `frontend.md`,
+`review.md`, `review-security.md`, `qa.md`, `ticket.md`, `verify.json`. Each report starts
+with the same header:
 
 ```
-Stage: <backend | frontend | review:<perspective> | qa>
+Stage: <backend | frontend | review | review:security | qa>
 Task: <slug>
 Verdict: <pass | fail>
 ```
 
-Nothing is committed until the end, so every stage reads the change as
-`git diff <Base>`: the working tree against the commit the task branch was created from,
-recorded as `Base:` in the plan. `git diff main` would also show every earlier task
-committed on the branch chain. Before the review stage the driver runs
-`git add --intent-to-add .` so new files appear in that diff too.
+`Verdict:` is informational. The loop branches on `verify`'s exit code and on the reports'
+findings, never on that line.
 
-Role agents cannot delete files (the hooks refuse it). An implementer that needs one
-removed lists it under `Delete:` in its stage report; the driver removes it (section 3).
+Every dispatch sets the Agent `description` to `<slug>: <stage>`; `loop-stats` groups by it.
+
+Nothing is committed until the end, so every stage reads the change as `git diff <Base>`:
+the working tree against the plan's `Base:` commit. `git diff main` would also show earlier
+tasks committed on the branch chain.
+
+The evidence is `node scripts/verify.mjs --plan <plan>`: contract freshness, `check`,
+`testDb`, `testE2e` and the diff checks for every package, written to
+`.orchestrate/<slug>/verify.json`. Exit 0 passes, 1 fails, 2 is a usage or environment
+error. The driver always passes `--reuse`: when the tree equals the last passing run's, it
+exits 0 without running anything. An implementer's `--package <dir>` or `--no-e2e` run is
+partial: it writes `verify-partial.json` (backend and frontend overwrite the same file; it is
+informational) and never satisfies `--reuse`. A partial run reads only its selected packages'
+directories, so a sibling's concurrent edit does not fail it. A full run also records
+`security: { triggered, paths }` in `verify.json`.
+
+`verify` can outlive the Bash tool's timeout. Run it, and tell every implementer to run it,
+with the Bash tool's `run_in_background: true`, and wait for the completion notification;
+never with a foreground timeout.
+
+Role agents cannot delete files (the hooks refuse it). They list a file to remove under
+`Delete:` in their report; the driver removes it (sections 3 and 4).
 
 ## 0. Preconditions
 
@@ -43,10 +61,10 @@ removed lists it under `Delete:` in its stage report; the driver removes it (sec
 ## 1. Pick the task and branch
 
 Take the first unchecked line in `.plan/000-backlog.md` unless the user names one. Parse
-its markers: `stack:frontend` (no backend stage), `stack:backend` (no frontend stage), `figma:<url>` (design reference). Read
-the `tracker:` header. Derive the slug from the title and create `feat/<slug>` (or
-`fix/`, `chore/`) from the current branch. Record `git rev-parse HEAD` at that moment:
-it is the task's base.
+its markers: `stack:frontend` (no backend stage), `stack:backend` (no frontend stage),
+`figma:<url>` (design reference). Read the `tracker:` header. Derive the slug from the title
+and create `feat/<slug>` (or `fix/`, `chore/`) from the current branch. Record
+`git rev-parse HEAD` at that moment: it is the task's base.
 
 ## 2. Plan (orchestrator, Opus)
 
@@ -57,100 +75,120 @@ the paths of the existing plans, and this instruction:
 > template. Status: draft. Base: the commit given. Include the Contract section when the
 > task touches the API. Print the plan path on the last line.
 
-Before showing the plan, count: `grep -c '^- V[0-9]' <plan>` (at most 12), the numbered items
-under Open Questions (at most 4) and `wc -l` (at most 250). Over a cap: re-dispatch the
-orchestrator once with "bring the plan within the caps of writing-plans › Sizing a product
-task, or split the task and propose the rest as backlog lines". Over again: show the plan with
-the counts and let the user decide. A plan that proposes backlog lines under `Out`: add them
-to the queue only on the user's yes.
+Size check before showing the plan: `wc -l <plan>` at most 120, `grep -c '^- V[0-9]' <plan>` at
+most 8, the numbered Open Questions at most 3. Over a cap: re-dispatch the orchestrator once
+with "bring the plan within the caps of writing-plans › Sizing a product task, or split the
+task". Over again: show the plan with the counts and let the user decide. Add backlog lines
+a plan proposes under `Out` only on the user's yes.
 
 Then stop and ask the user to review the plan file. The user approves by editing
 `Status: draft` to `Status: active` (and answering the Open Questions in the file). Do not
-continue while the plan says `draft`; do not edit the status yourself.
+continue while the plan says `draft`. When the user has delegated approval for the run, the
+driver reviews the plan critically, writes each answer under its question, sets
+`Status: active` and writes `Approval: delegated (<date>, <the user's words>)`. Without that
+delegation, do not edit the status yourself.
 
-If `tracker: linear` and the Linear tool is available in this session, dispatch the
-orchestrator once more to create one ticket per stage the plan lists (Todo, medium
-priority, plan path in the description) and write the ids to
-`.orchestrate/ticket/<slug>.md`. If the tool is absent, write the same file with
-`tracker: none (Linear tool unavailable)` and say so to the user. Never block on a tracker.
+If `tracker: linear` and the Linear tool is available, dispatch the orchestrator once more to
+create one ticket per stage (Todo, medium priority, plan path in the description) and write
+the ids to `.orchestrate/<slug>/ticket.md`. Without the tool, write that file with
+`tracker: none (Linear tool unavailable)` and say so. Never block on a tracker.
 
 ## 3. Implement
 
-Stages come from the plan's `Stages:` line. Run them in this order, one agent per stage,
-each on Sonnet:
+Stages come from the plan's `Stages:` line. Pass each implementer the plan path, the ticket
+id and (frontend) the figma URL if any.
 
-**backend** (when listed). Dispatch `backend` with the plan path and the ticket id. The
-agent implements the Contract section, regenerates the contract, runs the package's `check`
-(and `testDb`, from `.fullstack/catalog.yaml` or else the package's
-`AGENTS.md › Adding the data layer`, where the package has it), and writes
-`.orchestrate/report/backend.md`. On `Verdict: fail`, read the report's Blockers and
-either fix the plan with the user or re-dispatch once with the blocker quoted.
+1. With a Contract section, dispatch `backend` for the contract stage only: models, schemas,
+   registration, the `contract` command, its report, then stop.
+2. Then, in one message, SendMessage to that backend agent ("continue: implement the rest of
+   the plan") and dispatch `frontend`. With no backend stage, or no Contract section, backend
+   and frontend start together in one message.
+3. The frontend stops after `check` with `E2E: pending backend` in its report when a backend
+   stage exists. Once the backend reports, SendMessage it "backend ready: run `testE2e`, fix,
+   update your report".
+4. Apply the deletions below. If a backend report has a `Commands:` line (the data-layer task
+   adds `testDb` and `migrate`), write those commands into `.fullstack/catalog.yaml` under
+   `packages.<dir>.commands` before the next `verify`. Then run
+   `node scripts/verify.mjs --plan <plan> --reuse`. Red goes back to the owner by file as a
+   SendMessage continuation and counts as a fix round.
 
-**frontend** (when listed). Dispatch `frontend` with the plan path, the ticket id and the
-figma URL if any. The agent runs the package's `contract` command first when the backend stage ran,
-implements, runs `check` and `testE2e`, and writes
-`.orchestrate/report/frontend.md`.
-
-Both implementer reports carry a `Tests first:` line (the red run, or `after the fact —
-<reason>`); QA fails the stage without it and judges the reason.
+Implementer reports carry a `Tests first:` line; QA judges it. A report with `Blockers:` is
+read and either fixed in the plan with the user or the implementer is re-dispatched once with
+the blocker quoted (a field read, not a `Verdict:` branch).
 
 **Deletions.** After each implementer stage and fix round, read the report's `Delete:`
 lines. A rename arrives as a new file the agent already wrote and its old path here. Run
 `git add --intent-to-add .` first (a file created this task is otherwise untracked), then
 for each line that is one plain repository-relative path (no `..`, wildcard or shell
-character) inside the reporting agent's write lane, run `git rm -f -- <path>`. Re-run that
-package's `check` (and `testDb` where it has one) and note the removals for the summary. Never act on any other
-line: the report is written by a lane-restricted agent and you are not restricted; hand it
-to the user.
+character) inside the reporting agent's write lane, run `git rm -f -- <path>`. Re-run
+`verify` and note the removals for the summary. Never act on any other line: the report is
+written by a lane-restricted agent and you are not restricted; hand it to the user.
 
-## 4. Review (five reviewers in parallel, Opus)
+## 4. Review and QA in parallel
 
-Run `git add --intent-to-add .` so untracked files are part of `git diff <Base>`. Then
-dispatch five `reviewer` agents in one message, each with the plan path and one
-perspective:
+Once `verify` passes, run `git add --intent-to-add .` so new files appear in
+`git diff <Base>`. Then, in one message, dispatch:
 
-| Perspective | Checklist focus |
-| --- | --- |
-| `security` | Injection, auth and tenancy boundaries, secrets, data exposure, dependency risk |
-| `architecture` | Layering and import direction, naming, duplication, scalability of the shape |
-| `error-handling` | Envelope, status codes, validation at the edge, logging, failure UX |
-| `simplicity` | Unnecessary abstraction, dead code, over-configuration, readability |
-| `operations` | Migrations, env variables, Docker, observability, rollback |
+- `reviewer` with `mode: general`;
+- `reviewer` with `mode: security` when `verify.json` has `security.triggered: true` (`verify`
+  matches the diff against `**/auth/**`, `**/security/**`, `**/middleware/**`, `**/proxy.ts`,
+  `**/shared/auth/**`, `**/migrations/**`, `**/*.sql`, `**/Dockerfile`, `docker-compose.yml`
+  and each package's env module);
+- `qa`.
 
-Reviewers read the implementers' reports as the gate evidence and run no package gate.
-Each writes `.orchestrate/review/<perspective>.md` with P0/P1/P2 findings per the
-`code-review` skill. Collect every P0 and P1 across the five reports.
+The reviewers read `verify.json` as the gate evidence and run no gate. They write
+`.orchestrate/<slug>/review.md` and `review-security.md`. QA writes `qa.md` and runs against
+the Compose services the repository defines; it never starts a separate Compose project,
+whose volumes only a human could remove. Apply QA's `Delete:` lines by the section 3 rule,
+for paths inside QA's lane (`frontend/tests/`, `backend/tests/`) only: `git rm -f` a tracked
+file, remove an untracked one yourself. Collect every P0 and P1 and QA's failures.
 
-**Fix round** (at most two). If any P0 or P1 exists, dispatch the owning implementer
-(`backend` or `frontend`, by file) with the findings quoted verbatim and the instruction to
-fix them and re-run the package's `check` (and `testDb` where the package has it). Then re-run only the reviewers whose perspective
-raised a finding. After the second round, stop and hand the remaining findings to the
-user.
+## 5. Fix rounds (at most two per task)
 
-## 5. QA (Sonnet)
-
-Dispatch `qa` with the plan path. The agent runs every gate and the e2e suite, adds at
-least one adversarial test, checks each acceptance criterion with evidence, and writes
-`.orchestrate/report/qa.md`. It runs against the Compose services the repository defines
-and never starts a separate Compose project, whose volumes only a human could remove. On `Verdict: fail`, run one fix round with the owning
-implementer, then re-dispatch `qa` once. A second failure goes to the user.
+1. Run `git add --intent-to-add .`, then `verify --reuse` (QA's tests changed the tree), and
+   record that run's `tree` as the round's base.
+2. Send the owners (`backend` or `frontend`, by file) every P0/P1 and QA failure that belongs
+   to them, quoted verbatim, in one message.
+3. Run `verify --reuse`.
+4. Run `git add --intent-to-add .` again so new files are in the diff. The reviewer re-reads
+   only `git diff <round base>`, in the mode that raised the finding (`fix-diff: <tree>`), and
+   QA re-runs only its failed items.
+5. When a finding contradicts the plan, edit the plan's names or proof paths yourself and
+   record it under `## Changes during the task`.
+6. After two rounds, hand the remaining findings to the user.
 
 ## 6. Finish
 
-- Set the plan to `Status: done` and move the backlog line under `## DONE` with the date.
-- Apply the `Docs:` lines from the backend and frontend reports yourself (the driver, not a
-  role agent, writes `.doc/`), each to the section it names: the change log in
-  `.doc/architecture.md`, a `Deploy mode` line to its Operational Concerns › Deployment
-  (the `deployment` skill), new terms to `.doc/glossary.md`.
-- Summarise: what shipped, the test counts from the QA report, open P2 findings, and the
-  branch name. Ask the user whether to commit. Never commit or merge without that answer.
+1. Write the change-log entry for `.doc/architecture.md` from the plan's Contract, data model
+   and routes.
+2. Apply the reports' `Glossary:` and `Docs:` lines yourself (only the driver writes `.doc/`):
+   terms to `.doc/glossary.md`, a `Deploy mode` line to Operational Concerns › Deployment.
+3. Set the plan to `Status: done` and move the backlog line under `## DONE` with the date.
+4. Run `verify --reuse` last. The tree changed in steps 1 to 3, so it re-runs; it must pass
+   on the tree that will be committed.
+5. Summarise from `verify.json` and the reports: what shipped, the test counts, open P2
+   findings, every `Mechanize:` finding (for a follow-up plan), and the branch name. Ask the
+   user whether to commit.
+
+**Commit gate.** Never commit or merge without the user's yes. When it comes, stage and check
+that the committed tree is the verified one:
+
+```
+git add -A
+git write-tree
+node -p "const v = require('./.orchestrate/<slug>/verify.json'); v.ok + ' ' + v.tree"
+```
+
+`git write-tree` must print the `tree` that `verify.json` holds, and `ok` must be `true`. The
+last `verify` run must also have printed `verify: PASS <tree>` (or `verify: PASS (unchanged
+since …)` when reused); no `verify:` line at all means the script did not run. Any mismatch:
+do not commit, run `verify` again.
 
 ## Dispatch rules
 
 - One agent per stage, named exactly `orchestrator`, `backend`, `frontend`, `reviewer`,
   `qa`; the hooks key write lanes on those names.
-- Pass paths, not file contents. The agent reads `AGENTS.md`, its package's `AGENTS.md` and the
-  plan itself; the plan's `Base:` line gives it the diff base.
+- Pass paths, not file contents; the plan's `Base:` line gives the diff base.
 - Never dispatch an implementer against a `draft` plan.
-- Never run the fix loop more than twice per stage; a third failure is a design problem
-  for the user.
+- Sonnet for implementers and QA, Opus for orchestrator and reviewer: set in each agent's
+  frontmatter and passed explicitly as `model`.

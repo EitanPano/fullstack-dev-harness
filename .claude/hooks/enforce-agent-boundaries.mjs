@@ -3,8 +3,10 @@
 // agent in its write lane. The role is the payload's `agent_type` (or AGENT_ROLE for a headless
 // driver); none means the interactive session, which this hook leaves alone.
 // - Fail closed: a role with no lane below cannot Edit/Write, but may run read-only commands.
-// - Shell write channels (`>`, `tee`, `cp`, `rm`, `node -e`, git writes, …) are refused for role
-//   agents, since only Edit/Write paths map to a lane. Scripts like `bun run format` pass.
+// - Shell write channels (`>`, `tee`, `cp`, `rm`, git writes, …) are refused for role agents,
+//   since only Edit/Write paths map to a lane. Inline interpreter code (`node -e`, a stdin
+//   program) is refused too, except for orchestrator and reviewer. Scripts like
+//   `bun run format` pass.
 // - WRITE_LANES owns who writes where; the agent prompts repeat it and lose on conflict.
 import process from 'node:process'
 
@@ -14,6 +16,7 @@ import {
   commandLines,
   commandOf,
   escapeForms,
+  heredocContext,
   inlineCode,
   interpreterViews,
   isCanonicalPath,
@@ -22,6 +25,7 @@ import {
   readPayload,
   readsStdin,
   resolveRole,
+  runtimeOf,
   segmentTokens,
   sessionCwd,
   shellSegments,
@@ -31,17 +35,18 @@ import {
   withoutQuotes
 } from './lib/guardrail.mjs'
 
-// A lane ending in `/` is a directory prefix; anything else is one exact file.
+// A lane ending in `/` is a directory prefix; anything else is one exact file. In a lane a `*`
+// segment is one task folder: any single segment but an empty one, `.` or `..`.
 const WRITE_LANES = {
   // The data-layer task (database skill) adds its Compose service and db/init.sql.
-  backend: ['backend/', 'docker-compose.yml', 'db/', '.orchestrate/report/backend.md'],
-  frontend: ['frontend/', '.orchestrate/report/frontend.md'],
+  backend: ['backend/', 'docker-compose.yml', 'db/', '.orchestrate/*/backend.md'],
+  frontend: ['frontend/', '.orchestrate/*/frontend.md'],
   // QA may add coverage but never feature source.
-  qa: ['.orchestrate/report/qa.md', 'frontend/tests/', 'backend/tests/'],
+  qa: ['.orchestrate/*/qa.md', 'frontend/tests/', 'backend/tests/'],
   // The orchestrator plans and records tickets; it never touches application code.
-  orchestrator: ['.plan/', '.orchestrate/ticket/'],
-  // Reviewers read everything and write one report.
-  reviewer: ['.orchestrate/review/'],
+  orchestrator: ['.plan/', '.orchestrate/*/ticket.md'],
+  // Reviewers read everything and write their reports.
+  reviewer: ['.orchestrate/*/review.md', '.orchestrate/*/review-security.md'],
   // Generic implementers (superpowers, ad-hoc dispatch) are not role agents: unrestricted,
   // so a clone works out of the box. Remove this line to force every writer into a lane.
   'general-purpose': '*'
@@ -59,8 +64,12 @@ const WRITE_PROGRAMS = new Set([
 const GIT_READ = new Set([
   'status', 'diff', 'log', 'show', 'ls-files', 'ls-tree', 'rev-parse', 'rev-list', 'blame', 'grep',
   'describe', 'fetch', 'remote', 'shortlog', 'cat-file', 'hash-object', 'merge-base', 'name-rev',
-  'var', 'version', 'help'
+  'var', 'version', 'help', 'check-ignore'
 ])
+// Roles with no implementer lane may run every runtime's inline code (`node -e`, `python -c`, …)
+// and programs read from stdin (`node - <<'EOF'`). The lanes are not a sandbox (AGENTS.md), and
+// shell write channels, `sed -i` and git writes stay refused for them.
+const INLINE_CODE_ROLES = new Set(['orchestrator', 'reviewer'])
 const GIT_LIST_FLAG = /^(-a|-r|-v|-vv|--list|--show-current|-l|--all|--contains|--merged|--no-merged)$/
 // Global options that may precede the subcommand. Any other one is refused, `-c` above all:
 // a config override such as core.pager or core.fsmonitor runs a command under a read.
@@ -77,10 +86,6 @@ const PSQL_FILE_META = new Set([
 ])
 // A meta-command that pipes to a program (`\o |cmd`, `select 1 \g |cmd`) makes the body code.
 const PSQL_PIPE_META = /\\(?:out|gx|write|o|g|w)\b[^\n]*\|/
-// Docker and Compose `exec` flags that take a value, so it is not read as the container.
-const EXEC_VALUE_FLAGS = new Set([
-  '-u', '--user', '-e', '--env', '-w', '--workdir', '--env-file', '--index', '--detach-keys'
-])
 
 // Windows file systems are case-insensitive, so FRONTEND/ is frontend/ there and nowhere else.
 const fold = process.platform === 'win32' ? value => value.toLowerCase() : value => value
@@ -158,33 +163,13 @@ function shellWriteChannel(command) {
 // another command (`eval "$(cat <<EOF …)"`). Any other reader (a shell, an interpreter, `make`,
 // `at`, `ssh`, `mysql`, …) may execute it.
 function bodyIsData(line, at, body, bodyLines) {
-  const before = line.slice(0, at).replace(/\d?>&[\d-]+/g, ' ')
-  const reader = heredocReader(tokenize(shellSegments(before).at(-1) ?? ''))
+  const { reader, plain } = heredocContext(line, at)
   if (reader !== 'cat') bodyLines.push(...body.split('\n'))
-  if (withoutQuotes(line.slice(at)).includes('|')) return false
-  if (/\$\(|`/.test(before)) return false
+  if (!plain) return false
+  // For the two roles that may run interpreters, what an interpreter reads is code of its own
+  // language: its `>` and `>=` are not shell redirects (the accepted D8(a) risk).
+  if (INLINE_CODE_ROLES.has(role) && runtimeOf(reader) !== null) return true
   return reader === 'cat' || (reader === 'psql' && !PSQL_PIPE_META.test(body))
-}
-
-// The program that reads a heredoc, after leading assignments and the `docker compose exec`,
-// `docker exec` and `kubectl exec … --` front ends. A flag this table misses makes a value look
-// like the program, which is not `cat` or `psql`, so the body stays in the scan.
-function heredocReader(tokens) {
-  let at = tokens.findIndex(token => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token))
-  if (at === -1) return null
-  const program = programName(tokens[at])
-  if (program === 'kubectl') {
-    // Whatever follows `--` is the command, so no value flag before it can shift the reader.
-    const dashes = tokens.indexOf('--')
-    if (dashes === -1 || !tokens.slice(at, dashes).includes('exec')) return null
-    return programName(tokens[dashes + 1] ?? '')
-  }
-  if (program !== 'docker' && program !== 'docker-compose') return program
-  at = tokens.indexOf('exec', at)
-  if (at === -1) return null
-  at += 1
-  while (tokens[at]?.startsWith('-')) at += EXEC_VALUE_FLAGS.has(tokens[at]) ? 2 : 1
-  return programName(tokens[at + 1] ?? '')
 }
 
 // psql meta-commands that write a file or run a command: `\!` runs one; `\o`, `\w`, `\g` and
@@ -213,14 +198,16 @@ function segmentWriteChannel(segment, unescape, bodyLines) {
   if (program === 'sed' && args.some(arg => /^-[a-z]*i/i.test(arg) || arg === '--in-place')) {
     return 'sed -i'
   }
-  const inline = interpreterChannel(program, args)
-  if (inline !== null) return inline
-  // A runner's flag table is best effort: an unlisted flag can make its value the apparent
-  // program and hide an interpreter behind it. Judge every later interpreter as a program
-  // start too, which fails closed.
-  for (const view of interpreterViews(segment, unescape)) {
-    const hidden = interpreterChannel(programName(view[0]), view.slice(1))
-    if (hidden !== null) return hidden
+  if (!INLINE_CODE_ROLES.has(role)) {
+    const inline = interpreterChannel(program, args)
+    if (inline !== null) return inline
+    // A runner's flag table is best effort: an unlisted flag can make its value the apparent
+    // program and hide an interpreter behind it. Judge every later interpreter as a program
+    // start too, which fails closed.
+    for (const view of interpreterViews(segment, unescape)) {
+      const hidden = interpreterChannel(programName(view[0]), view.slice(1))
+      if (hidden !== null) return hidden
+    }
   }
   if (program === 'git') {
     const git = gitCommand(args)
@@ -269,5 +256,16 @@ function firstString(...values) {
 }
 
 function matchesLane(rel, lane) {
-  return lane.endsWith('/') ? fold(rel).startsWith(fold(lane)) : fold(rel) === fold(lane)
+  const parts = fold(rel).split('/')
+  const want = fold(lane).split('/')
+  // A trailing `/` leaves an empty last element: the lane is a directory prefix.
+  const prefix = want.at(-1) === ''
+  if (prefix ? parts.length < want.length : parts.length !== want.length) return false
+  return want.every(
+    (segment, i) =>
+      (prefix && i === want.length - 1) ||
+      (segment === '*'
+        ? parts[i] !== '' && parts[i] !== '.' && parts[i] !== '..'
+        : segment === parts[i])
+  )
 }

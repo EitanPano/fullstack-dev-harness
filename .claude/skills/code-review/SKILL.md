@@ -1,9 +1,14 @@
 ---
 name: code-review
-description: Review a change against this repository's standards. Use when acting as the reviewer agent, when the user asks for a review of a branch or diff, or when deciding whether a stage is done. Covers the six-priority checklist, the P0/P1/P2 scale, what counts as evidence, how to read an uncommitted change, and the report format the dev loop parses.
+description: Review a change against this repository's standards. Use when acting as the reviewer agent, when the user asks for a review of a branch or diff, or when deciding whether a stage is done. Covers the six-priority checklist, the security mode, the P0/P1/P2 scale, what counts as evidence, how to read an uncommitted change, and the report format the dev loop parses.
 ---
 
 # Code Review
+
+One reviewer applies the whole checklist below (`mode: general`). `mode: security` deepens
+priority 1 only; the driver adds it when `verify.json` has `security.triggered: true`, which
+`verify` computes: the diff touches auth, security, middleware, the proxy, migrations, SQL, an
+env module, a Dockerfile or `docker-compose.yml`.
 
 Be critical. Surface real problems and say them plainly; do not soften, do not pad with
 praise. A review with no findings states what was checked and why it holds.
@@ -15,14 +20,17 @@ plan's `Base:` commit (outside the dev loop, `main` unless the user names a base
 `git diff <Base>...HEAD`, which ignores the working tree, and inside the loop never
 `git diff main`, which also shows earlier tasks committed on the branch. The driver has run
 `git add --intent-to-add .`, so new files are in that diff; `git status --short` lists
-them too. Read the plan's Scope, Contract and Validation first, then the diff, then what
+them too (for a `fix-diff` re-review it has run it again). Read the plan's Scope, Contract and Validation first, then the diff, then what
 the change should have touched but did not (a migration or index, a failure-path test, an
 error state, a change-log line).
 
 ## Priorities, highest first
 
 1. **Security**: injection, auth and tenancy boundaries, secrets in code or logs, data
-   exposure in responses, unsafe dependencies.
+   exposure in responses, unsafe dependencies. In `mode: security` go further: auth and
+   session flows, authorization per endpoint, injection, secrets, CORS and proxy trust, the
+   Compose and Docker surface (privileges, bind mounts, host networking, ports published
+   beyond loopback).
 2. **Scalability**: N+1 queries, missing indexes, unbounded lists, work on the request
    path that belongs in a job, state that cannot be replicated.
 3. **Maintainability and architecture**: layering and import direction per `AGENTS.md` and
@@ -50,35 +58,41 @@ error state, a change-log line).
   a contract that drifted, a lane or rule violated.
 - **P1**: fix in this task. Wrong layering, missing failure-path test, misleading name,
   error leaking internals.
-- **P2**: note for later. Style, minor duplication, a better library call.
+- **P2**: note for later. Style, minor duplication, a better library call. A finding class
+  that an earlier task's `.orchestrate/*/review.md` already shows is tagged `Mechanize:` and
+  filed with the check that would catch it; the driver lists those for a follow-up plan.
 
 ## Evidence
 
 Every finding names `file:line`, quotes the problem in one line, states the consequence,
 and gives the fix. "Looks wrong" is not a finding; run the test or read the schema when
-in doubt. The implementer's report (`Tests:`, `Gates:`) and QA's report, when it exists, are
-the gate evidence: do not re-run `check`, `test`, `typecheck` or `lint`. To confirm one
+in doubt. `.orchestrate/<slug>/verify.json` is the gate evidence (and QA's report, when it exists): do
+not re-run `check`, `test`, `typecheck` or `lint`. To confirm one
 finding, run at most the one test file that covers it. Never run `testDb` (it writes the test
 database), a dev server, `format` or anything that writes.
 
 ## Report
 
-Write `.orchestrate/review/<perspective>.md`. `Verdict` is `fail` when any P0 or P1
-remains, otherwise `pass`.
+Write `.orchestrate/<slug>/review.md` (`review-security.md` for `mode: security`). `Verdict`
+is informational: `fail` when any P0 or P1 remains, otherwise `pass`; the loop branches on the
+findings.
 
 ```
-Stage: review:<perspective>
+Stage: <review | review:security>
 Task: <slug>
 Verdict: <pass | fail>
 
 ## Findings
 - P0 — <file:line> — <problem> — <consequence> — Fix: <what to change>
 - P1 — …
-- P2 — …
+- P2 — … (`Mechanize: <check that would catch it>` when the class repeats)
 
 ## Checked and holds
 - <what was examined and found correct, one line each>
 ```
+
+A `fix-diff: <tree>` re-review rewrites the file with the earlier content kept and a new
+`## Re-review <tree>` section at the end (you have Write, not Edit).
 
 The dev loop re-dispatches the implementer with the P0 and P1 lines verbatim, so each
 must be self-contained.

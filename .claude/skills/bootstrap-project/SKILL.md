@@ -11,6 +11,14 @@ that catalog's generator. This skill supplies the product, the stack choice and 
 database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24+, git, and
 each chosen template's own tools.
 
+## 0. Preflight
+
+- A git repository: run `git rev-parse --show-toplevel`. When it fails, offer `git init` and
+  say that the scaffold commit becomes the root commit. `scripts/bootstrap.mjs` refuses to run
+  outside a git work tree (`--fetch` writes no project and skips the check).
+- The tools: Bun 1.4+, Node 24+, git, and each chosen template's `tools` (section 2 checks
+  those once the stack is chosen).
+
 ## 1. Decide the product with the user
 
 Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in order, ask the
@@ -117,31 +125,30 @@ generator stages the output and moves it into place all or nothing (a failed mov
 back). The clearing step runs after the move, so a failure there leaves the scaffold in place
 and the message names the recovery (`node scripts/history.mjs <root> [--auth=false]`).
 
-## 4. Verify, in this order
+## 4. Verify
 
-Open `.fullstack/catalog.yaml`. Run each command from its package directory.
+Open `.fullstack/catalog.yaml`. With a provider (a non-empty `providers` map, e.g.
+`providers: { database: <id> }`; `providers: {}` means none), first run
+`docker compose up -d --wait <service>` (the provider's service, named in
+`docker-compose.yml`). Then, once:
 
-Without a provider:
+```bash
+cd <frontend dir>
+bun x playwright install chromium   # add --with-deps on Linux
+cd ..
+node scripts/verify.mjs --out .orchestrate/bootstrap
+```
 
-1. Each package's `check`.
-2. For a package that declares `testE2e`, the browser install its `AGENTS.md › Tests`
-   names, then `testE2e`.
+The browser install runs from the frontend package directory, so the package's pinned
+Playwright installs its own browser revision (the catalog's `tools/lib/browsers.ts` does the
+same). `verify` can outlive the Bash tool's timeout: run it with `run_in_background: true`
+and wait for the completion notification.
 
-With a provider (a non-empty `providers` map, e.g. `providers: { database: <id> }`;
-`providers: {}` means none):
-
-1. Each package's `check` (no Docker needed).
-2. `docker compose up -d --wait <service>` (the provider's service, named in
-   `docker-compose.yml`).
-3. The server package's `migrate`, then its `testDb`, each only when the package's commands
-   list it.
-4. For a package that declares `testE2e`, the browser install, then `testE2e`.
-
-The order matters: the server connects its database before it listens, and the e2e suite
-starts the server. Every command must exit 0. If one fails, fix the
-cause (not the gate), re-run it, and tell the user what was wrong. A failing gate on a fresh
-scaffold is a catalog bug: say so explicitly, name the template and version from the
-provenance file, and record it in the final message.
+`verify` runs the gates of every package in `.fullstack/catalog.yaml` and replaces the
+hand-run list. It is run without a base because the scaffold is not committed yet. It must
+exit 0. If it fails, fix the cause (not the gate), re-run it, and tell the user what was wrong.
+A failing gate on a fresh scaffold is a catalog bug: say so explicitly, name the template and
+version from the provenance file, and record it in the final message.
 
 Then start each package's `dev` command (an SPA's server first, as the frontend's
 `AGENTS.md` says) and open the frontend's `http.health` path on its

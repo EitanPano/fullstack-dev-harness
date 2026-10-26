@@ -10,13 +10,13 @@
 //     [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]
 //     [--deploy single|split]
 //
-// Steps: prerequisites → read the lock → locate the catalog (cache clone checked against the
-// locked commit, or a local override) → check the catalog's schemaVersion → install the
-// catalog tools → (`--fetch` prints the index and stops) → refuse a second run → generate →
-// verify `.fullstack/catalog.yaml` → clear the harness's own history. `--skip-install` maps
-// to the generator's `--skip-post-generate`. Environment: FULLSTACK_TEMPLATES_DIR (same as
-// `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE (cache root, default
-// ~/.cache/fullstack-templates).
+// Steps: prerequisites → git work tree check (skipped for `--fetch`) → read the lock → locate the
+// catalog (cache clone checked against the locked commit, or a local override) → check the
+// catalog's schemaVersion → install the catalog tools → (`--fetch` prints the index and stops) →
+// refuse a second run → generate → verify `.fullstack/catalog.yaml` → clear the harness's own
+// history. `--skip-install` maps to the generator's `--skip-post-generate`. Environment:
+// FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE
+// (cache root, default ~/.cache/fullstack-templates).
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import os from 'node:os'
@@ -49,6 +49,7 @@ main()
 function main() {
   step('Checking prerequisites')
   checkPrerequisites()
+  if (!args.fetch) checkGitWorkTree()
 
   step('Reading catalog.lock')
   const lock = readLock()
@@ -144,6 +145,21 @@ function checkPrerequisites() {
   if (docker.status !== 0) {
     console.warn(
       '  warning: docker is not on PATH; the compose stack and any database service need it',
+    )
+  }
+}
+
+// The scaffold commit and the verify gate need a repository; fail before any fetch. `--fetch`
+// writes no project, so it skips this check.
+function checkGitWorkTree() {
+  if (!isDirectory(root)) fail(`--root ${root} does not exist`)
+  const inside = spawnSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], {
+    encoding: 'utf8',
+  })
+  if (inside.status !== 0 || inside.stdout.trim() !== 'true') {
+    fail(
+      `${root} is not inside a git work tree; run \`git init\` there first ` +
+        '(the scaffold commit becomes the root commit)',
     )
   }
 }
