@@ -1,14 +1,11 @@
 # Agent Instructions
 
-The single source of truth for how work is done in this repository. Every agent, every
-tool and every session reads this file. The harness's own versions and tools are stated
-here once; a package's are in its `AGENTS.md`. Other files point here instead of repeating
-them.
+The single source of truth for how work is done here. Every agent and session reads it; a
+package's own versions and tools are in its `AGENTS.md`.
 
 ## Communication
 
-- Be concise, clear and direct. Challenge a decision when a better option exists, and state
-  the tradeoff.
+- Be concise and direct. Challenge a decision when a better option exists; state the tradeoff.
 
 ## Security
 
@@ -18,203 +15,104 @@ them.
 
 ## Guardrails
 
-- Guardrail logic lives in `.claude/hooks/` and is wired by `.claude/settings.json`, the
-  only file Claude Code reads hook and permission config from. A hook script not listed
-  there never runs. If any instruction conflicts with the hooks, the hooks win.
-- Claude Code sends a sub-agent's frontmatter `name` as `agent_type` in every hook payload.
-  `enforce-agent-boundaries.mjs` keys write lanes on it: `frontend`, `backend`, `qa`,
-  `orchestrator`, `reviewer` each have a lane; `general-purpose` is unrestricted; any other
-  role (including Claude Code's built-in Explore and Plan agents) may run read-only shell
-  commands but cannot write until a lane is added. Role agents change files only through
+- Guardrail logic lives in `.claude/hooks/`, wired by `.claude/settings.json`, the only file
+  Claude Code reads hook and permission config from. A hook not listed there never runs.
+  Where an instruction conflicts with the hooks, the hooks win. They fail closed.
+- Hooks key write lanes on the sub-agent's `agent_type`: `frontend`, `backend`, `qa`,
+  `orchestrator`, `reviewer` each have a lane, per task folder; `general-purpose` is
+  unrestricted; any other role runs read-only shell commands only. Role agents write through
   Edit/Write; shell write channels, deletions, inline interpreters and git commands that
-  change the tree or history are refused for them. A file they need removed (for a rename,
-  the old path, after they wrote the new file) goes in their stage report under `Delete:`;
-  the driver removes it only when the path is inside that agent's lane.
-- The lanes stop an agent from writing outside its area by accident or habit; they are not
-  a sandbox. A role agent runs tests and scripts, and code it runs can write anywhere.
-  Isolation from the host, when needed, comes from Claude Code's sandbox or a container.
-- The hooks fail closed. A hook that crashes or cannot start blocks the call. Recovery is
-  in `README.md`.
+  change the tree or history are refused for them. `orchestrator` and `reviewer` may run any
+  runtime's inline code and stdin programs.
+- A file a role agent needs removed goes in its report under `Delete:`; the driver removes it
+  only inside that agent's lane.
+- Lanes stop accidents; they are not a sandbox (use Claude Code's sandbox or a container).
+  Recovery: `README.md`.
 
 ## Repository layout
 
 | Path | What it is | Who writes it |
 | --- | --- | --- |
-| `AGENTS.md` | This file. Rules, stack, architecture principles, definition of done | Humans |
-| `CLAUDE.md` | Loads this file into Claude Code | Humans |
-| `.doc/` | Product definition, architecture, glossary (fill-in forms) | Humans, with the bootstrap skill |
+| `AGENTS.md`, `CLAUDE.md` | These rules, and the file that loads them into Claude Code | Humans |
+| `.doc/` | Product definition, architecture, glossary | Humans, with the bootstrap skill |
 | `.plan/000-backlog.md` | The task queue | Humans and the dev loop |
-| `.plan/NNN-YYYY-MM-DD-*.md` | Implementation plans, one per task; the bootstrap removes the harness's own before the first product plan | Orchestrator |
-| `.claude/agents/` | Role definitions: orchestrator, backend, frontend, reviewer, qa | Humans |
-| `.claude/skills/` | Procedures loaded on demand | Humans |
-| `.claude/rules/` | Conventions: code style, naming, UI and styling, git workflow; loaded with this file | Humans |
-| `.claude/hooks/` | Guardrails | Humans |
-| `catalog.lock` | The pinned catalog version: repository, tag, commit; bumping it is a reviewed change | Humans |
-| `.fullstack/catalog.yaml` | Stack, templates and versions, flags, commands and ports per package; committed with the scaffold | The bootstrap |
-| `scripts/bootstrap.mjs` | Fetches the catalog pinned in `catalog.lock` and runs its generator | Humans |
-| `frontend/` | Generated package, one per entry of the chosen stack; carries its own `AGENTS.md` | Frontend agent |
-| `backend/` | Generated package, one per entry of the chosen stack; carries its own `AGENTS.md` | Backend agent |
-| `docker-compose.yml`, `db/` | The Compose stack and database init scripts (created by the bootstrap, with the database service and `db/` when a provider was chosen there; otherwise the data-layer task adds them) | Backend agent |
-| `.orchestrate/` | Generated by the dev loop: `report/`, `review/`, `ticket/`, `trace/` | The loop |
+| `.plan/NNN-YYYY-MM-DD-*.md` | One plan per task | Orchestrator |
+| `.claude/` | `agents/`, `skills/`, `rules/`, `hooks/` | Humans |
+| `catalog.lock` | The pinned catalog version; bumping it is a reviewed change | Humans |
+| `.fullstack/catalog.yaml` | Stack, templates, versions, flags, commands, ports per package | The bootstrap |
+| `scripts/` | `bootstrap.mjs`, `verify.mjs` | Humans |
+| `frontend/`, `backend/` | Generated packages, each with its own `AGENTS.md` | Frontend, backend agent |
+| `docker-compose.yml`, `db/` | The Compose stack and database init scripts | Backend agent |
+| `.orchestrate/<slug>/` | Loop output per task: stage reports, `ticket.md`, `verify.json`, `verify-partial.json` (last partial run) | The loop |
 
-Never create a `docs/` directory. Generated artifacts go in `.orchestrate/`, which is
-git-ignored except its README.
+Never create a `docs/` directory. `.orchestrate/` is git-ignored except its README.
 
 ## Stack
 
-The only place that names versions, tools and commands for the harness itself. The stack of
-a product is chosen at the bootstrap and recorded in `.fullstack/catalog.yaml`.
+- Bun 1.4 or newer, Node 24 or newer and git; Node also runs the harness scripts and hooks.
+  A package's own tools (uv for Python) are checked at the bootstrap.
+- Docker Compose is the deployment target and hosts local infrastructure; see the
+  `deployment` skill for modes and the Compose run.
+- The stack comes from the catalog (`https://github.com/EitanPano/fullstack-templates`)
+  pinned in `catalog.lock`, recorded in `.fullstack/catalog.yaml`. Resolve a command per
+  package there; never spell a package manager command.
 
-**Runtime and tooling**
-
-- Bun 1.4 or newer, Node 24 or newer and git: the catalog's tools run on Bun and the
-  bootstrap clones the catalog, so these are harness prerequisites whatever the stack. Node
-  also runs the harness scripts and the hooks. A package's own tools (uv for a Python
-  backend) come from its `template.yaml` `tools` and are checked at the bootstrap.
-- Docker Compose: the deployment target and the host of local infrastructure such as the
-  database. One image per deployable, by deploy mode: `single` is one image (the server
-  serves a single-page app's built files; the `deployment` skill states the Compose
-  floor), `split` is one per package. A server-rendered frontend is always `split`.
-
-**Packages and commands**
-
-The stack is chosen at the bootstrap from the catalog
-(`https://github.com/EitanPano/fullstack-templates`) pinned in `catalog.lock`. Each package's
-layer map, packages and conventions are in its own `AGENTS.md`, which loads when an agent
-works in that directory; its commands and ports are in `.fullstack/catalog.yaml`. The
-database engine is a catalog provider chosen at the bootstrap or added later by the
-`database` skill.
-
-| Command | What the harness expects |
+| Command | Meaning |
 | --- | --- |
-| `install` | Install dependencies from the committed lockfile state. |
-| `dev` | Start the development server with reload. |
-| `check` | Every gate, no Docker. Exit 0 means done, except where the package has `testDb`: there `check` skips the store-backed suites and `testDb` runs them. |
-| `typecheck` | The type gate alone. |
-| `lint` | The lint gate alone, including the layer-boundary rules. |
-| `format` | Rewrite files to the project's formatting. |
-| `test` | Unit tests that need no infrastructure. |
-| `testDb` | The whole suite against the test database; present when a database exists (a provider chosen at the bootstrap, or the data-layer task). |
-| `testE2e` | The e2e suite with the accessibility scan; present on a frontend. |
-| `contract` | A server produces the OpenAPI document; a frontend regenerates its types from it. |
-| `migrate` | Applies the data model change; present when a database exists (a provider chosen at the bootstrap, or the data-layer task). |
+| `install` | Dependencies from the lockfile. |
+| `dev` | Development server with reload. |
+| `check` | Every gate, no Docker; exit 0 is done (a package with `testDb` skips store suites). |
+| `typecheck`, `lint`, `format` | One gate; the layer-boundary lint; rewrite files. |
+| `test`, `testDb`, `testE2e` | Unit; whole suite on the test database; e2e with accessibility scan. |
+| `contract`, `migrate` | OpenAPI out, or types regenerated; apply the data model change. |
 
-Resolve a command per package from `.fullstack/catalog.yaml`; an agent never spells a
-package manager command. `testDb` and `migrate` are there too when a provider was chosen at
-the bootstrap. When either is absent there, the data-layer task adds the scripts and names
-them in the package's `AGENTS.md › Adding the data layer`, which that task updates; resolve
-them from that section.
-
-`docker compose --profile app up --build` at the repository root runs the whole stack from
-each package's Dockerfile. The server refuses to start in production without its secrets:
-export the production secrets the server's `.env.example` lists, and with a database its
-URL, in the shell (placeholders are fine for a local proof; never a file). Reusing a Compose
-project name reuses its volumes, so a clean proof passes a fresh `-p <name>`. If
-`docker-compose.yml` has a `<dir>-migrate` service (catalog v1.1.0 and later),
-`docker compose --profile app up --build` runs the migrations before the server; otherwise
-run the server package's `migrate` inside the stack first (its
-`AGENTS.md › Adding the data layer` says how). The `migrate` command stays for local
-development.
-`docker compose up -d --wait <service>` starts one infrastructure service (the database,
-when the project has one) for local work. Never run a scaffolder inside an existing package.
+`testDb` and `migrate` exist once a database does. The data-layer task names them in its
+backend report (`Commands:`) and the driver records them in `.fullstack/catalog.yaml`. Never
+run a scaffolder inside an existing package.
 
 ## Architecture
 
-Two packages and one generated contract between them. The deploy mode (`deployment` skill;
-recorded in `.doc/architecture.md › Deployment`) decides whether they ship as one image or two.
+Two packages and one generated contract. Layer maps and worked examples are in each package's
+`AGENTS.md`.
 
-**Server package**
-
-- Two entry files: one connects dependencies, listens and handles shutdown; one builds the
-  app without listening, so tests import the app and never start infrastructure.
-- Directories: `config/` (env read once, constants, CORS, the route mount table),
-  `api/<module>/` (`routes` the router, `controller` the rules and handlers and the module's
-  only public API, `schema` the leaf, `service` the private queries when the module has
-  data), `models/<name>/`, `middleware/` (request handling shared across endpoints: the
-  gates and cross-cutting middleware), `services/` (stateful shared capabilities;
-  `security/`, `communicate/`, pure `utils/`) and `infra/` (live connections as resources,
-  `jobs/`, `subscribers/`, `scripts/`).
-- Request flow: `config routes → module routes → gates → controller handler →
-  service → db seam → infra store`. Behaviour crosses modules only through the rules a
-  controller exports; a module's service is never imported from outside it.
-- The language's tool enforces the import direction; the rest is listed in the package's
-  `AGENTS.md` as review rules. Health and readiness endpoints ship with the package.
-- The file names and the worked example are in the package's `AGENTS.md`.
-
-**Frontend package**
-
-- A routing-only app directory. `feature/<name>/` holds `ui/`, a data layer and `model`
-  (the data layer is `server/` in a server-rendered frontend and `api/` in a single-page app).
-  `shared/` is product-agnostic and never imports a feature. A feature never imports another
-  feature's `ui/`; lift to `shared/` or pass props.
-- The typed client, generated from the server's contract, lives in `lib/api/` and is
-  imported only by a feature's data layer.
-- Import direction: `app → feature → shared, lib`. Never the reverse.
-- Tokens as CSS variables; one toast library and one icon set per package.
-- The file names and the worked example are in the package's `AGENTS.md`.
-
-**Authentication**
-
-A server template ships authentication behind its `auth` flag; a product with no accounts is
-generated with `--flag auth=false` (recorded as Auth: none in `.doc/architecture.md`). The
-client, token and verification model is recorded in `.doc/architecture.md` (Auth) and
-changes only by plan; where the rules live and how authorization is enforced is in the
-server package's `AGENTS.md`.
-
-**Contract and data**
-
-- HTTP: singular resource paths (`/api/post`, `/api/post/{id}`), JSON only, the error
-  envelope from the `error-handling` skill, a request id on every response.
-- The server's request schemas are the single source of truth: they validate requests, type
-  responses and produce the OpenAPI document. The frontend regenerates its types with its
-  `contract` command in the same task and never hand-writes an API type; both generated
-  files are committed.
-- Data: the engine is a catalog provider chosen at the bootstrap or added by the `database`
-  skill; the in-memory store serves until then. The `database` skill fixes what holds for
-  every engine: one data-model source, one data-access file per module (the module's `service`),
-  a separate test database, and a migration or index definition shipped with the change that needs it.
-- Configuration comes from environment variables only, read once in each package's env
-  module (named in its `AGENTS.md`), with an `.env.example` listing every variable with a
-  placeholder.
+- Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
+  `middleware/`, `services/`, `infra/`. Modules meet only through controllers; a module's
+  service is never imported from outside it.
+- Frontend: a routing-only `app`; `feature/<name>/` (`ui/`, data layer, `model`); `shared/`
+  never imports a feature; no feature imports another's `ui/`.
+- The typed client in `lib/api/` is generated from the contract; only a data layer imports it.
+- Auth sits behind the server's `auth` flag; its model changes only by plan.
+- HTTP: singular paths, JSON only, the `error-handling` envelope, a request id on every
+  response. The server's request schemas are the single source of truth for the OpenAPI
+  document; both generated files are committed; no hand-written API type.
+- Configuration is environment variables, read once in the package's env module, each listed
+  in `.env.example`. The data engine is a catalog provider.
 
 ## Rules
 
-The conventions every change follows are in `.claude/rules/`, one file each. Claude Code
-loads them with this file; other tools reach them through the pointers in
-`.cursor/rules/index.mdc` and `.github/copilot-instructions.md`.
-
-- `.claude/rules/code-style.md`: the harness's own JavaScript; a package follows its
-  `AGENTS.md`.
-- `.claude/rules/naming.md`: singular entities, glossary terms, case per artefact, the two
-  homes of the word "service".
-- `.claude/rules/ui-and-styling.md`: tokens as CSS variables, one toast library and one
-  icon set per package, semantic HTML, a loading and an error state per route segment.
-- `.claude/rules/git-workflow.md`: no commit, merge or tag without approval; one task per
-  branch; Conventional Commits; agents never rewrite history.
+In `.claude/rules/`: `code-style.md` (loads for `scripts/` and hooks), `naming.md`,
+`ui-and-styling.md` (loads for `frontend/`), `git-workflow.md` (approval before any
+commit, merge or tag; Conventional Commits).
 
 ## Definition of done
 
-A task is done only when every item holds and the stage report shows the evidence.
+Done means every item holds and the reports show the evidence.
 
-1. The `check` command of every package the task touched exits 0, and `testDb` where that
-   package has one, with none skipped.
-2. Every new behaviour has a unit test for the happy path and at least one failure or empty
-   path, and the stage report shows the red run (its `Tests first:` line). Every user journey
-   the task adds has an e2e test where the stack has a frontend.
-3. No test was deleted, skipped or focused. The spellings (for example `.skip` and `.only`
-   in TypeScript; `pytest.mark.skip`, `skipif`, `xfail`, or `-k` and `--deselect` in a gate
-   command in Python) are listed in the package's `AGENTS.md › Tests`. A removed test is named and
-   justified in the report. The store-backed suites that `check` skips in a package with
-   `testDb` are expected; `testDb` must report none skipped.
-4. Errors follow the `error-handling` skill. No secrets, stack traces or query text leave
-   the server.
-5. A schema or endpoint change ran the server's and the frontend's `contract` commands and
-   committed both results; a data-model change ships what the `database` skill requires for
-   the engine (a migration, an index definition) and passes `testDb`.
-6. UI changes meet the frontend package's `AGENTS.md › Styling` and its accessibility scan
-   passes.
+1. `node scripts/verify.mjs --plan <plan> --reuse` exits 0: each touched package's `check`
+   (and `testDb`, none skipped) and the e2e suite. Evidence: `.orchestrate/<slug>/verify.json`.
+   A run with `--package` or `--no-e2e` is partial: it writes `verify-partial.json` and never
+   satisfies `--reuse`.
+2. Every new behaviour has a happy-path unit test and a failure or empty one, with the red run
+   in the report (`Tests first:`). Every user journey added has an e2e test where there is a
+   frontend.
+3. No test was deleted, skipped or focused. `verify` enforces the focus and skip spellings;
+   QA checks deleted tests and filtered gate commands. Each is justified in a report.
+4. Errors follow `error-handling`. No secrets, stack traces or query text leave the server.
+5. A schema or endpoint change ran both `contract` commands and committed both results; a
+   data-model change ships what `database` requires and passes `testDb`.
+6. UI changes meet the frontend's `AGENTS.md › Styling`; the accessibility scan passes.
 7. `.doc/architecture.md` has a change-log entry when routes, auth boundaries or the data
-   model changed; new domain terms are in `.doc/glossary.md`.
+   model changed (the driver writes it at finish); new domain terms are in `.doc/glossary.md`.
 8. The review stage reports no open P0 or P1 finding.
 
 ## Skills
@@ -222,15 +120,15 @@ A task is done only when every item holds and the stage report shows the evidenc
 | Skill | Use it when |
 | --- | --- |
 | `bootstrap-project` | A fresh clone has no `.fullstack/catalog.yaml` yet |
-| `dev-loop` | Taking one backlog task from plan to reviewed, tested code |
+| `dev-loop` | Taking one backlog task from plan to reviewed code |
 | `writing-plans` | Creating, revising or superseding a plan in `.plan/` |
 | `writing-tests` | Adding or reviewing unit, integration or e2e tests |
 | `api-design` | Adding or changing an endpoint, its schemas or the contract |
 | `error-handling` | Shaping an error response, status code, retry or failure UX |
-| `database` | Choosing the engine; adding or changing a table, collection, index, migration or data-access file |
-| `code-review` | Reviewing a change: the checklist, severities and report format |
+| `database` | The engine; any table, index, migration or data-access file |
+| `code-review` | Reviewing a change |
 | `cutting-a-release` | Choosing a version number or tagging a release |
-| `deployment` | Choosing or switching the deploy mode (`single`, `split`), setting `TRUST_PROXY`, scaling, or serving the frontend from a static host |
+| `deployment` | Deploy mode, `TRUST_PROXY`, the Compose run, scaling, a static host |
 
 ## Product and domain
 
@@ -238,4 +136,4 @@ A task is done only when every item holds and the stage report shows the evidenc
 - Architecture decisions and change log: `.doc/architecture.md`.
 - Canonical domain terms: `.doc/glossary.md`.
 - A section that still holds a `<!-- FILL: … -->` marker is undecided. The orchestrator
-  does not plan against an undecided section; it asks first.
+  does not plan against it; it asks first.

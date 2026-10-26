@@ -11,6 +11,14 @@ bootstrap, and recorded in `.doc/architecture.md` under Data store. Everything u
 engine" holds whatever was chosen. The client library, the files and the scripts are the
 package's: `backend/AGENTS.md › Adding the data layer`.
 
+The engine is a catalog provider, chosen at the bootstrap or added later by the data-layer
+task below. `docker compose up -d --wait <service>` starts the database service for local
+work. `testDb` and `migrate` exist once a database does. Commands are always resolved from
+`.fullstack/catalog.yaml`: when the bootstrap wired no database, the data-layer task adds the
+scripts, names them in `AGENTS.md › Adding the data layer` and in the backend report's
+`Commands:` line, and the driver writes them to the catalog (see the data-layer list). The
+production `migrate` run in the stack is in the `deployment` skill (section 4).
+
 ## Choosing (bootstrap)
 
 Ask the user one question: Postgres, MongoDB, or decide later.
@@ -57,6 +65,10 @@ type changes with the engine. One task, planned and reviewed like any other, del
    `migrate` script, named in the package's `AGENTS.md › Adding the data layer`.
 7. A test database and the `testDb` script (see Test database), named in the same section,
    plus one test proving the test database is the one in use.
+   The Compose service is named `database`: `verify` starts it by that name.
+   The backend report carries `Commands: testDb=<command>; migrate=<command>`; the driver
+   writes both under `packages.<dir>.commands` in `.fullstack/catalog.yaml` before the next
+   `verify`, so the gate runs them.
 8. A `.doc/architecture.md` change-log line and the Data Model section started.
 
 ### What the shipped code assumes of the store
@@ -130,7 +142,9 @@ properties, or a race the memory store hides reaches production:
 Tests never touch the development database. The same local service hosts a second database
 named `app_test`. With the in-memory store, store-backed suites run under `check`. Once the
 package has a database, `check` skips them and they run only under `testDb`, against a
-database whose name marks it as the test database. A cache test uses a separate index or
+database whose name marks it as the test database. The diff checks accept the one
+skip the template ships (`skipif` with `reason=STORE_SKIP_REASON` in `tests/store.py`); `testDb`
+fails on any skipped test. A cache test uses a separate index or
 database and flushes only that. A test opts in through the database block the
 package's `AGENTS.md › Tests` names, which resets the test database before each test. Never
 fake a data-access file with a process-global module mock. In production a human or the
