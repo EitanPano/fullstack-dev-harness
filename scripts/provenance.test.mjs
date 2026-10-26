@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
@@ -16,10 +16,17 @@ const single = [
   '    commands:',
   '      check: >-',
   '        bun run typecheck && bun run lint',
+  '      testDb: >-',
+  '        docker compose up -d --wait database',
+  '        && bun run test',
+  '      dev: bun run dev # reload',
   '  backend:',
   '    template: server/python-fastapi',
   '    http:',
   '      port: 8000',
+  '    commands:',
+  '      check: uv run poe check',
+  '      contract: "uv run poe contract"',
   '',
 ].join('\n')
 
@@ -27,16 +34,44 @@ function read(text) {
   const dir = mkdtempSync(path.join(tmpdir(), 'provenance-'))
   const file = path.join(dir, 'catalog.yaml')
   writeFileSync(file, text)
-  return readProvenance(file)
+  try {
+    return readProvenance(file)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
-test('single: deploy, templates and ports, folded command skipped', () => {
+test('single: deploy, templates and ports', () => {
   const result = read(single)
   assert.equal(result.deploy, 'single')
-  assert.deepEqual(result.packages, [
-    { name: 'frontend', template: 'frontend/react', port: 5173 },
-    { name: 'backend', template: 'server/python-fastapi', port: 8000 },
-  ])
+  assert.deepEqual(
+    result.packages.map(({ name, dir, template, port }) => ({ name, dir, template, port })),
+    [
+      { name: 'frontend', dir: 'frontend', template: 'frontend/react', port: 5173 },
+      { name: 'backend', dir: 'backend', template: 'server/python-fastapi', port: 8000 },
+    ],
+  )
+})
+
+test('commands: folded lines are joined, plain and quoted values are read', () => {
+  const [frontend, backend] = read(single).packages
+  assert.deepEqual(frontend.commands, {
+    check: 'bun run typecheck && bun run lint',
+    testDb: 'docker compose up -d --wait database && bun run test',
+    dev: 'bun run dev',
+  })
+  assert.deepEqual(backend.commands, { check: 'uv run poe check', contract: 'uv run poe contract' })
+})
+
+test('a package with no commands block has an empty command map', () => {
+  const result = read(['packages:', '  frontend:', '    template: frontend/react', ''].join('\n'))
+  assert.deepEqual(result.packages[0].commands, {})
+})
+
+test('a port stays out of the commands', () => {
+  const [frontend] = read(single).packages
+  assert.equal(frontend.port, 5173)
+  assert.equal('port' in frontend.commands, false)
 })
 
 test('split: deploy is read as written', () => {
@@ -82,4 +117,21 @@ test('an unparsed package key does not attach facts to the previous package', ()
 test('a missing file gives an empty result', () => {
   const result = readProvenance(path.join(tmpdir(), 'provenance-does-not-exist.yaml'))
   assert.deepEqual(result, { deploy: undefined, packages: [] })
+})
+
+test('a literal block joins its lines with newlines, a folded one with spaces', () => {
+  const text = [
+    'packages:',
+    '  backend:',
+    '    template: server/x',
+    '    commands:',
+    '      check: |',
+    '        one',
+    '        two',
+    '      lint: >',
+    '        three',
+    '        four',
+    '',
+  ].join('\n')
+  assert.deepEqual(read(text).packages[0].commands, { check: 'one\ntwo', lint: 'three four' })
 })
