@@ -12,6 +12,8 @@
       "Bash(uv sync*)",
       "Bash(uv lock*)",
       "Bash(node scripts/bootstrap.mjs*)",
+      "Bash(node scripts/verify.mjs*)",
+      "Bash(node scripts/loop-stats.mjs*)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",

@@ -175,6 +175,42 @@ export function splitHeredocBodies(command, mayStrip = () => true) {
   return quote === null ? { rest: kept.join('\n'), code } : raw
 }
 
+// Docker and Compose `exec` flags that take a value, so it is not read as the container.
+const EXEC_VALUE_FLAGS = new Set([
+  '-u', '--user', '-e', '--env', '-w', '--workdir', '--env-file', '--index', '--detach-keys'
+])
+
+// The program that reads a heredoc, after leading assignments and the `docker compose exec`,
+// `docker exec` and `kubectl exec … --` front ends. A flag this table misses makes a value look
+// like the program, which is not `cat` or `psql`, so the body stays in the scan.
+export function heredocReader(tokens) {
+  let at = tokens.findIndex(token => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(token))
+  if (at === -1) return null
+  const program = programName(tokens[at])
+  if (program === 'kubectl') {
+    // Whatever follows `--` is the command, so no value flag before it can shift the reader.
+    const dashes = tokens.indexOf('--')
+    if (dashes === -1 || !tokens.slice(at, dashes).includes('exec')) return null
+    return programName(tokens[dashes + 1] ?? '')
+  }
+  if (program !== 'docker' && program !== 'docker-compose') return program
+  at = tokens.indexOf('exec', at)
+  if (at === -1) return null
+  at += 1
+  while (tokens[at]?.startsWith('-')) at += EXEC_VALUE_FLAGS.has(tokens[at]) ? 2 : 1
+  return programName(tokens[at + 1] ?? '')
+}
+
+// What a heredoc operator at `at` in `line` hands its body to: `reader` is the program that reads
+// it, and `plain` is false when the operator's output is piped on or the line substitutes a
+// command before it (`eval "$(cat <<EOF …)"`), so the body may run whatever its reader is.
+export function heredocContext(line, at) {
+  const before = line.slice(0, at).replace(/\d?>&[\d-]+/g, ' ')
+  const reader = heredocReader(tokenize(shellSegments(before).at(-1) ?? ''))
+  const plain = !withoutQuotes(line.slice(at)).includes('|') && !/\$\(|`/.test(before)
+  return { reader, plain }
+}
+
 // One line with its quoted text (and the quotes) replaced by spaces, same length, and the quote
 // state at its end, given the state at its start. An escaped character outside quotes is kept.
 function scanQuotes(line, quote) {
