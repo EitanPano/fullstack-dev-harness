@@ -17,6 +17,13 @@ Tests come before implementation, from the plan's `Validation` list:
 The red run's summary (command, failed and passed counts, failing test names) goes in the
 stage report as `Tests first:`; QA checks the names against the diff.
 
+The gate is `node scripts/verify.mjs --plan <plan>`: contract freshness, `check`, `testDb`
+where the package has it, `testE2e` and the diff checks, written to
+`.orchestrate/<slug>/verify.json`. An implementer runs it with `--package <dir>` (partial),
+with the Bash tool's `run_in_background: true`, since it can outlive a foreground timeout;
+the driver's full run is the evidence. QA runs only its own new test files with the package's
+test runner; the next full `verify` covers them.
+
 A stage report that shows tests written after the fact is acceptable only when the
 report says why (`Tests first: after the fact — <reason>`); QA judges the reason.
 
@@ -49,7 +56,7 @@ Each package's `AGENTS.md › Tests` names its runner, test directories, stubs a
 (`backend/AGENTS.md`, `frontend/AGENTS.md`). The commands `test` and `testE2e` come from
 `.fullstack/catalog.yaml`, and `testDb` is there too when a provider was chosen at the
 bootstrap; otherwise the data-layer task adds `testDb` and names it in the package's
-`AGENTS.md › Adding the data layer`. Run `testDb` wherever the package has it.
+`AGENTS.md › Adding the data layer`. `verify` runs `testDb` wherever the package has it.
 
 - Server: HTTP tests import the app builder and never start infrastructure or the
   entry file. A module's tests live in one file; gates, shared capabilities and
@@ -86,7 +93,10 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
 
 ## Deleted and skipped tests
 
-A deleted, skipped or todo test in the diff (spellings per the package's `AGENTS.md › Tests`:
-for example `.skip` and `.todo`, or `pytest.mark.skip`, `skipif`, `xfail`, `-k` and
-`--deselect` in a gate command) is a QA failure unless the stage report names it and the
-reason (behaviour removed on purpose). When a test fails, fix the code, not the test.
+`verify` fails a focused, skipped or todo test on a test path (`.only`, `.skip`, `.todo`, the
+conditional spellings such as `.skipIf` and `.failing`, `xit`, `xtest`, `pytest.mark.skip`,
+`skipif`, `xfail`); the one `skipif` with `reason=STORE_SKIP_REASON` in the catalog's
+`tests/store.py` is exempt. `verify` cannot see a deleted test file or `-k`/`--deselect` in a
+gate command, so QA checks both (`git diff --name-status <Base>` shows `D`): either is a QA
+failure unless a stage report names it and the reason (behaviour removed on purpose). When a
+test fails, fix the code, not the test.
