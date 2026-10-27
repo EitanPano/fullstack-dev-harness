@@ -7,27 +7,32 @@ description: Review a change against this repository's standards. Use when actin
 
 One reviewer applies the whole checklist below (`mode: general`). `mode: security` deepens
 priority 1 only; the driver adds it when `verify.json` has `security.triggered: true`, which
-`verify` computes: the diff touches auth, security, middleware, the proxy, migrations, SQL, an
-env module, a Dockerfile or `docker-compose.yml`.
+`verify` computes: the diff touches auth, session, security or middleware code, the proxy,
+CORS configuration, an env module, a Dockerfile or `docker-compose.yml`. Migrations and SQL do
+not trigger it; the general reviewer covers the data model (priorities 1 and 2).
 
 Be critical. Surface real problems and say them plainly; do not soften, do not pad with
 praise. A review with no findings states what was checked and why it holds.
 
 ## What to read
 
-The change is uncommitted: read it as `git diff <Base>`, the working tree against the
-plan's `Base:` commit (outside the dev loop, `main` unless the user names a base). Never
-`git diff <Base>...HEAD`, which ignores the working tree, and inside the loop never
-`git diff main`, which also shows earlier tasks committed on the branch. The driver has run
-`git add --intent-to-add .`, so new files are in that diff; `git status --short` lists
-them too (for a `fix-diff` re-review it has run it again). Read the plan's Scope, Contract and Validation first, then the diff, then what
-the change should have touched but did not (a migration or index, a failure-path test, an
-error state, a change-log line).
+The change is uncommitted. Inside the loop, `verify` prepared a review package,
+`.orchestrate/<slug>/review.diff`: the working tree against the plan's `Base:` commit, with
+the stat of every file and lockfiles and generated files left out of the body. Read it once;
+open code outside it only for a named risk, one check per risk; never re-run the suites
+(`verify.json` is the evidence). A `fix-diff: <path>` re-review reads only that file
+(`review-fix-<n>.diff`). Outside the loop, read `git diff <Base>` (`main` unless the user
+names a base) and `git status --short`. Never `git diff <Base>...HEAD`, which ignores the
+working tree, and inside the loop never `git diff main`, which also shows earlier tasks
+committed on the branch. Read the plan's Scope, Contract and Validation first, then the
+diff, then what the change should have touched but did not (a migration or index, a
+failure-path test, an error state, a change-log line).
 
 ## Priorities, highest first
 
 1. **Security**: injection, auth and tenancy boundaries, secrets in code or logs, data
-   exposure in responses, unsafe dependencies. In `mode: security` go further: auth and
+   exposure in responses, unsafe dependencies; in a data-model change, grants and roles,
+   destructive statements and new personal-data columns. In `mode: security` go further: auth and
    session flows, authorization per endpoint, injection, secrets, CORS and proxy trust, the
    Compose and Docker surface (privileges, bind mounts, host networking, ports published
    beyond loopback).
@@ -91,8 +96,8 @@ Verdict: <pass | fail>
 - <what was examined and found correct, one line each>
 ```
 
-A `fix-diff: <tree>` re-review rewrites the file with the earlier content kept and a new
-`## Re-review <tree>` section at the end (you have Write, not Edit).
+A `fix-diff:` re-review rewrites the file with the earlier content kept and a new
+`## Re-review <n>` section at the end (you have Write, not Edit).
 
 The dev loop re-dispatches the implementer with the P0 and P1 lines verbatim, so each
 must be self-contained.

@@ -10,7 +10,8 @@ this file.
 | `<slug>/review.md`, `<slug>/review-security.md` | the reviewer (general, security) | the dev loop, the implementers, later reviews |
 | `<slug>/ticket.md` | the orchestrator | the dev loop |
 | `<slug>/verify.json` | `scripts/verify.mjs` (the full run; carries `tree`, `ok` and `security`) | the dev loop, the reviewers, QA |
-| `<slug>/verify-partial.json` | `scripts/verify.mjs` (the last `--package` or `--no-e2e` run; backend and frontend overwrite one file; informational) | the implementers |
+| `<slug>/verify-partial.json` | `scripts/verify.mjs` (the last `--package` or `--no-e2e` run; backend and frontend share one file; its passing steps are reused per package) | the implementers |
+| `<slug>/review.diff`, `<slug>/review-fix-<n>.diff` | `scripts/verify.mjs` (the full run with a Base; the fix-round diff) | the reviewers |
 
 Every report starts with `Stage:`, `Task:` and `Verdict:` lines. `Verdict:` is
 informational: the loop branches on `verify`'s exit code and the reports' findings.

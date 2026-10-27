@@ -28,11 +28,15 @@ service: run against the services the repository defines.
    `.orchestrate/<slug>/backend.md` and `frontend.md` (what was claimed), and `verify.json`.
 2. **Gates**: `verify.json` is the evidence for `check`, `testDb`, `testE2e`, contract
    freshness and the diff checks (no focused, skipped or todo test on a test path). Do not
-   re-run them; a red or missing `verify.json` is a finding owned by the driver. Run only your
-   own new test files, with the package's test runner on those files; the next full `verify`
-   covers them. Do not run `verify` yourself. Keep the one diff-hygiene duty `verify` does not
-   cover: a deleted test file (`git diff --name-status <Base>` shows `D` on a test path) or
-   `-k`/`--deselect` in a gate command must be named and justified in a stage report, else it
+   re-run them; a red or missing `verify.json` is a finding owned by the driver. Before
+   reporting, run the package's `format` command (`.fullstack/catalog.yaml`; it rewrites the
+   whole package, but after a passing `verify` only your new or edited files should change),
+   then the test runner on your files, then `git diff --name-only <tree>` (`<tree>` from
+   `verify.json`; it lists only files changed since the verified tree). A listed file outside
+   your lane is not yours to fix or revert: list it under Findings, owner: driver. The next full
+   `verify` covers your files. Do not run `verify` yourself. Keep the one diff-hygiene duty
+   `verify` does not cover: a deleted test file (`git diff --name-status <Base>` shows `D` on
+   a test path) or `-k`/`--deselect` in a gate command must be named and justified in a stage report, else it
    is a QA failure.
 3. **Tests first**: each stage report's `Tests first:` line exists, names at least one failing
    test per new behaviour, and every named test is in `git diff <Base>`. A missing or
@@ -68,7 +72,7 @@ Acceptance criteria:
 - AC01 — PASS|FAIL — <evidence>
 
 Findings:
-- <file:line> — expected <x>, actual <y> — owner: <backend|frontend>
+- <file:line> — expected <x>, actual <y> — owner: <backend|frontend|driver>
 Delete: <paths inside frontend/tests/ or backend/tests/ only, or none>
 ```
 

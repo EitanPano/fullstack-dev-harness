@@ -33,14 +33,16 @@ importers, and list the old path there. The driver removes it.
    goes in the report as `Tests first:`.
 4. **Implement** per `frontend/AGENTS.md › Adding a feature`, with a loading and an error
    state per new route segment and the plan's `UX` section as the brief for each route.
-5. **Gates**: `node scripts/verify.mjs --plan <plan> --package frontend --no-e2e` until it
-   exits 0, then stop with `E2E: pending backend` when the plan has a backend stage. Without
-   one, run `testE2e` too (`--package frontend`); the backend's database must be up for e2e, and
+5. **Gates**: `node scripts/verify.mjs --plan <plan> --package frontend --no-e2e --reuse`
+   until it exits 0, then stop with `E2E: pending backend` when the plan has a backend stage.
+   Without one, run `node scripts/verify.mjs --plan <plan> --package frontend --reuse` (it
+   includes `testE2e`); the backend's database must be up for e2e, and
    `verify` starts it and runs the server's `migrate`. Both are partial runs; the driver's full
    run is the evidence. Run it in the foreground with `timeout: 600000`, never in the
    background: ending your turn while it runs ends your stage. A partial run that needs more
-   than ten minutes is a blocker for your report. Fix the code, never the test. When the backend has reported, the driver
-   sends "backend ready: run `testE2e`, fix, update your report". Where the package has a
+   than ten minutes is a blocker for your report. Fix the code, never the test. When the
+   backend has reported, the driver sends "backend ready: run `verify --package frontend
+   --reuse` (with `testE2e`), fix, update your report". Where the package has a
    `phone` e2e project, list the screenshots under `test-results/` for the task's routes in
    `Handoff` so QA can read them.
 6. **Report**: write `.orchestrate/<slug>/frontend.md`:

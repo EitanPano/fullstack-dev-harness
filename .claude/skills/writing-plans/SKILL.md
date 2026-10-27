@@ -38,7 +38,8 @@ Stages: backend, frontend, qa   (omit backend for a stack:frontend task, fronten
 New plans start as `Status: draft`. Only the human flips a plan to `active`, by editing
 the file. The review and QA stages run in parallel after the implementation stages and are not
 listed.
-Every stage reads the task's change as `git diff <Base>`: on a branch that already carries
+Implementers and QA read the task's change as `git diff <Base>`, reviewers the review
+package (`dev-loop` section 4): on a branch that already carries
 earlier committed tasks, `git diff main` would show those too. When the user delegates
 approval, the driver adds `Approval: delegated (<date>, <the user's words>)`.
 
