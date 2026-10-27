@@ -1,3 +1,7 @@
+---
+paths: ["scripts/**", ".claude/hooks/**"]
+---
+
 # Code style
 
 Applies to the harness's own JavaScript: `scripts/` and `.claude/hooks/`. A generated

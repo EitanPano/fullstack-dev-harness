@@ -227,7 +227,7 @@ for (const tool of ['Write', 'Edit']) {
   lane(tool, 'backend/src/x.ts', 'qa', true)
   lane(tool, '.plan/001-x.md', 'orchestrator', false)
   lane(tool, 'backend/src/x.ts', 'orchestrator', true)
-  lane(tool, '.orchestrate/review/security.md', 'reviewer', false)
+  lane(tool, '.orchestrate/012-lean-loop/review.md', 'reviewer', false)
   lane(tool, 'backend/src/x.ts', 'reviewer', true)
   lane(tool, 'backend/src/x.ts', 'general-purpose', false)
   lane(tool, 'backend/src/x.ts', 'explore', true)

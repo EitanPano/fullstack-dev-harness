@@ -6,9 +6,11 @@ this file.
 
 | Path | Written by | Read by |
 | --- | --- | --- |
-| `report/backend.md`, `report/frontend.md`, `report/qa.md` | the stage's agent | the dev loop, the reviewers, QA |
-| `review/<perspective>.md` | one reviewer each | the dev loop, the implementers, QA |
-| `ticket/<slug>.md` | the orchestrator | the dev loop |
+| `<slug>/backend.md`, `<slug>/frontend.md`, `<slug>/qa.md` | the stage's agent | the dev loop, the reviewers, QA |
+| `<slug>/review.md`, `<slug>/review-security.md` | the reviewer (general, security) | the dev loop, the implementers, later reviews |
+| `<slug>/ticket.md` | the orchestrator | the dev loop |
+| `<slug>/verify.json` | `scripts/verify.mjs` (the full run; carries `tree`, `ok` and `security`) | the dev loop, the reviewers, QA |
+| `<slug>/verify-partial.json` | `scripts/verify.mjs` (the last `--package` or `--no-e2e` run; backend and frontend overwrite one file; informational) | the implementers |
 
-Every report starts with `Stage:`, `Task:` and `Verdict:` lines; the loop branches on
-`Verdict:` alone.
+Every report starts with `Stage:`, `Task:` and `Verdict:` lines. `Verdict:` is
+informational: the loop branches on `verify`'s exit code and the reports' findings.

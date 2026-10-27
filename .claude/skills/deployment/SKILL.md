@@ -139,7 +139,12 @@ Every `docker compose` command below that inspects or stops the stack (`config`,
 - Windows, Git Bash: a value that starts with `/` (base64 can) is rewritten as a path when
   passed to `docker.exe`, and the server then rejects it. Run the Compose commands with
   `MSYS_NO_PATHCONV=1` set, or generate keys that do not start with `/`.
-- With a database, the `<dir>-migrate` one-shot service runs the migrations before the server.
+- `docker compose --profile app up --build` at the repository root runs the whole stack from
+  each package's Dockerfile: one image in `single`, one per package in `split`.
+- With a database, the `<dir>-migrate` one-shot service (catalog v1.1.0 and later) runs the
+  migrations before the server. On an older catalog's output, run the server package's
+  `migrate` inside the stack first (its `AGENTS.md › Adding the data layer` says how). The
+  `migrate` command stays for local development.
 - Reusing a Compose project name reuses its volumes (a database from an earlier run keeps its
   data). Pass a fresh `-p <name>` for a clean proof, and the same one to every later command.
 - Stop with `docker compose -p <name> --profile app down`. Without `--profile app` the

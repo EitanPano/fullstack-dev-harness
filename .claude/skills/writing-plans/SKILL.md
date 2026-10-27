@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Create, revise, or supersede an implementation plan in .plan/. Use whenever the user asks for a plan, an approach, or a design doc for a task, when revising an existing plan after feedback, or when the dev loop asks the orchestrator for a plan. Defines the .plan/ lifecycle, the NNN-YYYY-MM-DD-topic.md filename, required metadata, the Stages and Contract sections, and the nine required sections.
+description: Create, revise, or supersede an implementation plan in .plan/. Use whenever the user asks for a plan, an approach, or a design doc for a task, when revising an existing plan after feedback, or when the dev loop asks the orchestrator for a plan. Defines the .plan/ lifecycle, the NNN-YYYY-MM-DD-topic.md filename, required metadata, the Stages and Contract sections, and the required sections.
 ---
 
 # Writing Plans
@@ -11,7 +11,8 @@ fill it; do not invent a different shape.
 
 ## Before writing anything
 
-1. Read every existing `.plan/*.md`. A new plan builds on decisions already made.
+1. Read the change log of `.doc/architecture.md` and the plans it cites for the areas the task
+   touches, not every plan. A new plan builds on decisions already made.
 2. Read `.doc/product-definition.md` (acceptance criteria, scope, auth and tenancy),
    `.doc/architecture.md` (data store, data model, API) and `.doc/glossary.md` (names).
 3. If any section you depend on still holds a `<!-- FILL: … -->` marker, do not plan.
@@ -35,21 +36,28 @@ Stages: backend, frontend, qa   (omit backend for a stack:frontend task, fronten
 ```
 
 New plans start as `Status: draft`. Only the human flips a plan to `active`, by editing
-the file. The review stage runs once after the implementation stages and is not listed.
+the file. The review and QA stages run in parallel after the implementation stages and are not
+listed.
 Every stage reads the task's change as `git diff <Base>`: on a branch that already carries
-earlier committed tasks, `git diff main` would show those too.
+earlier committed tasks, `git diff main` would show those too. When the user delegates
+approval, the driver adds `Approval: delegated (<date>, <the user's words>)`.
 
 ## Required sections
 
-All nine, in this order, with these exact headings:
+In this order, with these exact headings:
 
-`Goal` · `Scope` · `Assumptions` · `Open Questions` · `Steps` · `Validation` · `Risks` ·
-`Rollout Order` · `Rollback`
+`Goal` · `Scope` · `Assumptions` · `Open Questions` · `Contract` (when the API changes) ·
+`UX` (when there is a frontend stage) · `Steps` · `Validation` · `Risks` ·
+`Changes during the task`
 
-When the task touches the API, `Steps` begins with a `Contract` subsection: each
-endpoint as `METHOD /api/<entity>[/{id}]`, its request fields, its response fields, and
-the error codes it can return. The backend agent implements exactly that list; the
-frontend agent consumes the generated types.
+- `Rollback` follows `Risks` only when a migration or a data change ships.
+- `Contract`: each endpoint as `METHOD /api/<entity>[/{id}]`, its request fields, its response
+  fields, and the error codes it can return. The backend agent implements exactly that list;
+  the frontend agent consumes the generated types.
+- `UX`: per route, its primary action, its loading, empty and error states, and its phone
+  layout. No copy strings.
+- `Steps`: per package, one line per module or feature.
+- `Changes during the task` is empty at the start; the driver writes it.
 
 ## Content rules
 
@@ -59,7 +67,7 @@ frontend agent consumes the generated types.
   (`backend/src/api/<name>/…`, `backend/src/models/<name>/…`,
   `frontend/src/feature/<name>/…`). A plan that puts logic in the routing layer, a fetch call
   in a UI component, or a query in a route handler is wrong.
-- Every `Validation` item has the form `- V01 — <statement> — proof: <test name | command>`.
+- Every `Validation` item has the form `- V01 — <statement> (AC<n>) — proof: <test name | command>`.
   QA runs the list as its checklist; "the code looks right" is not a proof.
 - Every `Open Questions` item ends with `Recommended: <answer>`.
 - Generated artifacts belong in `.orchestrate/`. Never create a `docs/` directory.
@@ -72,13 +80,15 @@ frontend agent consumes the generated types.
 - The scope is the backlog line and the acceptance criteria it names. Pagination, rate limits,
   caching and other hardening an AC does not ask for go under `Out` as a proposed backlog line
   (`- [ ] <title>`); the driver adds it to the backlog on the user's yes.
-- At most 12 `Validation` items and at most 4 `Open Questions` of at most 5 lines each. A
-  question with a conventional default is an Assumption, not a question.
-- `Steps` name files, one line each, with no code beyond the Contract table; rationale is one
-  line under Assumptions.
-- Target about 150 lines. Above 250, plan the first half and propose the rest as backlog
-  lines under `Out`, and say so in the response, above the plan-path line (the last line
-  stays the path).
+- At most 6 `Assumptions` of one line each, at most 8 `Validation` items (each naming its AC)
+  and at most 3 `Open Questions` of at most 5 lines each. A question with a conventional
+  default is an Assumption, not a question.
+- `Steps` name files, one line each, with no copy strings and no code beyond the Contract
+  table; rationale is one line under Assumptions.
+- Target 80 lines, cap 120 (`wc -l`); the driver counts Validation items with
+  `grep -c '^- V[0-9]'`. Above the cap, plan the first half and propose the rest
+  as backlog lines under `Out`, and say so in the response, above the plan-path line (the
+  last line stays the path). Harness plans stay exempt.
 
 ## Superseding a plan
 
