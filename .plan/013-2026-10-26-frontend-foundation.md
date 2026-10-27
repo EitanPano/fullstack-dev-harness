@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Eitan
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 Approval: the design was approved by Eitan on 2026-10-26 ("approved"); this plan was approved
 by him on 2026-10-26 ("approved"), which confirms OQ1–OQ4 as recommended.
 Input:
@@ -544,3 +544,101 @@ with a Sonnet review after each task.
     10 per 15 minutes per IP, so the whole site could register ten users per 15 minutes.
   - A production deploy behind a platform or proxy that sets or appends the header must set
     it.
+- 2026-10-27, Rollout: the catalog's work in progress merged into `dev` early (catalog #11,
+  8ef25ee), at Eitan's request. The harness pins the v1.3.0 tag, so no consumer saw it. The
+  final review and the local proofs stayed before G4. The rest went through catalog #12.
+- 2026-10-27, D13:
+  - Playwright 1.64.1 starts its web servers before `globalSetup`, so there is no
+    `globalSetup`. The API's web server command is `e2eDb && start`.
+  - The `_e2e` URL guard is `scripts/e2e-database-url.ts`, because the image build typechecks
+    `playwright.config.ts` and `.dockerignore` drops `tests/`. It runs only without
+    `E2E_BASE_URL`. A blank `E2E_DATABASE_URL` or `E2E_BASE_URL` counts as unset.
+  - Generation fails closed on a server without `start`, and on `server:database` without
+    `e2eDb` or a provider `e2e` URL.
+  - The phone and desktop projects select tests by `@phone` and `@desktop` tags with
+    `grepInvert`, so no test is skipped at run time.
+  - The URL wait after a sign-up or sign-in submit is 15 s, because password hashing is
+    CPU-bound. Retries stay 0.
+  - Both templates name their lint test `tests/unit/eslint-boundaries.test.ts`.
+- 2026-10-27, D7 and D8 (Next): one submit helper (`ignoreNavigation`) swallows only Next's
+  navigation errors (the `NEXT_REDIRECT`, `NEXT_NOT_FOUND` and `NEXT_HTTP_ERROR_FALLBACK`
+  digests) and rethrows the rest. A server field error that no form field shows becomes a
+  toast. The email check is the generated one plus `z.email()`, with our own wording for both,
+  because only Python's OpenAPI marks emails `format: email`.
+- 2026-10-27, D9 (SPA): route loaders call `queryClient.query`, since query-core 5.104.2
+  deprecates `ensureQueryData`. They get fetch semantics with a 30 s `staleTime`. The
+  react-query plugin runs with `infiniteQueryOptions: false`, because no endpoint paginates
+  yet.
+- 2026-10-27, D10 (SPA):
+  - The CSP is `script-src 'self'`, so the theme script is `public/theme-init.js`. zod runs with
+    `jitless: true`, because its `new Function` probe broke the image's CSP.
+  - A localStorage session hint (a flag, never a token) saves the per-IP refresh budget for
+    anonymous visitors. A refresh answer of 400, 401 or 403 clears it.
+  - `noindex` is client-side, an accepted SPA limitation. Splitting the 690 kB chunk is
+    deferred.
+- 2026-10-27, D6 (Next): compose passes `CLIENT_IP_HEADER`. Without it, a default Next deploy
+  with auth tops out at about 30 active signed-in visitors per 15 min, the API's shared per-IP
+  refresh budget. The Next `AGENTS.md › Deployment` states the cap and the production recipe.
+- 2026-10-27, D14 and D15: compose fragments write a secret as `${NAME-}` and an optional
+  setting as `${NAME:-}`. The case runner generates a value only for the first kind. Before
+  this rule it filled every variable, so `CLIENT_IP_HEADER` got a random, invalid value.
+  `CONTRIBUTING.md` states the rule.
+
+## As built
+
+2026-10-27. Catalog `feat/frontend-foundation`, from f1f38e7:
+
+- Catalog #11 (work in progress) merged into `dev` as 8ef25ee.
+- Catalog #12 merged into `dev` as 59df042. It carried five commits:
+  - df46a12 `feat(react)`;
+  - ae1b9a5 `fix(next)`;
+  - 298f2d0 `fix(tools)`;
+  - 65e9da5 `docs`;
+  - 7f49b88 `chore(catalog)`.
+
+  The tree of `dev` is d64cf3f, the tree the local proofs ran on.
+- The templates: `frontend/next` 2.0.0, `frontend/react` 2.0.0, `server/bun-express` 2.4.0,
+  `server/python-fastapi` 1.2.0. `schemaVersion` stays 1. The release notes draft is in the
+  ledger (`v1.4.0-tag.txt`).
+- Reviews:
+  - each of C1–C8 had a Sonnet task review, with scoped re-reviews of its fix rounds (at most
+    2);
+  - the Opus final review found 3 P1s and 10 P2s, and its re-review of the fix wave found 1 more
+    P1 (mojibake in the SPA's pending labels) and 3 more P2s;
+  - all are fixed.
+- Two defects that the reviews missed were caught by the proof runs. The case runner filled
+  optional compose settings (the D14 and D15 change above). An e2e test clicked a Radix
+  trigger before hydration, fixed by a `toPass` open helper.
+
+| Item | Result |
+| --- | --- |
+| V01 | `bun run check` in `tools/` → 662 pass, 0 fail; `bun tools/validate.ts` and `--lockfiles` → ok |
+| V02–V04 | `tools/tests/theme.test.ts`, the generator tests and the `auth-off` cases; each template's `tests/unit/eslint-boundaries.test.ts` |
+| V05 | A generated `next-bun-express` with Postgres, on a tmpfs development database: 36/36 twice (30.3 s, 23.5 s). `app` held module 0, schema_migration 1, session 0, user 0 before and after both runs; `app_e2e` held user 5, session 7 after each |
+| V06 | The same for `react-python-fastapi` with Postgres: 38/38 twice (13.2 s, 13.0 s), with the same counts |
+| V07 | The 8 server-only cases pass. Unit tests pin `RATE_LIMIT_SCALE` (its cap) and `e2eDb` (its `_e2e` and `dbname` refusals); the e2e runs exercise the create, migrate and truncate. The C3 and C5 case logs hold no `at …` or `Traceback` line |
+| V08 | `git grep` on catalog `dev`: no `switch (` on a status under `feature/`, `widget/` or `entity/`; no `.min(N)`, `.max(N)` or `.length(N)` in `src` outside `generated/` (the one hit is `Math.max` in `cookies.ts`); `revalidatePath(` only in the lint test's seeded violation; no raw control outside `shared/ui`; no `.skip(` or `.only(` |
+| V09 | The ledger's Spikes section and ADR 0005 (S2's `connection()` hole, S5's fallback with `CLIENT_IP_HEADER`) |
+| V10 | The final review's agreement check and the old-path grep: the old paths appear only as history in ADR 0003, ADR 0005 and the CHANGELOGs |
+| V11 | Catalog #12: 28 of 28 checks green (26 cases plus `list` and `validate`) |
+| V12 | The ledger: the task reviews, the Opus final review and its re-review, with no open P0 or P1 |
+
+Local proof 2 ran all 26 cases with `--e2e --install-browsers --with-services --with-app` on a
+quiet machine. The 18 frontend and stack cases ran on the final tree; the slowest was
+`server/python-fastapi/stack-postgres` at 229 s. The 8 server-only cases come from the run
+before, and their code has not changed since. `frontend/react/default` failed once on
+`net::ERR_NO_BUFFER_SPACE` (Windows socket exhaustion) and passed on the re-run. Local proof 3
+(screens for Eitan's look) was not collected. `screens.spec.ts` captures them on every e2e run,
+and spec V6 judges them in Phase 4.
+
+Open:
+
+- G4: catalog `dev` → `main`, the tag `v1.4.0` and its release.
+- Phase 3 gets its own plan after the tag. It bumps `catalog.lock` together with the harness
+  text.
+- Proposed backlog line: `- [ ] Servers key the refresh rate limit on the refresh token`, to
+  remove the Next cap that applies when `CLIENT_IP_HEADER` is unset.
+- Left for Eitan:
+  - the Docker volume `c6bcounts_database-data` (the hook refuses `docker volume rm`);
+  - the `%TEMP%` `fullstack-case-*` folders;
+  - the session's scratchpad `v05v06/`.
