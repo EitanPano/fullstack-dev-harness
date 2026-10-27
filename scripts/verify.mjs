@@ -2,7 +2,10 @@
 // checks over one working tree, with a tree hash at both ends. Exit 0 pass, 1 fail, 2 usage or
 // environment error. `node scripts/verify.mjs --plan <plan> [--package <dir>]... [--no-e2e]
 // [--reuse]`, or `[--base <commit>] --out <dir>` outside the loop.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+// With --reuse a passing step whose key (package subtree, shared inputs, command, Base) is
+// unchanged is taken from an earlier result instead of re-run. A full run with a Base also
+// writes review.diff; --round <n> --round-base <tree> adds review-fix-<n>.diff.
+import { mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { readProvenance } from './provenance.mjs'
@@ -10,6 +13,17 @@ import { diffChecks } from './verify/checks.mjs'
 import { addedLines, changedFiles, git, treeHash } from './verify/git.mjs'
 import { isMain } from './verify/main.mjs'
 import { portStatus, runCommand } from './verify/proc.mjs'
+import {
+  KEYED,
+  carriedPackages,
+  completeKey,
+  findReusable,
+  keyFactory,
+  readSources,
+  sameKey,
+  writeJsonAtomic,
+} from './verify/reuse.mjs'
+import { writeReviewPackage } from './verify/review.mjs'
 import { securityPaths } from './verify/security.mjs'
 import { parseSummary, tail } from './verify/summary.mjs'
 
@@ -17,11 +31,19 @@ const MIN = 60_000
 const TIMEOUTS = { contract: 3 * MIN, check: 10 * MIN, testDb: 15 * MIN, testE2e: 20 * MIN }
 const USAGE =
   'usage: node scripts/verify.mjs --plan <plan> [--package <dir>]... [--no-e2e] [--reuse]\n' +
-  '       node scripts/verify.mjs [--base <commit>] --out <dir> [--reuse]'
+  '       node scripts/verify.mjs [--base <commit>] --out <dir> [--reuse]\n' +
+  '       add --round <n> --round-base <tree> to a full run for a fix-round review package'
 
 export function parseArgs(argv) {
   const options = { packages: [], noE2e: false, reuse: false }
-  const takes = { '--plan': 'plan', '--base': 'base', '--out': 'out', '--root': 'root' }
+  const takes = {
+    '--plan': 'plan',
+    '--base': 'base',
+    '--out': 'out',
+    '--root': 'root',
+    '--round': 'round',
+    '--round-base': 'roundBase',
+  }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--package') options.packages.push(argv[++i])
@@ -75,6 +97,7 @@ export async function runVerify(options) {
   const chosen = options.packages ?? []
   // A run narrowed by --package or --no-e2e must never stand in for the full gate under --reuse.
   const partial = chosen.length > 0 || options.noE2e === true
+  const round = options.round === undefined ? undefined : String(options.round)
   const result = { startedAt: new Date().toISOString(), plan: options.plan, ok: false }
   // `--out` is known before the plan is read, so even an unreadable plan leaves its reason there.
   let outDir = options.out === undefined ? undefined : path.resolve(root, options.out)
@@ -84,7 +107,11 @@ export async function runVerify(options) {
     if (outDir !== undefined) {
       mkdirSync(outDir, { recursive: true })
       const file = partial ? 'verify-partial.json' : 'verify.json'
-      writeFileSync(path.join(outDir, file), `${JSON.stringify(result, null, 2)}\n`)
+      if (partial && result.packages !== undefined) {
+        const dirs = Object.keys(result.packages)
+        result.packages = { ...carriedPackages(outDir, dirs), ...result.packages }
+      }
+      writeJsonAtomic(path.join(outDir, file), result)
     }
     return { exit, result }
   }
@@ -114,6 +141,18 @@ export async function runVerify(options) {
   const isCommit = () => git(root, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`]).ok
   if (base !== undefined && !isCommit()) return fail2(`base ${base} is not a commit`)
 
+  if ((round === undefined) !== (options.roundBase === undefined)) {
+    return fail2('--round and --round-base go together')
+  }
+  if (round !== undefined) {
+    if (base === undefined) return fail2('--round needs a base (a plan Base or --base)')
+    if (!/^[1-9]\d*$/.test(round)) return fail2('--round must be a positive integer')
+    if (partial) return fail2('--round needs a full run, without --package or --no-e2e')
+    if (!git(root, ['rev-parse', '--verify', '--quiet', `${options.roundBase}^{tree}`]).ok) {
+      return fail2(`round base ${options.roundBase} is not a tree or commit`)
+    }
+  }
+
   // Windows runs a command line through cmd, which stops at the first newline.
   if (platform === 'win32') {
     for (const pkg of catalog.packages) {
@@ -133,7 +172,8 @@ export async function runVerify(options) {
 
   async function execute() {
     const startTree = treeHash(root)
-    if (options.reuse && !partial) {
+    // A fix round must write its package, so it never takes the whole-run shortcut.
+    if (options.reuse && !partial && round === undefined) {
       try {
         const last = JSON.parse(readFileSync(path.join(outDir, 'verify.json'), 'utf8'))
         const same = last.base === base && last.plan === options.plan
@@ -169,7 +209,22 @@ export async function runVerify(options) {
       const entry = (result.packages[pkg.dir] ??= {})
       entry[name] = outcome
     }
-    const step = async (pkg, name) => {
+    // The keys come from the start tree; the end tree's must match for a result to be reusable.
+    const startKey = keyFactory(root, startTree, catalog.packages, isFrontend, base)
+    const sources = options.reuse ? readSources(outDir) : []
+    const lookup = (pkg, name) => findReusable(sources, pkg.dir, name, startKey(pkg, name))
+    const step = async (pkg, name, hit) => {
+      if (hit !== undefined) {
+        const reused = { file: hit.file, finishedAt: hit.finishedAt }
+        const entry = { ...hit.entry, reused }
+        delete entry.carried
+        store(pkg, name, entry)
+        const { passed, failed: bad, skipped, flaky } = hit.entry
+        const counts = `${passed} passed, ${bad} failed, ${skipped} skipped`
+        const note = `reused (${hit.file}, ${hit.finishedAt})`
+        record(`${pkg.dir} ${name}`, true, `${counts}${flaky > 0 ? `, ${flaky} flaky` : ''}, ${note}`)
+        return true
+      }
       const limit = timeouts[name] ?? timeouts.check
       const cwd = path.join(root, pkg.dir)
       const run = await runCommand(pkg.commands[name], {
@@ -179,6 +234,8 @@ export async function runVerify(options) {
         reapInterval: options.reapInterval,
       })
       const outcome = stepOutcome(name, { ...run, limit })
+      if (KEYED.includes(name)) outcome.key = startKey(pkg, name)
+      outcome.finishedAt = new Date().toISOString()
       store(pkg, name, outcome)
       const { passed, failed: bad, skipped } = outcome
       const counts = `${passed} passed, ${bad} failed, ${skipped} skipped`
@@ -242,7 +299,9 @@ export async function runVerify(options) {
     let blocker
     for (const pkg of selected) {
       if (!has(pkg, 'contract')) skip(pkg, 'contract', 'skipped: no contract command')
-      else if (!(await step(pkg, 'contract'))) blocker ??= `${pkg.dir} contract`
+      else if (!(await step(pkg, 'contract', lookup(pkg, 'contract')))) {
+        blocker ??= `${pkg.dir} contract`
+      }
     }
     if (selected.some((pkg) => has(pkg, 'contract'))) {
       const afterContract = treeHash(root)
@@ -252,7 +311,7 @@ export async function runVerify(options) {
     }
     for (const pkg of selected) {
       if (has(pkg, 'check')) {
-        if (!(await step(pkg, 'check'))) blocker ??= `${pkg.dir} check`
+        if (!(await step(pkg, 'check', lookup(pkg, 'check')))) blocker ??= `${pkg.dir} check`
       } else if (!partial) {
         refuse(pkg, 'check', 'no check command in .fullstack/catalog.yaml')
         blocker ??= `${pkg.dir} check`
@@ -261,6 +320,7 @@ export async function runVerify(options) {
     const withDb = selected.filter((p) => has(p, 'testDb'))
     for (const pkg of withDb) {
       if (blocker !== undefined) refuse(pkg, 'testDb', `skipped: ${blocker} failed`)
+      else if (lookup(pkg, 'testDb') !== undefined) await step(pkg, 'testDb', lookup(pkg, 'testDb'))
       else {
         const db = await ensureDatabase()
         if (db.ok) await step(pkg, 'testDb')
@@ -275,24 +335,33 @@ export async function runVerify(options) {
     if (blocker !== undefined) {
       for (const pkg of e2e) refuse(pkg, 'testE2e', `skipped: ${blocker} failed`)
     } else if (e2e.length > 0) {
-      let ready = true
-      // Every server's migrate runs, not only the selected ones: a frontend-only run still
-      // needs the backend's database migrated.
-      for (const pkg of catalog.packages.filter((p) => !isFrontend(p) && has(p, 'migrate'))) {
-        const db = await ensureDatabase()
-        if (!db.ok) refuse(pkg, 'migrate', db.reason)
-        ready = db.ok && (await step(pkg, 'migrate')) && ready
-      }
-      // Every package's port, not only the frontend's: the e2e config starts all of the servers.
-      const busy = []
-      for (const other of catalog.packages.filter((pkg) => pkg.port !== undefined)) {
-        const status = await portStatus(other.port)
-        if (!status.busy) continue
-        busy.push(`port ${other.port} (${other.dir}) is in use by PID ${status.pid ?? 'unknown'}`)
-      }
+      // Reused e2e steps need no database, migration or free port; only a step that runs does.
+      const pending = []
       for (const pkg of e2e) {
-        if (busy.length > 0) refuse(pkg, 'testE2e', busy.join('; '))
-        else if (ready) await step(pkg, 'testE2e')
+        const hit = lookup(pkg, 'testE2e')
+        if (hit !== undefined) await step(pkg, 'testE2e', hit)
+        else pending.push(pkg)
+      }
+      if (pending.length > 0) {
+        let ready = true
+        // Every server's migrate runs, not only the selected ones: a frontend-only run still
+        // needs the backend's database migrated.
+        for (const pkg of catalog.packages.filter((p) => !isFrontend(p) && has(p, 'migrate'))) {
+          const db = await ensureDatabase()
+          if (!db.ok) refuse(pkg, 'migrate', db.reason)
+          ready = db.ok && (await step(pkg, 'migrate')) && ready
+        }
+        // Every package's port, not only the frontend's: the e2e config starts all the servers.
+        const busy = []
+        for (const other of catalog.packages.filter((pkg) => pkg.port !== undefined)) {
+          const status = await portStatus(other.port)
+          if (!status.busy) continue
+          busy.push(`port ${other.port} (${other.dir}) is in use by PID ${status.pid ?? 'unknown'}`)
+        }
+        for (const pkg of pending) {
+          if (busy.length > 0) refuse(pkg, 'testE2e', busy.join('; '))
+          else if (ready) await step(pkg, 'testE2e')
+        }
       }
     }
 
@@ -311,6 +380,23 @@ export async function runVerify(options) {
     if (!partial && base !== undefined) {
       const paths = securityPaths(changedFiles(root, base, endTree))
       result.security = { triggered: paths.length > 0, paths }
+    }
+    // A step is reusable only if it passed and its inputs were the same when the run ended.
+    const endKey = keyFactory(root, endTree, catalog.packages, isFrontend, base)
+    for (const pkg of selected) {
+      for (const name of KEYED) {
+        const entry = result.packages[pkg.dir]?.[name]
+        if (entry?.key === undefined) continue
+        entry.reusable =
+          entry.ok && completeKey(entry.key) && sameKey(entry.key, endKey(pkg, name))
+      }
+    }
+
+    if (!partial && base !== undefined) {
+      const fix = round === undefined ? undefined : { n: Number(round), base: options.roundBase }
+      const names = writeReviewPackage(root, outDir, { base, tree: endTree, round: fix })
+      result.review = names
+      for (const name of names) out(`review: ${path.join(outDir, name)}`)
     }
     const done = finish(failed ? 1 : 0, { tree: endTree, ok: !failed })
     out(`verify: ${failed ? 'FAIL' : 'PASS'} ${endTree}`)
