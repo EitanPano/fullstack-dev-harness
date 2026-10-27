@@ -1,6 +1,6 @@
 # Frontend foundation: layers, design system, one way to mutate, read, authenticate and test
 
-Status: active
+Status: done
 Owner: Eitan
 Last updated: 2026-10-27
 Approval: the design was approved by Eitan on 2026-10-26 ("approved"); this plan was approved
@@ -631,11 +631,18 @@ before, and their code has not changed since. `frontend/react/default` failed on
 (screens for Eitan's look) was not collected. `screens.spec.ts` captures them on every e2e run,
 and spec V6 judges them in Phase 4.
 
+Release (G4, 2026-10-27, Eitan: "yes"):
+
+- Catalog #13 (`dev` → `main`) had 56/56 checks green and merged into `main` as 5b04a32, tree
+  d64cf3f.
+- The annotated tag `v1.4.0` is on 5b04a32.
+- The release workflow (run 40560420922, 29 jobs) re-ran `validate` and every case, then
+  published the release.
+
 Open:
 
-- G4: catalog `dev` → `main`, the tag `v1.4.0` and its release.
-- Phase 3 gets its own plan after the tag. It bumps `catalog.lock` together with the harness
-  text.
+- Phase 3 gets its own plan, in a new session. It bumps `catalog.lock` to v1.4.0 together with
+  the harness text. Until then, harness `main` pins v1.3.0.
 - Proposed backlog line: `- [ ] Servers key the refresh rate limit on the refresh token`, to
   remove the Next cap that applies when `CLIENT_IP_HEADER` is unset.
 - Left for Eitan:
