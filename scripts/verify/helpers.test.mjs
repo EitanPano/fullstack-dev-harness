@@ -172,6 +172,7 @@ test('securityPaths matches the plan 014 globs with glob semantics', () => {
     'backend/src/config/env.ts',
     'backend/src/app/config/env.py',
     'frontend/src/env.ts',
+    'frontend/src/shared/config/env.ts',
     'frontend/nginx/security-headers.conf',
     'frontend/.dockerignore',
     'frontend/next.config.ts',

@@ -878,6 +878,9 @@ test('review.diff holds the stat and the -U10 diff, untracked files in, lockfile
   writeFileSync(path.join(fx.root, 'backend', 'openapi.json'), '{"GENERATED":1}\n')
   mkdirSync(path.join(fx.root, 'frontend', 'src', 'lib', 'api'), { recursive: true })
   writeFileSync(path.join(fx.root, 'frontend', 'src', 'lib', 'api', 'schema.d.ts'), 'GENSCHEMA\n')
+  const generated = path.join(fx.root, 'frontend', 'src', 'shared', 'api', 'generated')
+  mkdirSync(generated, { recursive: true })
+  writeFileSync(path.join(generated, 'schema.ts'), 'GENSHARED\n')
   const { options, lines } = opts(fx, { base: fx.base30 })
   await runVerify(options)
   const result = read(fx)
@@ -895,8 +898,14 @@ test('review.diff holds the stat and the -U10 diff, untracked files in, lockfile
   const body = rest.slice(rest.indexOf('\n') + 1)
   assert.deepEqual(
     excluded.split(', ').sort(),
-    ['backend/bun.lock', 'backend/openapi.json', 'frontend/src/lib/api/schema.d.ts'].sort(),
+    [
+      'backend/bun.lock',
+      'backend/openapi.json',
+      'frontend/src/lib/api/schema.d.ts',
+      'frontend/src/shared/api/generated/schema.ts',
+    ].sort(),
   )
+  assert.doesNotMatch(body, /GENSHARED/)
   assert.match(body, /\+export const v15 = 999/)
   assert.match(body, /\+export const fresh = 1/)
   // Ten lines of context each side of line 15: lines 5 and 25 are in, 4 and 26 are not.

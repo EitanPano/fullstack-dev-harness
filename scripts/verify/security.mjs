@@ -14,8 +14,9 @@ const GLOBS = [
   '**/cors.*',
   '**/Dockerfile',
   'docker-compose.yml',
-  // bun-express `src/config/env.ts`, python-fastapi `src/app/config/env.py`, react and next
-  // `src/env.ts`.
+  // bun-express `src/config/env.ts`, python-fastapi `src/app/config/env.py`, and the v1.4.0
+  // frontends' `src/shared/config/env.ts` (matched by `**/config/env.ts`). `**/src/env.ts`
+  // stays for 1.x frontends.
   '**/config/env.ts',
   '**/config/env.py',
   '**/src/env.ts',
