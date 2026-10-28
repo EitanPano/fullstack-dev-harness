@@ -43,7 +43,7 @@ package's own versions and tools are in its `AGENTS.md`.
 | `scripts/` | `bootstrap.mjs`, `verify.mjs` | Humans |
 | `frontend/`, `backend/` | Generated packages, each with its own `AGENTS.md` | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | The Compose stack and database init scripts | Backend agent |
-| `.orchestrate/<slug>/` | Loop output per task: stage reports, `ticket.md`, `verify.json`, `verify-partial.json` (last partial run) | The loop |
+| `.orchestrate/<slug>/` | Loop output per task: stage reports, `ticket.md`, `verify.json`, `verify-partial.json` (last partial run), `review.diff`, `review-fix-<n>.diff` | The loop |
 
 Never create a `docs/` directory. `.orchestrate/` is git-ignored except its README.
 
@@ -101,7 +101,7 @@ Done means every item holds and the reports show the evidence.
 1. `node scripts/verify.mjs --plan <plan> --reuse` exits 0: each touched package's `check`
    (and `testDb`, none skipped) and the e2e suite. Evidence: `.orchestrate/<slug>/verify.json`.
    A run with `--package` or `--no-e2e` is partial: it writes `verify-partial.json` and never
-   satisfies `--reuse`.
+   satisfies `--reuse` as a whole run; its passing steps are reused per package.
 2. Every new behaviour has a happy-path unit test and a failure or empty one, with the red run
    in the report (`Tests first:`). Every user journey added has an e2e test where there is a
    frontend.

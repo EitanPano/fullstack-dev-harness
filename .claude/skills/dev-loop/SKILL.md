@@ -11,7 +11,8 @@ dispatches another agent; no agent runs the approval or the commit gate; no agen
 commits, stashes or checks out (the hooks refuse it).
 
 Every task keeps its files in `.orchestrate/<slug>/`: `backend.md`, `frontend.md`,
-`review.md`, `review-security.md`, `qa.md`, `ticket.md`, `verify.json`. Each report starts
+`review.md`, `review-security.md`, `qa.md`, `ticket.md`, `verify.json`, `review.diff`
+(`review-fix-<n>.diff` in a fix round). Each report starts
 with the same header:
 
 ```
@@ -25,19 +26,26 @@ findings, never on that line.
 
 Every dispatch sets the Agent `description` to `<slug>: <stage>`; `loop-stats` groups by it.
 
-Nothing is committed until the end, so every stage reads the change as `git diff <Base>`:
-the working tree against the plan's `Base:` commit. `git diff main` would also show earlier
-tasks committed on the branch chain.
+Nothing is committed until the end, so every stage but the reviewers (section 4) reads the
+change as `git diff <Base>`: the working tree against the plan's `Base:` commit. `git diff
+main` would also show earlier tasks committed on the branch chain.
 
 The evidence is `node scripts/verify.mjs --plan <plan>`: contract freshness, `check`,
 `testDb`, `testE2e` and the diff checks for every package, written to
 `.orchestrate/<slug>/verify.json`. Exit 0 passes, 1 fails, 2 is a usage or environment
 error. The driver always passes `--reuse`: when the tree equals the last passing run's, it
-exits 0 without running anything. An implementer's `--package <dir>` or `--no-e2e` run is
-partial: it writes `verify-partial.json` (backend and frontend overwrite the same file; it is
-informational) and never satisfies `--reuse`. A partial run reads only its selected packages'
+exits 0 without running anything. Otherwise `--reuse` reuses, per step (`contract`, `check`,
+`testDb`, `testE2e`), a passing result whose key matches (the package's subtree hash, the
+shared inputs, the command line, the Base) and prints `reused (<file>, <time>)`; a failing
+step is never reused, and the cross-package checks always run. The key does not cover
+environment variables, git-ignored `.env*` files or toolchains: after changing any of them,
+run `verify` without `--reuse`. An implementer's `--package
+<dir>` or `--no-e2e` run is partial: it writes `verify-partial.json` (backend and frontend
+share the file, each keeping the other's entries) and never satisfies `--reuse` as a whole run,
+but its passing steps are reused per package. A partial run reads only its selected packages'
 directories, so a sibling's concurrent edit does not fail it. A full run also records
-`security: { triggered, paths }` in `verify.json`.
+`security: { triggered, paths }` in `verify.json` and, with a Base, writes the review package
+`review.diff` (section 4).
 
 `verify` can outlive the Bash tool's timeout. The driver runs its full run with the Bash
 tool's `run_in_background: true` and waits for the completion notification. A role agent
@@ -100,14 +108,15 @@ the ids to `.orchestrate/<slug>/ticket.md`. Without the tool, write that file wi
 Stages come from the plan's `Stages:` line. Pass each implementer the plan path, the ticket
 id and (frontend) the figma URL if any.
 
-1. With a Contract section, dispatch `backend` for the contract stage only: models, schemas,
+1. With a Contract section, dispatch `backend` for the contract stage only: the failing
+   request-schema tests (one per validation rule the plan names), then models, schemas,
    registration, the `contract` command, its report, then stop.
 2. Then, in one message, SendMessage to that backend agent ("continue: implement the rest of
    the plan") and dispatch `frontend`. With no backend stage, or no Contract section, backend
    and frontend start together in one message.
 3. The frontend stops after `check` with `E2E: pending backend` in its report when a backend
-   stage exists. Once the backend reports, SendMessage it "backend ready: run `testE2e`, fix,
-   update your report".
+   stage exists. Once the backend reports, SendMessage it "backend ready: run
+   `verify --package frontend --reuse` (with `testE2e`), fix, update your report".
 4. Apply the deletions below. If a backend report has a `Commands:` line (the data-layer task
    adds `testDb` and `migrate`), write those commands into `.fullstack/catalog.yaml` under
    `packages.<dir>.commands` before the next `verify`. Then run
@@ -133,15 +142,22 @@ Once `verify` passes, run `git add --intent-to-add .` so new files appear in
 
 - `reviewer` with `mode: general`;
 - `reviewer` with `mode: security` when `verify.json` has `security.triggered: true` (`verify`
-  matches the diff against `**/auth/**`, `**/security/**`, `**/middleware/**`, `**/proxy.ts`,
-  `**/shared/auth/**`, `**/migrations/**`, `**/*.sql`, `**/Dockerfile`, `docker-compose.yml`
-  and each package's env module);
+  matches the diff against auth, session, security and middleware code (`**/auth/**`,
+  `**/session/**`, `**/*session*`, `**/security/**`, `**/middleware/**`), `**/proxy.ts`,
+  `**/shared/auth/**`, CORS configuration (`**/cors.*`), `**/Dockerfile`,
+  `docker-compose.yml` and each package's env module (`**/config/env.ts`, `**/config/env.py`,
+  `**/src/env.ts`), and deploy configuration (`**/nginx/**`, `**/.dockerignore`,
+  `**/next.config.*`); migrations and `.sql` files do not trigger it);
 - `qa`.
 
-The reviewers read `verify.json` as the gate evidence and run no gate. They write
+The reviewers read the review package `.orchestrate/<slug>/review.diff` once (the diff against
+the Base, lockfiles and generated files left out of the body) and `verify.json` as the gate
+evidence, and run no gate. They write
 `.orchestrate/<slug>/review.md` and `review-security.md`. QA writes `qa.md` and runs against
 the Compose services the repository defines; it never starts a separate Compose project,
-whose volumes only a human could remove. Apply QA's `Delete:` lines by the section 3 rule,
+whose volumes only a human could remove. A QA finding with `owner: driver` is a file the
+formatter rewrote outside QA's lane: keep a formatting-only change (re-run `verify`), and send
+anything else to the owning implementer as a finding. Apply QA's `Delete:` lines by the section 3 rule,
 for paths inside QA's lane (`frontend/tests/`, `backend/tests/`) only: `git rm -f` a tracked
 file, remove an untracked one yourself. Collect every P0 and P1 and QA's failures.
 
@@ -151,10 +167,12 @@ file, remove an untracked one yourself. Collect every P0 and P1 and QA's failure
    record that run's `tree` as the round's base.
 2. Send the owners (`backend` or `frontend`, by file) every P0/P1 and QA failure that belongs
    to them, quoted verbatim, in one message.
-3. Run `verify --reuse`.
-4. Run `git add --intent-to-add .` again so new files are in the diff. The reviewer re-reads
-   only `git diff <round base>`, in the mode that raised the finding (`fix-diff: <tree>`), and
-   QA re-runs only its failed items.
+3. Run `git add --intent-to-add .`, then
+   `node scripts/verify.mjs --plan <plan> --reuse --round <n> --round-base <round base tree>`.
+   It also writes `review-fix-<n>.diff`, the diff from the round base.
+4. The reviewer re-reads only that file, in the mode that raised the finding
+   (`fix-diff: .orchestrate/<slug>/review-fix-<n>.diff`), and QA re-runs only its failed
+   items.
 5. When a finding contradicts the plan, edit the plan's names or proof paths yourself and
    record it under `## Changes during the task`.
 6. After two rounds, hand the remaining findings to the user.

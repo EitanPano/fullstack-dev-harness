@@ -15,14 +15,19 @@ Tests come before implementation, from the plan's `Validation` list:
 3. Refactor with the test green.
 
 The red run's summary (command, failed and passed counts, failing test names) goes in the
-stage report as `Tests first:`; QA checks the names against the diff.
+stage report as `Tests first:`; QA checks the names against the diff. This holds for the
+backend's contract stage too: it writes the request-schema tests that must fail (one per
+validation rule the plan names) before it writes the schemas.
 
 The gate is `node scripts/verify.mjs --plan <plan>`: contract freshness, `check`, `testDb`
 where the package has it, `testE2e` and the diff checks, written to
-`.orchestrate/<slug>/verify.json`. An implementer runs it with `--package <dir>` (partial),
+`.orchestrate/<slug>/verify.json`. An implementer runs it with `--package <dir> --reuse` (partial),
 in the foreground with `timeout: 600000`, and never ends its turn while it runs; the driver
-runs the full run in the background, and that run is the evidence. QA runs only its own new test files with the package's
-test runner; the next full `verify` covers them.
+runs the full run in the background, and that run is the evidence. QA runs the package's
+`format` command (it rewrites the whole package; after a passing `verify` only QA's new or
+edited files should change), then the test runner on its files, then
+`git diff --name-only <tree>` (`<tree>` from `verify.json`); a listed file outside its lane
+goes under `Findings:` with `owner: driver`. The next full `verify` covers them.
 
 A stage report that shows tests written after the fact is acceptable only when the
 report says why (`Tests first: after the fact — <reason>`); QA judges the reason.
