@@ -309,3 +309,89 @@ together. P3a runs in disposable clones.
   - P3a step 3 now uses a malformed hex, since no valid hex fails on contrast. V06 compares the
     OKLCH hue.
   - The README keeps 1.x projects on the earlier harness.
+
+## As built
+
+2026-10-28, on `feat/frontend-foundation-adopt` (Base cc9fb1f):
+
+- Commits: 7b408e2 (the plan), b8019b8 (scripts), 77965c0 (text), d6e490b (the lock), then this
+  section.
+- Process:
+  - H1 ∥ H2 ∥ H3 ∥ H4 had Sonnet implementers and a Sonnet review each; H3 and H4 needed one
+    fix round each.
+  - The Opus final review found 4 Important and 15 Minor findings. One fix wave followed and its
+    re-review closed them all.
+- Gates on d6e490b, re-run after P3a: scripts 142/142, hooks 1680/1680, `AGENTS.md` 1,195 words.
+
+**P3a** ran in two disposable clones of d6e490b, from an empty catalog cache:
+
+| Step | Result |
+| --- | --- |
+| 1. `next-bun-express` with postgres, Opus driver, P1's brief | The skill mapped the Design to seven flags, turning "a cool neutral grey" into `#64748b`. Bootstrap took 11 min. Its first `verify` was red on catalog defect C3; the driver darkened the light `--primary` by hand, and the second run was green. |
+| 2. `react-python-fastapi`, `--font inter --theme dark --density compact --radius lg` | The flags were recorded and applied. `verify` was red on C1 and then C2; nothing else failed. |
+| 3. `--brand-primary '#ggg'` | Refused before generating: `--brand-primary: "#ggg" is not a hex colour`. The clone was untouched, and step 2 then ran in it. |
+| 4. The dev loop on brief line 2, in clone 1 | 32.7 min. Committed after one fix round; the commit tree equals `verify.json`'s tree. |
+
+Three catalog defects at v1.4.0. None is in the harness, and P3a found nothing else:
+
+- **C1:** react 2.0.0 `tests/unit/theme-provider.test.tsx:155` uses `'__THEME_DEFAULT__'` as its
+  "anything else" value. The generator substitutes it, so `--theme light|dark` fails `check`.
+- **C2:** in next and react 2.0.0, `tests/e2e/shell.spec.ts`'s desktop density test expects
+  36 px. `--density compact` renders 32 px and fails `testE2e`.
+- **C3:** `tools/lib/theme.ts` has no text pair for the primary on the background, card or
+  popover, yet shadcn's `link` variant uses exactly that. `#ea580c` passes the generator and
+  then fails the axe scan at 3.55:1. So the claim (OQ2, Risks, `bootstrap-project`) that the
+  generator adjusts the colour until every contrast pair passes is untrue for this pair.
+
+The loop task, measured with `loop-stats`:
+
+| Stage | Minutes |
+| --- | --- |
+| Plan (orchestrator, Opus) | 6.2 |
+| Delegated approval, then the backend contract | 1.6, then 1.4 |
+| Backend ∥ frontend, to the first full `verify` | 9.5 |
+| General and security reviews (Opus) ∥ QA (Sonnet) | 5.4 (QA: 1.1) |
+| Fix round 1, with its re-review | 7.3 |
+| Total, first plan dispatch to commit | 32.7 |
+
+- Subagent context was 20.0M (once per message); driver context was 17.9M; the driver cost
+  $19.03.
+- P1b averaged 31.5 min and 10.7M per task, on a smaller diff. This task renamed the template's
+  roles and removed its reference module: 83 files, +2,324/−1,470.
+
+Validation:
+
+| Item | Result | Evidence |
+| --- | --- | --- |
+| V01 | Holds | `bootstrap.test.mjs`; 142/142 |
+| V02 | Holds | The verify and helpers tests; 142/142 |
+| V03 | Holds | Only `dev-loop:151` matches, and it is exempt (R6) |
+| V04 | Holds | 1,195 words |
+| V05 | Fails on v1.4.0 | React fails with a non-default theme or density (C1, C2). Next passes only after a hand token edit (C3). The lock and the schema check hold. |
+| V06 | Partly holds | `answers.brand.primary: "#ea580c"`, and the generated `--primary` is `oklch(0.646 0.194 41.1)`. Step 3 holds. `home-phone-light.png` has no primary element; `sign-in-desktop-light.png` shows the hand-darkened orange (C3). |
+| V07 | Holds | Every new frontend file sits in `app/(site)/(staff)/`, `widget/schedule`, `widget/publish-class`, `feature/publish-class` or `entity/class`. The lint is green, and the stage minutes are above. |
+| V08 | Holds | The ledger |
+
+Follow-ups (proposed, not queued):
+
+- **Catalog patch for C1–C3:**
+  - fix the test value and the density assertion;
+  - add the primary text pairs;
+  - add one generation case with non-default brand values that runs the gates.
+- **`bootstrap-project`:**
+  - a recovery path for a brand the generator accepted that then fails a gate (the generator
+    refuses a second run);
+  - "keep the tree still while `verify` runs" (P1b reported it too);
+  - compare the product's roles and auth criteria with what the template ships.
+- **For plan 016, from the driver's notes:**
+  - a contract change made after the contract stage cost relays both ways;
+  - role agents' shell writes were refused (4 true positives) and went unreported;
+  - the security trigger misses role gates in a module and the seed script.
+- **Catalog `AGENTS.md`:**
+  - `server/bun-express` says to drop the reference module, then keeps pointing at it, and its
+    only `withTransaction` example goes with it;
+  - the Auth sections assume `user`/`admin`.
+- Left for Eitan:
+  - the clones `C:/Dev/Playground/AI/fullstack-dev-harness-proof-015` and `…-proof-015-react`;
+  - the volumes `proof-studio-015_database-data` and `proof-studio-015-appcheck_database-data`;
+  - the images `proof-studio-015-appcheck-{frontend,backend,backend-migrate}`.
