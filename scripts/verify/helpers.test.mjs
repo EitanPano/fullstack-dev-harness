@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { test } from 'node:test'
 import { parsePlan } from '../verify.mjs'
 import { diffChecks } from './checks.mjs'
+import { carriedPackages, readSources } from './reuse.mjs'
 import { securityPaths } from './security.mjs'
 import { parseSummary } from './summary.mjs'
 
@@ -148,28 +152,65 @@ test('parsePlan reads the first token after Base:', () => {
   assert.equal(parsePlan(`${branch}Base: dev (defaced)\n`).base, undefined)
 })
 
-test('securityPaths matches the D3 globs with glob semantics', () => {
+test('securityPaths matches the plan 014 globs with glob semantics', () => {
   const hit = [
     'backend/src/api/auth/routes.ts',
     'frontend/src/shared/auth/session.ts',
     'backend/src/middleware/gate.ts',
     'backend/src/services/security/hash.ts',
     'frontend/src/proxy.ts',
-    'backend/db/migrations/001.sql',
-    'db/init.sql',
+    'backend/src/services/session.ts',
+    'backend/src/infra/jobs/session-cleanup.ts',
+    'backend/src/app/infra/jobs/session_cleanup.py',
+    'backend/src/api/session/routes.ts',
+    'backend/src/config/cors.ts',
+    'backend/src/app/config/cors.py',
+    'frontend/src/shared/auth/token.ts',
+    'backend/src/middleware/auth.ts',
     'backend/Dockerfile',
     'docker-compose.yml',
     'backend/src/config/env.ts',
     'backend/src/app/config/env.py',
     'frontend/src/env.ts',
+    'frontend/src/shared/config/env.ts',
+    'frontend/nginx/security-headers.conf',
+    'frontend/.dockerignore',
+    'frontend/next.config.ts',
   ]
   const miss = [
+    'backend/src/api/booking/routes.ts',
     'backend/src/api/author/routes.ts',
     'backend/src/api/post/controller.ts',
     'frontend/src/feature/post/ui/Card.tsx',
     'backend/docs/docker-compose.yml',
     'backend/src/myproxy.ts',
     'backend/src/authority.ts',
+    'backend/src/infra/database/migrations/0001_init.sql',
+    'db/init/01-schema.sql',
+    'backend/drizzle/0002_booking.sql',
   ]
   assert.deepEqual(securityPaths([...hit, ...miss]), hit)
+})
+
+test('a malformed result file is no source, for the reuse reader and the carry-forward', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'sources-'))
+  try {
+    writeFileSync(path.join(dir, 'verify.json'), '{"packages": null}')
+    writeFileSync(path.join(dir, 'verify-partial.json'), '{"packages": ')
+    assert.deepEqual(readSources(dir), [])
+    assert.deepEqual(carriedPackages(dir, {}), {})
+    writeFileSync(path.join(dir, 'verify.json'), '{"packages": []}')
+    assert.deepEqual(readSources(dir), [])
+    const good = { check: { ok: true } }
+    const body = { packages: { backend: null, frontend: good, other: 'x' } }
+    writeFileSync(path.join(dir, 'verify-partial.json'), JSON.stringify(body))
+    assert.equal(readSources(dir).length, 1)
+    const carried = carriedPackages(dir, {})
+    assert.deepEqual(Object.keys(carried), ['frontend'])
+    assert.equal(carried.frontend.check.carried, true)
+    writeFileSync(path.join(dir, 'verify-partial.json'), '{"packages": null}')
+    assert.deepEqual(carriedPackages(dir, {}), {})
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

@@ -38,7 +38,8 @@ Stages: backend, frontend, qa   (omit backend for a stack:frontend task, fronten
 New plans start as `Status: draft`. Only the human flips a plan to `active`, by editing
 the file. The review and QA stages run in parallel after the implementation stages and are not
 listed.
-Every stage reads the task's change as `git diff <Base>`: on a branch that already carries
+Implementers and QA read the task's change as `git diff <Base>`, reviewers the review
+package (`dev-loop` section 4): on a branch that already carries
 earlier committed tasks, `git diff main` would show those too. When the user delegates
 approval, the driver adds `Approval: delegated (<date>, <the user's words>)`.
 
@@ -62,10 +63,11 @@ In this order, with these exact headings:
 ## Content rules
 
 - Repository-relative paths only.
-- Name files to create or change per package, following the layout in `AGENTS.md` and
-  `backend/AGENTS.md`
+- Name files to create or change per package, following the layout in `AGENTS.md`,
+  `backend/AGENTS.md` and `frontend/AGENTS.md › Where does X go`
   (`backend/src/api/<name>/…`, `backend/src/models/<name>/…`,
-  `frontend/src/feature/<name>/…`). A plan that puts logic in the routing layer, a fetch call
+  `frontend/src/entity/<noun>/`, `feature/<action>/`, `widget/<section>/`,
+  `app/(group)/<route>/`). A plan that puts logic in the routing layer, a fetch call
   in a UI component, or a query in a route handler is wrong.
 - Every `Validation` item has the form `- V01 — <statement> (AC<n>) — proof: <test name | command>`.
   QA runs the list as its checklist; "the code looks right" is not a proof.

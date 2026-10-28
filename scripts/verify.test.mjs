@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { runVerify } from './verify.mjs'
+import { parseArgs, runVerify } from './verify.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const bases = []
@@ -348,8 +348,11 @@ test('a partial run writes verify-partial.json and never satisfies --reuse', asy
   assert.deepEqual(Object.keys(result.packages), ['backend'])
   assert.equal(existsSync(path.join(fx.root, '.orchestrate', 'lean-loop', 'verify.json')), false)
   const ran = runs(fx).length
+  // Its passing steps are reused per package, but it still leaves no verify.json behind.
   assert.equal((await runVerify(opts(fx, { packages: ['backend'], reuse: true }).options)).exit, 0)
-  assert.ok(runs(fx).length > ran)
+  assert.equal(runs(fx).length, ran)
+  assert.ok(read(fx, 'verify-partial.json').packages.backend.check.reused)
+  assert.equal(existsSync(path.join(fx.root, '.orchestrate', 'lean-loop', 'verify.json')), false)
   assert.equal((await runVerify(opts(fx, { reuse: true }).options)).exit, 0)
   assert.ok(existsSync(path.join(fx.root, '.orchestrate', 'lean-loop', 'verify.json')))
   const noE2e = await runVerify(opts(fx, { noE2e: true }).options)
@@ -648,6 +651,414 @@ test('a full run records whether the change touches security paths', async () =>
   assert.deepEqual(read(fx).security, { triggered: true, paths: ['backend/auth/gate.ts'] })
   await runVerify(opts(fx, { packages: ['backend'], noE2e: true }).options)
   assert.equal(read(fx, 'verify-partial.json').security, undefined)
+})
+
+// Reuse tests: `lines` are the log lines of a run, `reusedLines` the steps it took from a file.
+const reusedLines = (lines) => lines.filter((line) => line.includes('reused ('))
+const stepLine = (lines, label) => lines.find((line) => line.includes(label))
+const outDir = (fx) => path.join(fx.root, '.orchestrate', 'lean-loop')
+
+test('a partial backend run and a partial frontend run are both reused by the full run', async () => {
+  const fx = await fixture()
+  assert.equal((await runVerify(opts(fx, { packages: ['backend'], noE2e: true }).options)).exit, 0)
+  assert.equal((await runVerify(opts(fx, { packages: ['frontend'], noE2e: true }).options)).exit, 0)
+  const partial = read(fx, 'verify-partial.json')
+  assert.deepEqual(Object.keys(partial.packages).sort(), ['backend', 'frontend'])
+  assert.equal(partial.packages.backend.check.carried, true)
+  assert.equal(partial.packages.frontend.check.carried, undefined)
+  const ran = runs(fx).length
+  const full = opts(fx, { reuse: true })
+  assert.equal((await runVerify(full.options)).exit, 0)
+  // Only testE2e (and the migrate it needs) ran; every other step came from the partial file.
+  assert.equal(runs(fx).length - ran, 2)
+  assert.equal(reusedLines(full.lines).length, 5)
+  assert.match(stepLine(full.lines, 'backend check'), /reused \(verify-partial\.json, \d{4}-/)
+  const result = read(fx)
+  assert.equal(result.packages.backend.check.reused.file, 'verify-partial.json')
+  assert.equal(result.packages.backend.check.reusable, true)
+  assert.ok(result.packages.backend.check.key)
+  assert.equal(result.packages.frontend.testE2e.reused, undefined)
+})
+
+test('a frontend e2e partial run keeps the backend partial steps and adds migrate', async () => {
+  const fx = await fixture()
+  assert.equal((await runVerify(opts(fx, { packages: ['backend'], reuse: true }).options)).exit, 0)
+  assert.equal((await runVerify(opts(fx, { packages: ['frontend'], reuse: true }).options)).exit, 0)
+  const { backend } = read(fx, 'verify-partial.json').packages
+  for (const name of ['contract', 'check', 'testDb']) assert.equal(backend[name].carried, true)
+  assert.equal(backend.migrate.ok, true)
+  assert.equal(backend.migrate.carried, undefined)
+  const ran = runs(fx).length
+  const full = opts(fx, { reuse: true })
+  assert.equal((await runVerify(full.options)).exit, 0)
+  for (const name of ['contract', 'check', 'testDb']) {
+    assert.match(stepLine(full.lines, `backend ${name}`), /reused \(verify-partial\.json/)
+  }
+  assert.ok(runs(fx).length >= ran)
+})
+
+test('a --no-e2e frontend run keeps the earlier testE2e entry, reused only on a matching key', async () => {
+  const fx = await fixture()
+  assert.equal((await runVerify(opts(fx, { packages: ['frontend'] }).options)).exit, 0)
+  assert.equal((await runVerify(opts(fx, { packages: ['frontend'], noE2e: true }).options)).exit, 0)
+  const kept = read(fx, 'verify-partial.json').packages.frontend.testE2e
+  assert.equal(kept.ok, true)
+  assert.equal(kept.carried, true)
+  const same = opts(fx, { reuse: true })
+  assert.equal((await runVerify(same.options)).exit, 0)
+  assert.match(stepLine(same.lines, 'frontend testE2e'), /reused \(verify-partial\.json/)
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), 'export const a = 3\n')
+  const changed = opts(fx, { reuse: true })
+  assert.equal((await runVerify(changed.options)).exit, 0)
+  assert.doesNotMatch(reusedLines(changed.lines).join('\n'), /testE2e/)
+})
+
+test('without --reuse everything runs and the keys are still recorded', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  const ran = runs(fx).length
+  const again = opts(fx)
+  await runVerify(again.options)
+  assert.equal(runs(fx).length, ran * 2)
+  assert.equal(reusedLines(again.lines).length, 0)
+  const { key, reusable } = read(fx).packages.backend.check
+  assert.deepEqual(Object.keys(key), ['packages', 'shared', 'command', 'base'])
+  assert.deepEqual(Object.keys(key.packages), ['backend'])
+  assert.equal(key.base, fx.sha)
+  assert.equal(key.command, 'node ../stub.mjs pass')
+  assert.equal(reusable, true)
+})
+
+test('a docs-only change reuses every step and starts no database or migration', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  const ran = runs(fx).length
+  const dockerLog = path.join(fx.base, 'docker.log')
+  const before = readFileSync(dockerLog, 'utf8').split('\n').length
+  mkdirSync(path.join(fx.root, 'notes'))
+  writeFileSync(path.join(fx.root, 'notes', 'a.md'), 'words\n')
+  const again = opts(fx, { reuse: true })
+  assert.equal((await runVerify(again.options)).exit, 0)
+  assert.equal(runs(fx).length, ran)
+  assert.equal(reusedLines(again.lines).length, 6)
+  const docker = readFileSync(dockerLog, 'utf8').split('\n')
+  assert.equal(docker.filter((line) => line.startsWith('compose up')).length, 1)
+  assert.equal(docker.length, before + 1)
+  assert.equal(read(fx).packages.backend.migrate, undefined)
+})
+
+test('a package change re-runs that package and the e2e, not the other package', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), 'export const a = 2\n')
+  const again = opts(fx, { reuse: true })
+  assert.equal((await runVerify(again.options)).exit, 0)
+  const reused = reusedLines(again.lines).join('\n')
+  assert.doesNotMatch(reused, /backend (contract|check|testDb)/)
+  assert.doesNotMatch(reused, /testE2e/)
+  assert.match(reused, /frontend contract/)
+  assert.match(reused, /frontend check/)
+})
+
+test('a frontend change leaves the backend steps reused and re-runs the e2e', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  writeFileSync(path.join(fx.root, 'frontend', 'app.ts'), 'export const b = 2\n')
+  const again = opts(fx, { reuse: true })
+  await runVerify(again.options)
+  const reused = reusedLines(again.lines).join('\n')
+  assert.match(reused, /backend contract/)
+  assert.match(reused, /backend check/)
+  assert.match(reused, /backend testDb/)
+  assert.doesNotMatch(reused, /frontend check/)
+  assert.doesNotMatch(reused, /testE2e/)
+})
+
+test('a shared-input change re-runs every step', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  mkdirSync(path.join(fx.root, 'db'))
+  writeFileSync(path.join(fx.root, 'db', 'init.sql'), 'select 1\n')
+  const again = opts(fx, { reuse: true })
+  await runVerify(again.options)
+  assert.equal(reusedLines(again.lines).length, 0)
+})
+
+test('a changed command line re-runs that step', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  const file = path.join(fx.root, '.fullstack', 'catalog.yaml')
+  const text = readFileSync(file, 'utf8')
+  writeFileSync(file, text.replace('check: node ../stub.mjs pass', 'check: node ../stub.mjs skip'))
+  const again = opts(fx, { reuse: true })
+  await runVerify(again.options)
+  assert.doesNotMatch(stepLine(again.lines, 'backend check'), /reused/)
+})
+
+test('a changed Base re-runs every step, the same Base reuses them', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  writeFileSync(path.join(fx.root, 'backend', 'extra.ts'), 'export const e = 1\n')
+  git(fx.root, 'add', '-A')
+  git(fx.root, 'commit', '-qm', 'extra')
+  const second = git(fx.root, 'rev-parse', '--short', 'HEAD')
+  const other = opts(fx, { reuse: true, base: second })
+  await runVerify(other.options)
+  assert.equal(reusedLines(other.lines).length, 0)
+  // A docs file moves the tree, so the whole-run shortcut does not answer for the third run.
+  writeFileSync(path.join(fx.root, 'notes.md'), 'words\n')
+  const again = opts(fx, { reuse: true, base: second })
+  await runVerify(again.options)
+  assert.equal(reusedLines(again.lines).length, 6)
+})
+
+test('a failing step is never reused', async () => {
+  const fx = await fixture({ commands: { backend: { check: 'node ../stub.mjs fail' } } })
+  assert.equal((await runVerify(opts(fx).options)).exit, 1)
+  const ran = runs(fx).filter((mode) => mode === 'fail').length
+  const again = opts(fx, { reuse: true })
+  assert.equal((await runVerify(again.options)).exit, 1)
+  assert.equal(runs(fx).filter((mode) => mode === 'fail').length, ran + 1)
+  assert.doesNotMatch(stepLine(again.lines, 'backend check'), /reused/)
+  assert.match(stepLine(again.lines, 'frontend check'), /reused/)
+  const entry = read(fx).packages.backend.check
+  assert.equal(entry.ok, false)
+  assert.equal(entry.reusable, false)
+})
+
+test('a step whose inputs moved during its run is recorded as not reusable', async () => {
+  const fx = await fixture({
+    commands: { backend: { check: 'node ../stub.mjs stable ../backend/app.ts changed' } },
+  })
+  assert.equal((await runVerify(opts(fx).options)).exit, 1)
+  const result = read(fx)
+  assert.equal(result.packages.backend.check.ok, true)
+  assert.equal(result.packages.backend.check.reusable, false)
+  assert.equal(result.packages.frontend.check.reusable, true)
+})
+
+test('--round and --round-base are validated together, on full runs, against a real tree', async () => {
+  const fx = await fixture()
+  const tree = git(fx.root, 'rev-parse', 'HEAD^{tree}')
+  const cases = [
+    [{ round: '1' }, /--round-base/],
+    [{ roundBase: tree }, /--round/],
+    [{ round: '0', roundBase: tree }, /positive integer/],
+    [{ round: 'x', roundBase: tree }, /positive integer/],
+    [{ round: '1', roundBase: tree, noE2e: true }, /full run/],
+    [{ round: '1', roundBase: tree, packages: ['backend'] }, /full run/],
+    [{ round: '1', roundBase: 'nonsense' }, /not a tree or commit/],
+  ]
+  for (const [extra, reason] of cases) {
+    const { exit, result } = await runVerify(opts(fx, extra).options)
+    assert.equal(exit, 2, JSON.stringify(extra))
+    assert.match(result.reason, reason)
+  }
+  assert.equal(runs(fx).length, 0)
+})
+
+// A committed 30-line file, so the -U10 context is visible, on top of the fixture's commit.
+async function reviewFixture() {
+  const fx = await fixture()
+  const body = Array.from({ length: 30 }, (_, i) => `export const v${i + 1} = ${i + 1}`)
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), `${body.join('\n')}\n`)
+  git(fx.root, 'add', '-A')
+  git(fx.root, 'commit', '-qm', 'long file')
+  fx.base30 = git(fx.root, 'rev-parse', '--short', 'HEAD')
+  fx.body = body
+  return fx
+}
+
+test('review.diff holds the stat and the -U10 diff, untracked files in, lockfiles out', async () => {
+  const fx = await reviewFixture()
+  const edited = fx.body.map((line, i) => (i === 14 ? 'export const v15 = 999' : line))
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), `${edited.join('\n')}\n`)
+  writeFileSync(path.join(fx.root, 'frontend', 'fresh.ts'), 'export const fresh = 1\n')
+  writeFileSync(path.join(fx.root, 'backend', 'bun.lock'), 'LOCKFILE-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', 'openapi.json'), '{"GENERATED":1}\n')
+  mkdirSync(path.join(fx.root, 'frontend', 'src', 'lib', 'api'), { recursive: true })
+  writeFileSync(path.join(fx.root, 'frontend', 'src', 'lib', 'api', 'schema.d.ts'), 'GENSCHEMA\n')
+  const generated = path.join(fx.root, 'frontend', 'src', 'shared', 'api', 'generated')
+  mkdirSync(generated, { recursive: true })
+  writeFileSync(path.join(generated, 'schema.ts'), 'GENSHARED\n')
+  const { options, lines } = opts(fx, { base: fx.base30 })
+  await runVerify(options)
+  const result = read(fx)
+  const file = path.join(outDir(fx), 'review.diff')
+  const text = readFileSync(file, 'utf8')
+  assert.deepEqual(result.review, ['review.diff'])
+  assert.ok(lines.some((line) => line === `review: ${file}`))
+  assert.match(text, new RegExp(`^# review package\nbase [0-9a-f]{40}\ntree ${result.tree}\n\n`))
+  const [head, rest] = text.split('\nexcluded from the diff below: ')
+  for (const name of ['backend/app.ts', 'frontend/fresh.ts', 'backend/bun.lock']) {
+    assert.ok(head.includes(name), `stat lists ${name}`)
+  }
+  assert.match(head, /files? changed/)
+  const excluded = rest.split('\n')[0]
+  const body = rest.slice(rest.indexOf('\n') + 1)
+  assert.deepEqual(
+    excluded.split(', ').sort(),
+    [
+      'backend/bun.lock',
+      'backend/openapi.json',
+      'frontend/src/lib/api/schema.d.ts',
+      'frontend/src/shared/api/generated/schema.ts',
+    ].sort(),
+  )
+  assert.doesNotMatch(body, /GENSHARED/)
+  assert.match(body, /\+export const v15 = 999/)
+  assert.match(body, /\+export const fresh = 1/)
+  // Ten lines of context each side of line 15: lines 5 and 25 are in, 4 and 26 are not.
+  assert.match(body, / export const v5 = 5\n/)
+  assert.match(body, / export const v25 = 25\n/)
+  assert.doesNotMatch(body, /^ export const v4 = 4$/m)
+  assert.doesNotMatch(body, /^ export const v26 = 26$/m)
+  assert.doesNotMatch(body, /LOCKFILE-BODY|GENERATED|GENSCHEMA/)
+})
+
+test('review.diff says none when nothing is excluded, and a partial run writes none', async () => {
+  const fx = await reviewFixture()
+  writeFileSync(path.join(fx.root, 'frontend', 'fresh.ts'), 'export const fresh = 1\n')
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const file = path.join(outDir(fx), 'review.diff')
+  assert.match(readFileSync(file, 'utf8'), /excluded from the diff below: none\n/)
+  rmSync(file)
+  await runVerify(opts(fx, { base: fx.base30, packages: ['backend'] }).options)
+  assert.equal(existsSync(file), false)
+  assert.equal(read(fx, 'verify-partial.json').review, undefined)
+})
+
+test('a failing full run still writes the review package, a run with no base does not', async () => {
+  const fx = await fixture({ commands: { backend: { check: 'node ../stub.mjs fail' } } })
+  assert.equal((await runVerify(opts(fx).options)).exit, 1)
+  assert.ok(existsSync(path.join(outDir(fx), 'review.diff')))
+  const none = await fixture({ plan: false })
+  await runVerify(opts(none, { plan: undefined, out: '.orchestrate/x' }).options)
+  assert.equal(existsSync(path.join(none.root, '.orchestrate', 'x', 'review.diff')), false)
+})
+
+test('--round writes review-fix-<n>.diff against the round base and rewrites review.diff', async () => {
+  const fx = await reviewFixture()
+  writeFileSync(path.join(fx.root, 'backend', 'one.ts'), 'export const first = 1\n')
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const roundBase = read(fx).tree
+  writeFileSync(path.join(fx.root, 'backend', 'two.ts'), 'export const second = 2\n')
+  const { options, lines } = opts(fx, { base: fx.base30, reuse: true, round: '1', roundBase })
+  assert.equal((await runVerify(options)).exit, 0)
+  const fix = readFileSync(path.join(outDir(fx), 'review-fix-1.diff'), 'utf8')
+  const full = readFileSync(path.join(outDir(fx), 'review.diff'), 'utf8')
+  const tree = read(fx).tree
+  const header = `^# review package: fix round 1\nround-base ${roundBase}\ntree ${tree}\n`
+  assert.match(fix, new RegExp(header))
+  assert.match(fix, /\+export const second = 2/)
+  assert.doesNotMatch(fix, /first = 1/)
+  assert.match(full, /first = 1/)
+  assert.match(full, /second = 2/)
+  assert.deepEqual(read(fx).review, ['review.diff', 'review-fix-1.diff'])
+  assert.ok(lines.some((line) => line.startsWith('review: ') && line.endsWith('review-fix-1.diff')))
+})
+
+test('a round run is not short-circuited by an unchanged passing tree', async () => {
+  const fx = await reviewFixture()
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const roundBase = read(fx).tree
+  const again = opts(fx, { base: fx.base30, reuse: true, round: '2', roundBase })
+  const { reused } = await runVerify(again.options)
+  assert.equal(reused, undefined)
+  assert.ok(existsSync(path.join(outDir(fx), 'review-fix-2.diff')))
+})
+
+test('parseArgs reads --round and --round-base', () => {
+  const options = parseArgs(['--plan', 'p.md', '--round', '2', '--round-base', 'abc'])
+  assert.equal(options.round, '2')
+  assert.equal(options.roundBase, 'abc')
+  assert.throws(() => parseArgs(['--plan', 'p.md', '--round']), /missing its value/)
+})
+
+test('an .editorconfig change invalidates every reused step', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  writeFileSync(path.join(fx.root, '.editorconfig'), 'root = true\n')
+  const again = opts(fx, { reuse: true })
+  await runVerify(again.options)
+  assert.equal(reusedLines(again.lines).length, 0)
+})
+
+test('a package missing from the tree is never reusable', async () => {
+  const fx = await fixture({
+    noDb: true,
+    commands: { backend: { contract: null, testDb: null, migrate: null } },
+  })
+  rmSync(path.join(fx.root, 'backend', 'app.ts'))
+  rmSync(path.join(fx.root, 'backend', 'contract.json'))
+  await runVerify(opts(fx).options)
+  const { packages } = read(fx)
+  assert.equal(packages.backend.check.ok, true)
+  assert.equal(packages.backend.check.reusable, false)
+  assert.equal(packages.frontend.testE2e.reusable, false)
+  assert.equal(packages.frontend.check.reusable, true)
+})
+
+test('a reused step keeps its counts in the line', async () => {
+  const fx = await fixture()
+  await runVerify(opts(fx).options)
+  const again = opts(fx, { reuse: true })
+  writeFileSync(path.join(fx.root, 'notes.md'), 'words\n')
+  await runVerify(again.options)
+  const line = stepLine(again.lines, 'backend check')
+  assert.match(line, /\d+ passed, \d+ failed, \d+ skipped(, \d+ flaky)?, reused \(verify\.json, /)
+})
+
+test('--round with no base exits 2 with a reason', async () => {
+  const fx = await fixture()
+  const roundBase = git(fx.root, 'rev-parse', 'HEAD^{tree}')
+  const extra = { plan: undefined, out: '.orchestrate/x', round: '1', roundBase }
+  const { exit, result } = await runVerify(opts(fx, extra).options)
+  assert.equal(exit, 2)
+  assert.match(result.reason, /--round needs a base/)
+})
+
+test('secret-named files stay out of the review body and are listed by name', async () => {
+  const fx = await reviewFixture()
+  writeFileSync(path.join(fx.root, '.npmrc'), '//registry/:_authToken=TOKEN-XYZ\n')
+  writeFileSync(path.join(fx.root, 'backend', 'id_rsa'), 'PRIVATE-KEY-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.env.example'), 'PLACEHOLDER=1\n')
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const text = readFileSync(path.join(outDir(fx), 'review.diff'), 'utf8')
+  const [head] = text.split('\nexcluded from the diff below: ')
+  assert.ok(head.includes('.npmrc'))
+  assert.match(text, /\nsecret-named, not shown: .*\.npmrc/)
+  assert.match(text, /\nsecret-named, not shown: .*backend\/id_rsa/)
+  assert.doesNotMatch(text, /TOKEN-XYZ|PRIVATE-KEY-BODY/)
+  assert.doesNotMatch(text, /not shown: .*\.env\.example/)
+  assert.match(text, /\+PLACEHOLDER=1/)
+})
+
+test('env-prefixed names and credential directories stay out of the review body', async () => {
+  const fx = await reviewFixture()
+  mkdirSync(path.join(fx.root, 'backend', '.ssh'))
+  writeFileSync(path.join(fx.root, 'backend', '.ssh', 'config'), 'SSH-CONFIG-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.envrc'), 'ENVRC-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.env.example'), 'PLACEHOLDER=1\n')
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const text = readFileSync(path.join(outDir(fx), 'review.diff'), 'utf8')
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.envrc/)
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.ssh\/config/)
+  assert.doesNotMatch(text, /SSH-CONFIG-BODY|ENVRC-BODY/)
+  assert.match(text, /\+PLACEHOLDER=1/)
+})
+
+test('a failing git call leaves no review package and exits 2', async () => {
+  const { writeReviewPackage } = await import('./verify/review.mjs')
+  const fx = await reviewFixture()
+  const out = path.join(fx.base, 'pkg')
+  const bad = '0'.repeat(40)
+  assert.throws(() => writeReviewPackage(fx.root, out, { base: fx.base30, tree: bad }), /git/)
+  assert.equal(existsSync(path.join(out, 'review.diff')), false)
+  const tree = git(fx.root, 'rev-parse', 'HEAD^{tree}')
+  const round = { n: 1, base: bad }
+  assert.throws(() => writeReviewPackage(fx.root, out, { base: fx.base30, tree, round }), /git/)
+  assert.equal(existsSync(path.join(out, 'review.diff')), false)
 })
 
 describe('verify', { concurrency: 6 }, () => {

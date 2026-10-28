@@ -15,14 +15,19 @@ Tests come before implementation, from the plan's `Validation` list:
 3. Refactor with the test green.
 
 The red run's summary (command, failed and passed counts, failing test names) goes in the
-stage report as `Tests first:`; QA checks the names against the diff.
+stage report as `Tests first:`; QA checks the names against the diff. This holds for the
+backend's contract stage too: it writes the request-schema tests that must fail (one per
+validation rule the plan names) before it writes the schemas.
 
 The gate is `node scripts/verify.mjs --plan <plan>`: contract freshness, `check`, `testDb`
 where the package has it, `testE2e` and the diff checks, written to
-`.orchestrate/<slug>/verify.json`. An implementer runs it with `--package <dir>` (partial),
+`.orchestrate/<slug>/verify.json`. An implementer runs it with `--package <dir> --reuse` (partial),
 in the foreground with `timeout: 600000`, and never ends its turn while it runs; the driver
-runs the full run in the background, and that run is the evidence. QA runs only its own new test files with the package's
-test runner; the next full `verify` covers them.
+runs the full run in the background, and that run is the evidence. QA runs the package's
+`format` command (it rewrites the whole package; after a passing `verify` only QA's new or
+edited files should change), then the test runner on its files, then
+`git diff --name-only <tree>` (`<tree>` from `verify.json`); a listed file outside its lane
+goes under `Findings:` with `owner: driver`. The next full `verify` covers them.
 
 A stage report that shows tests written after the fact is acceptable only when the
 report says why (`Tests first: after the fact — <reason>`); QA judges the reason.
@@ -70,15 +75,18 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
   through the block the package names and run under `testDb`, against the test database.
   `check` never needs Docker and skips these suites once the package has `testDb`. Until the product has a database, the test resets the
   in-memory store before each test. The `database` skill defines the test database.
-- Frontend: unit tests cover components, loaders and actions. Components get props and are
-  asserted through roles and text. Loaders and actions run with the API stubbed at the
-  network boundary; no test starts the server. A Next client leaf that
-  receives a server action as a prop is tested with a fake action and a mocked toast library;
-  an SPA route renders in a memory router with the API stubbed. Each package's
-  `AGENTS.md › Tests` gives the pattern.
+- Frontend: unit tests cover components, loaders, actions, and each feature's `model.ts`
+  (its form schema) and copy table. Components get props and are asserted through roles and
+  text. Loaders and actions run with the API stubbed at the network boundary, through the real
+  `call`; no test starts the server. A Next client leaf imports its own action, so a component
+  test mocks that action module and the toast library; an SPA route renders in a memory router
+  with the API stubbed. Each package's `AGENTS.md › Tests` gives the pattern.
 - Frontend e2e: one test per user journey, with an accessibility scan on every new page.
-  Locate by role and label, never CSS selectors. A journey that needs data starts from an
-  API call in the test's setup, never from the development database's contents.
+  Locate by role and label, never CSS selectors. Journeys run on the `phone` project;
+  `desktop` runs the shell and screens specs. A check for one viewport carries a `@phone` or
+  `@desktop` tag; never skip at run time (`verify` refuses `.skip`). `retries` stays 0. A
+  journey creates its data through the UI with an email unique to the run, never from the
+  development database's contents.
 
 ## Data and fixtures
 

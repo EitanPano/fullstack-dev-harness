@@ -14,6 +14,12 @@ docs use these words and no synonyms. Add a term here before using it anywhere e
 | module (reference) | The shipped CRUD module `api/module/` that a developer copies | `api/module/`, `models/module/` |
 | <!-- FILL: term --> | <!-- FILL: one-line definition --> | <!-- FILL: table `x`, route `/api/x`, module `x` --> |
 
+## Actions
+
+Features are named by actions, so a product's glossary also holds verbs. List each action
+beside the nouns, in the same table, with `feature/<action>` in the Used as column (for
+example `refresh`: re-read an entity's data, `feature/refresh-health`).
+
 ## Rules
 
 - One word per concept. If two candidates exist, pick one here and never use the other.

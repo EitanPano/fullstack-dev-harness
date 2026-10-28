@@ -45,15 +45,19 @@ holds a marker. Delete a marker only by replacing it with a decision.
 ## Design
 
 The brief every frontend task follows (`.claude/rules/ui-and-styling.md`); a `figma:<url>`
-backlog marker overrides it for one task.
+backlog marker overrides it for one task. The bootstrap passes the display name, colours,
+radius, type, density and default theme to the frontend generator as flags.
 
 - Tone: <!-- FILL: two or three adjectives, e.g. calm, dense, playful -->
 - Reference apps: <!-- FILL: one to three products whose look is the target, or "none" -->
-- Colour seed: <!-- FILL: one primary hue and a neutral, as hex values or names -->
-- Type: <!-- FILL: the system font stack | a named font -->
-- Density: <!-- FILL: compact | comfortable -->
+- Display name: <!-- FILL: the product name shown in the header and the page title -->
+- Primary colour: <!-- FILL: one hex value, e.g. #1d4ed8 -->
+- Neutral colour: <!-- FILL: one hex value, e.g. #64748b -->
+- Radius: <!-- FILL: sm | md | lg -->
+- Type: <!-- FILL: system | inter -->
+- Density: <!-- FILL: comfortable | compact -->
 - Primary viewport: <!-- FILL: phone first | desktop first; the breakpoints that matter -->
-- Dark mode: <!-- FILL: no | follows the system | a toggle -->
+- Default theme: <!-- FILL: system | light | dark; the theme toggle always ships -->
 
 ## Acceptance Criteria
 
