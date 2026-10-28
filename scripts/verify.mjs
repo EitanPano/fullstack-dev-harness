@@ -108,8 +108,12 @@ export async function runVerify(options) {
       mkdirSync(outDir, { recursive: true })
       const file = partial ? 'verify-partial.json' : 'verify.json'
       if (partial && result.packages !== undefined) {
-        const dirs = Object.keys(result.packages)
-        result.packages = { ...carriedPackages(outDir, dirs), ...result.packages }
+        const carried = carriedPackages(outDir, result.packages)
+        const merged = {}
+        for (const dir of new Set([...Object.keys(carried), ...Object.keys(result.packages)])) {
+          merged[dir] = { ...carried[dir], ...result.packages[dir] }
+        }
+        result.packages = merged
       }
       writeJsonAtomic(path.join(outDir, file), result)
     }

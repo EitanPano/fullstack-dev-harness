@@ -197,18 +197,18 @@ test('a malformed result file is no source, for the reuse reader and the carry-f
     writeFileSync(path.join(dir, 'verify.json'), '{"packages": null}')
     writeFileSync(path.join(dir, 'verify-partial.json'), '{"packages": ')
     assert.deepEqual(readSources(dir), [])
-    assert.deepEqual(carriedPackages(dir, []), {})
+    assert.deepEqual(carriedPackages(dir, {}), {})
     writeFileSync(path.join(dir, 'verify.json'), '{"packages": []}')
     assert.deepEqual(readSources(dir), [])
     const good = { check: { ok: true } }
     const body = { packages: { backend: null, frontend: good, other: 'x' } }
     writeFileSync(path.join(dir, 'verify-partial.json'), JSON.stringify(body))
     assert.equal(readSources(dir).length, 1)
-    const carried = carriedPackages(dir, [])
+    const carried = carriedPackages(dir, {})
     assert.deepEqual(Object.keys(carried), ['frontend'])
     assert.equal(carried.frontend.check.carried, true)
     writeFileSync(path.join(dir, 'verify-partial.json'), '{"packages": null}')
-    assert.deepEqual(carriedPackages(dir, []), {})
+    assert.deepEqual(carriedPackages(dir, {}), {})
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

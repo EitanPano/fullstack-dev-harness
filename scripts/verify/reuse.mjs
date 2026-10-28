@@ -81,18 +81,18 @@ export function findReusable(sources, pkgDir, name, key) {
   return best
 }
 
-// The earlier partial file's entries for packages this run did not select, marked carried, so
-// a backend run followed by a frontend run leaves both for a later full run.
-export function carriedPackages(outDir, selectedDirs) {
+// The earlier partial file's step entries that `produced` (this run's packages) does not hold,
+// marked carried, in whatever package they sit: a backend run, then a frontend run that only
+// re-runs the server's `migrate`, still leaves the backend's other steps for a later full run.
+export function carriedPackages(outDir, produced) {
   const carried = {}
   const earlier = readSources(outDir).find((source) => source.file === 'verify-partial.json')
   for (const [dir, steps] of Object.entries(earlier?.data.packages ?? {})) {
-    if (selectedDirs.includes(dir) || !isObject(steps)) continue
-    carried[dir] = Object.fromEntries(
-      Object.entries(steps)
-        .filter(([, entry]) => isObject(entry))
-        .map(([name, entry]) => [name, { ...entry, carried: true }]),
-    )
+    if (!isObject(steps)) continue
+    for (const [name, entry] of Object.entries(steps)) {
+      if (!isObject(entry) || produced[dir]?.[name] !== undefined) continue
+      ;(carried[dir] ??= {})[name] = { ...entry, carried: true }
+    }
   }
   return carried
 }

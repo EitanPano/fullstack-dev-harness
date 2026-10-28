@@ -680,6 +680,39 @@ test('a partial backend run and a partial frontend run are both reused by the fu
   assert.equal(result.packages.frontend.testE2e.reused, undefined)
 })
 
+test('a frontend e2e partial run keeps the backend partial steps and adds migrate', async () => {
+  const fx = await fixture()
+  assert.equal((await runVerify(opts(fx, { packages: ['backend'], reuse: true }).options)).exit, 0)
+  assert.equal((await runVerify(opts(fx, { packages: ['frontend'], reuse: true }).options)).exit, 0)
+  const { backend } = read(fx, 'verify-partial.json').packages
+  for (const name of ['contract', 'check', 'testDb']) assert.equal(backend[name].carried, true)
+  assert.equal(backend.migrate.ok, true)
+  assert.equal(backend.migrate.carried, undefined)
+  const ran = runs(fx).length
+  const full = opts(fx, { reuse: true })
+  assert.equal((await runVerify(full.options)).exit, 0)
+  for (const name of ['contract', 'check', 'testDb']) {
+    assert.match(stepLine(full.lines, `backend ${name}`), /reused \(verify-partial\.json/)
+  }
+  assert.ok(runs(fx).length >= ran)
+})
+
+test('a --no-e2e frontend run keeps the earlier testE2e entry, reused only on a matching key', async () => {
+  const fx = await fixture()
+  assert.equal((await runVerify(opts(fx, { packages: ['frontend'] }).options)).exit, 0)
+  assert.equal((await runVerify(opts(fx, { packages: ['frontend'], noE2e: true }).options)).exit, 0)
+  const kept = read(fx, 'verify-partial.json').packages.frontend.testE2e
+  assert.equal(kept.ok, true)
+  assert.equal(kept.carried, true)
+  const same = opts(fx, { reuse: true })
+  assert.equal((await runVerify(same.options)).exit, 0)
+  assert.match(stepLine(same.lines, 'frontend testE2e'), /reused \(verify-partial\.json/)
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), 'export const a = 3\n')
+  const changed = opts(fx, { reuse: true })
+  assert.equal((await runVerify(changed.options)).exit, 0)
+  assert.doesNotMatch(reusedLines(changed.lines).join('\n'), /testE2e/)
+})
+
 test('without --reuse everything runs and the keys are still recorded', async () => {
   const fx = await fixture()
   await runVerify(opts(fx).options)
