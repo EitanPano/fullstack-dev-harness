@@ -1,6 +1,6 @@
 # Adopt catalog v1.4.0: the harness speaks the frontend foundation
 
-Status: active
+Status: done
 Owner: Eitan
 Last updated: 2026-10-28
 Approval: delegated (2026-10-28, Eitan: "go"), confirming OQ1–OQ4 as recommended.
@@ -309,13 +309,21 @@ together. P3a runs in disposable clones.
   - P3a step 3 now uses a malformed hex, since no valid hex fails on contrast. V06 compares the
     OKLCH hue.
   - The README keeps 1.x projects on the earlier harness.
+- After P3a (Eitan, 2026-10-28: "Patch v1.4.1 first"):
+  - This plan writes the catalog for one patch, v1.4.1, which fixes C1–C3 (As built) and adds a
+    case per frontend with non-default brand values.
+  - C3's fix moves the primary's lightness, keeping its hue, until it passes as text on the
+    background, cards and popovers. The move is not capped (ledger R17).
+  - The lock moves to v1.4.1 on this branch, and P3a's bootstrap steps 1–3 re-run on it, without
+    the loop.
+  - PR #26 stays a draft until then.
 
 ## As built
 
 2026-10-28, on `feat/frontend-foundation-adopt` (Base cc9fb1f):
 
-- Commits: 7b408e2 (the plan), b8019b8 (scripts), 77965c0 (text), d6e490b (the lock), then this
-  section.
+- Commits: 7b408e2 (the plan), b8019b8 (scripts), 77965c0 (text), d6e490b (the lock at v1.4.0),
+  e2e1571 (this section), 042e266 (the lock at v1.4.1), then the v1.4.1 results.
 - Process:
   - H1 ∥ H2 ∥ H3 ∥ H4 had Sonnet implementers and a Sonnet review each; H3 and H4 needed one
     fix round each.
@@ -343,6 +351,28 @@ Three catalog defects at v1.4.0. None is in the harness, and P3a found nothing e
   then fails the axe scan at 3.55:1. So the claim (OQ2, Risks, `bootstrap-project`) that the
   generator adjusts the colour until every contrast pair passes is untrue for this pair.
 
+**Catalog v1.4.1** fixes all three. It shipped through catalog PR #14 into `dev` (d11f25a, CI
+30/30) and release PR #15 into `main` (6a81924, CI 60/60), tagged v1.4.1. It contains:
+
+- `frontend/next` and `frontend/react` 2.0.1;
+- the primary moved, with its hue kept, until it passes as text on all three surfaces (R17);
+- a `note:` line whenever the generator moves the primary;
+- an optional `brand` on a test case, and one brand case per frontend, which `validate`
+  requires;
+- two Next e2e timing flakes, fixed.
+
+The work had a Sonnet implementer, an Opus review (0 Critical, 0 Important, 8 Minor) and one fix
+round with a clean re-review.
+
+**The P3a bootstraps on v1.4.1** ran in fresh clones of 042e266, from an empty cache, with no
+hand edits:
+
+| Step | Result |
+| --- | --- |
+| 1. `next-bun-express` with postgres, the flags the P3a driver chose | The generator noted `#ea580c ships as oklch(0.571 0.175 41.1) in light mode`. `verify` passed: `check`, `testDb` and e2e 36/36. |
+| 2. `react-python-fastapi`, `--font inter --theme dark --density compact --radius lg` | `verify` passed: `check` 927 and 252, e2e 38/38. |
+| 3. `--brand-primary '#ggg'` | Refused, naming the flag; the tree was untouched. |
+
 The loop task, measured with `loop-stats`:
 
 | Stage | Minutes |
@@ -367,17 +397,16 @@ Validation:
 | V02 | Holds | The verify and helpers tests; 142/142 |
 | V03 | Holds | Only `dev-loop:151` matches, and it is exempt (R6) |
 | V04 | Holds | 1,195 words |
-| V05 | Fails on v1.4.0 | React fails with a non-default theme or density (C1, C2). Next passes only after a hand token edit (C3). The lock and the schema check hold. |
-| V06 | Partly holds | `answers.brand.primary: "#ea580c"`, and the generated `--primary` is `oklch(0.646 0.194 41.1)`. Step 3 holds. `home-phone-light.png` has no primary element; `sign-in-desktop-light.png` shows the hand-darkened orange (C3). |
+| V05 | Holds on v1.4.1 | Both stacks' bootstrap `verify` passes with no hand edit: `check` per package, e2e on `phone` and `desktop`, and the screens spec. On v1.4.0 it failed (C1, C2, C3). |
+| V06 | Holds on v1.4.1 | `answers.brand.primary: "#ea580c"`. The generated light `--primary` is `oklch(0.571 0.175 41.1)`, orange's 41° hue, moved for contrast (C3). Step 3 is refused, naming the flag. `home-phone-light.png` has no primary element, so the evidence is `sign-in-phone-light.png`, which shows the generated orange. |
 | V07 | Holds | Every new frontend file sits in `app/(site)/(staff)/`, `widget/schedule`, `widget/publish-class`, `feature/publish-class` or `entity/class`. The lint is green, and the stage minutes are above. |
 | V08 | Holds | The ledger |
 
 Follow-ups (proposed, not queued):
 
-- **Catalog patch for C1–C3:**
-  - fix the test value and the density assertion;
-  - add the primary text pairs;
-  - add one generation case with non-default brand values that runs the gates.
+- **Catalog docs:**
+  - ADR 0005 does not describe the uncapped primary move;
+  - compact density leaves the Account menu icon button at 36 px.
 - **`bootstrap-project`:**
   - a recovery path for a brand the generator accepted that then fails a gate (the generator
     refuses a second run);
@@ -392,6 +421,8 @@ Follow-ups (proposed, not queued):
     only `withTransaction` example goes with it;
   - the Auth sections assume `user`/`admin`.
 - Left for Eitan:
-  - the clones `C:/Dev/Playground/AI/fullstack-dev-harness-proof-015` and `…-proof-015-react`;
-  - the volumes `proof-studio-015_database-data` and `proof-studio-015-appcheck_database-data`;
+  - the clones `C:/Dev/Playground/AI/fullstack-dev-harness-proof-015`, `…-proof-015-react`,
+    `…-proof-015b` and `…-proof-015b-react`;
+  - the volumes `proof-studio-015_database-data`, `proof-studio-015-appcheck_database-data`
+    and `proof-studio-015b_database-data`;
   - the images `proof-studio-015-appcheck-{frontend,backend,backend-migrate}`.
