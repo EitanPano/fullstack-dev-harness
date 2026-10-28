@@ -24,7 +24,8 @@ each chosen template's own tools.
 Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in order, ask the
 user one question at a time and replace the marker with their answer. Keep answers in
 their words; suggest a default only when they ask. The `Design` section is part of this walk;
-a product with no frontend answers it "n/a". Do the same for `.doc/architecture.md`
+a product with no frontend answers it "n/a". Its brand fields become scaffold flags in
+section 3. Do the same for `.doc/architecture.md`
 (Data store, Data Model, Data migrations, API versioning, Auth, External Dependencies,
 Deployment, except its `Deploy mode` and `TRUST_PROXY` lines, which section 5 fills once the
 stack is chosen) and `.doc/glossary.md` (one row per entity named in the scope).
@@ -50,9 +51,9 @@ marker in the Auth section with the line for the chosen frontend:
 
 - Server-rendered (Next): the frontend's server is the backend's client (no browser
   fetch). CORS is off unless `CORS_ORIGINS` is set. Rate limits key on the client
-  address, and the template does not forward `X-Forwarded-For` yet: the frontend auth task
-  must add it, with the backend running with `TRUST_PROXY` set, or every caller shares one
-  rate-limit key.
+  address. The opt-in `CLIENT_IP_HEADER` makes the frontend forward the visitor's address
+  (the `deployment` skill, section 6); without it all visitors share one rate-limit bucket,
+  about 30 active signed-in visitors per 15 minutes.
 - Single-page app (React): the browser calls `/api` on the page's own origin (the
   server in `single`, the frontend image's proxy in `split`), so there is no CORS and no
   API URL in the bundle. Rate limits key on the client address, so `TRUST_PROXY` is the
@@ -110,8 +111,35 @@ outside the working tree on purpose.
 
 ```bash
 node scripts/bootstrap.mjs --stack <id> --name <project-name> \
-  [--flag k=v]… [--capability k=v]… [--deploy single|split]
+  [--flag k=v]… [--capability k=v]… [--deploy single|split] [brand flags]…
 ```
+
+The brand flags come from the `Design` form; pass only the fields that hold a value:
+
+| Design field | Flag |
+| --- | --- |
+| `Display name` | `--display-name` |
+| `Primary colour` (hex) | `--brand-primary` |
+| `Neutral colour` (hex) | `--brand-neutral` |
+| `Radius` | `--radius sm\|md\|lg` |
+| `Type` | `--font system\|inter` |
+| `Default theme` | `--theme system\|light\|dark` |
+| `Density` | `--density comfortable\|compact` |
+
+- Quote every hex value on the command line (`--brand-primary '#2f6f4e'`): an unquoted `#`
+  starts a shell comment.
+- An empty `Display name` omits the flag; the generator title-cases the project name. A given
+  name is 1 to 60 characters of letters, digits, spaces and `. , : ! ? _ -`, starting with a
+  letter or digit, with no two underscores in a row.
+- A named colour (for example "a cool neutral grey") is converted to a hex by this skill,
+  which writes the hex into the Design form. A free-text answer to an enumerated field maps
+  to the nearest allowed value (Type "Roboto" becomes `system` or `inter`); state the mapping
+  to the user. Show every brand value to the user together with the stack and deploy mode
+  (section 2) before scaffolding, so an unattended run does not stall.
+- When the generator rejects a brand value (an invalid hex, enum or name, or a colour pair it
+  cannot make pass contrast) it names the flag: report it, ask for another value, then
+  re-run.
+- `Tone`, `Reference apps` and `Primary viewport` stay in the form and have no flag.
 
 It creates the packages the stack lists, under the directories the stack names; a merged
 `docker-compose.yml` and `.gitignore`; `.editorconfig` when absent; and
@@ -153,8 +181,8 @@ version from the provenance file, and record it in the final message.
 Then start each package's `dev` command (an SPA's server first, as the frontend's
 `AGENTS.md` says) and open the frontend's `http.health` path on its
 `http.port` (a Next frontend on its port; an SPA's dev server on its `http.port`, which
-proxies `/api` to the server): the page must reach the server (the API version pill
-proves the typed client reaches it).
+proxies `/api` to the server): the page must reach the server (the `HealthBadge` in
+`widget/system-status` proves the typed client reaches it).
 
 Stop the dev servers by port. On Windows a `--reload` server leaves its child holding the port
 after the parent is stopped, and the port's owner is then the dead reloader, so stop the owner
@@ -191,9 +219,10 @@ with defaults and warns.
 ## 5. First backlog lines
 
 Follow the grammar at the top of `.plan/000-backlog.md`. When no database provider was
-passed at generation, the first line is `- [ ] add the <engine> data layer | stack:backend`
-for a named engine, or `- [ ] add the data layer | stack:backend` when the answer was
-"decide later" (the `database` skill says what that task delivers). With a provider, the
+passed at generation, the first line is `- [ ] add the <engine> data layer` for a named
+engine, or `- [ ] add the data layer` when the answer was "decide later", with
+` | stack:backend` appended only when the stack has no frontend (the `database` skill says
+what that task delivers, and why the frontend takes part). With a provider, the
 first line is the first in-scope capability from the product definition; without one it is
 the next line. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
 `Stack` row of the components table in `.doc/architecture.md` from `.fullstack/catalog.yaml`:

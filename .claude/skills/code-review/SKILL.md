@@ -47,6 +47,11 @@ failure-path test, an error state, a change-log line).
    Is every new file in the home the `backend/AGENTS.md` table names for it (module file,
    `models/`, `middleware/`, `services/`, `services/utils/`, `infra/jobs/`,
    `infra/subscribers/`)? A file in two defensible homes is a finding.
+   Frontend: layer direction (`app` → `widget` → `feature` → `entity` → `shared`, no sibling
+   slice); no raw `button`, `input`, `select` or `textarea`, hex colour or palette class
+   outside `shared/ui`; status never by colour alone; no `revalidatePath`; no limit copied
+   from the backend into a form schema; every new file in the slice the frontend's
+   `AGENTS.md` table names for it.
 4. **Error handling and validation**: validation at the edge with the envelope, correct
    status codes, no swallowed errors, user-safe failure UX, logs with request id.
 5. **Unnecessary complexity**: abstraction without a second caller (a controller function

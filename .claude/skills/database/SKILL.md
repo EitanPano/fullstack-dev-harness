@@ -13,10 +13,10 @@ package's: `backend/AGENTS.md › Adding the data layer`.
 
 The engine is a catalog provider, chosen at the bootstrap or added later by the data-layer
 task below. `docker compose up -d --wait <service>` starts the database service for local
-work. `testDb` and `migrate` exist once a database does. Commands are always resolved from
+work. `testDb`, `migrate` and `e2eDb` exist once a database does. Commands are always resolved from
 `.fullstack/catalog.yaml`: when the bootstrap wired no database, the data-layer task adds the
-scripts, names them in `AGENTS.md › Adding the data layer` and in the backend report's
-`Commands:` line, and the driver writes them to the catalog (see the data-layer list). The
+scripts (`testDb`, `migrate`, `e2eDb`), names them in `AGENTS.md › Adding the data layer` and
+in the backend report's `Commands:` line, and the driver writes them to the catalog (see the data-layer list). The
 production `migrate` run in the stack is in the `deployment` skill (section 4).
 
 ## Choosing (bootstrap)
@@ -39,8 +39,10 @@ fact. When it lists one for the engine, the bootstrap generates it wired
 is written. The package's `AGENTS.md › Adding the data layer` then describes what exists and
 how to change the model, and the rules under "Every engine" and "What the shipped code
 assumes of the store" still bind every later change. When it lists none, the
-first backlog line is `- [ ] add the <engine> data layer | stack:backend`; for "decide
-later" it is the same line with the engine left for the task to fill (`add the data layer`).
+first backlog line is `- [ ] add the <engine> data layer`, with ` | stack:backend` appended
+only when the stack has no frontend (on a stack with one it is a full-stack line, see item 7
+of the task below); for "decide later" it is the same line with the engine left for the task
+to fill (`add the data layer`).
 
 ## The data-layer task
 
@@ -66,9 +68,41 @@ type changes with the engine. One task, planned and reviewed like any other, del
 7. A test database and the `testDb` script (see Test database), named in the same section,
    plus one test proving the test database is the one in use.
    The Compose service is named `database`: `verify` starts it by that name.
-   The backend report carries `Commands: testDb=<command>; migrate=<command>`; the driver
-   writes both under `packages.<dir>.commands` in `.fullstack/catalog.yaml` before the next
+   The backend report carries `Commands: testDb=<command>; migrate=<command>` and, with a
+   frontend, `; e2eDb=<command>`; the driver writes them under `packages.<dir>.commands` in
+   `.fullstack/catalog.yaml` before it dispatches the frontend stage and before the next
    `verify`, so the gate runs them.
+   On a stack with a frontend, the task also wires the browser-test database, in two stages
+   (the backlog line is full-stack for this reason). The frontend was generated without its
+   `server:database` e2e files, so its e2e would start the API against the development
+   database.
+   - **Backend stage.** Adds `e2eDb`, which creates, migrates and truncates the e2e database
+     (`app_e2e`), reads `E2E_DATABASE_URL` (the frontend's Playwright config passes it) and
+     refuses a name not ending in `_e2e`. Follow the database overlay's reference script in
+     the catalog: `server/bun-express/capabilities/database/postgres/overlay/src/infra/scripts/e2e-db.ts`
+     (script `db:e2e`) or `server/python-fastapi/capabilities/database/postgres/overlay/src/app/infra/scripts/e2e_db.py`
+     (`poe e2e-db`), with its test. The backend report names it:
+     `Commands: testDb=…; migrate=…; e2eDb=…`.
+   - **Frontend stage.** Wires the e2e start chain as the template's `server:database` variant
+     does, `<e2eDb> && <start>` for the API. The **driver** reads three files, by exact path and
+     without browsing, in the catalog release `catalog.lock` pins (cache root
+     `FULLSTACK_TEMPLATES_CACHE`, default `~/.cache/fullstack-templates`, then the version
+     folder; `bootstrap-project` forbids listing or searching it), under
+     `frontend/<next|react>/base/` for the frontend's template: `scripts/e2e-database-url.ts`,
+     `tests/unit/e2e-database-url.test.ts` and `playwright.config.ts`. It hands their content
+     in the frontend dispatch, never in the plan, which only names the step. Resolve the
+     markers in the config: keep `@server:database` lines and blocks, drop `@noserver:database`
+     lines, strip the marker comments, and fill `__SERVER_E2E_DB_COMMAND__`,
+     `__SERVER_START_COMMAND__` and `__SERVER_DIR__`/`__SERVER_PORT__` from
+     `.fullstack/catalog.yaml` (the driver records the backend's `Commands:` there first), and
+     `__SERVER_E2E_DATABASE_URL__` with the `e2e` value of the engine's `DATABASE_URL` in the
+     catalog's `shared/providers/database/<id>/provider.yaml` (Postgres:
+     `postgres://app:app@127.0.0.1:5432/app_e2e`). The frontend agent never reaches into the
+     cache itself.
+   - **Engines without an e2e chain.** v1.4.0 ships one for Postgres only (MongoDB has no
+     provider): the frontend stage is skipped and the plan's Risks note that e2e uses the
+     development database.
+   Without a frontend there is no e2e chain, and `e2eDb` is not added.
 8. A `.doc/architecture.md` change-log line and the Data Model section started.
 
 ### What the shipped code assumes of the store

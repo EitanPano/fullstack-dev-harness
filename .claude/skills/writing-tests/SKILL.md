@@ -75,15 +75,18 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
   through the block the package names and run under `testDb`, against the test database.
   `check` never needs Docker and skips these suites once the package has `testDb`. Until the product has a database, the test resets the
   in-memory store before each test. The `database` skill defines the test database.
-- Frontend: unit tests cover components, loaders and actions. Components get props and are
-  asserted through roles and text. Loaders and actions run with the API stubbed at the
-  network boundary; no test starts the server. A Next client leaf that
-  receives a server action as a prop is tested with a fake action and a mocked toast library;
-  an SPA route renders in a memory router with the API stubbed. Each package's
-  `AGENTS.md › Tests` gives the pattern.
+- Frontend: unit tests cover components, loaders, actions, and each feature's `model.ts`
+  (its form schema) and copy table. Components get props and are asserted through roles and
+  text. Loaders and actions run with the API stubbed at the network boundary, through the real
+  `call`; no test starts the server. A Next client leaf imports its own action, so a component
+  test mocks that action module and the toast library; an SPA route renders in a memory router
+  with the API stubbed. Each package's `AGENTS.md › Tests` gives the pattern.
 - Frontend e2e: one test per user journey, with an accessibility scan on every new page.
-  Locate by role and label, never CSS selectors. A journey that needs data starts from an
-  API call in the test's setup, never from the development database's contents.
+  Locate by role and label, never CSS selectors. Journeys run on the `phone` project;
+  `desktop` runs the shell and screens specs. A check for one viewport carries a `@phone` or
+  `@desktop` tag; never skip at run time (`verify` refuses `.skip`). `retries` stays 0. A
+  journey creates its data through the UI with an email unique to the run, never from the
+  development database's contents.
 
 ## Data and fixtures
 

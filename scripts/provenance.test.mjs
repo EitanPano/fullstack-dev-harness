@@ -135,3 +135,40 @@ test('a literal block joins its lines with newlines, a folded one with spaces', 
   ].join('\n')
   assert.deepEqual(read(text).packages[0].commands, { check: 'one\ntwo', lint: 'three four' })
 })
+
+test('answers.brand and the v1.4.0 start and e2eDb commands: brand stays out of the commands', () => {
+  const text = [
+    'deploy: single',
+    'answers:',
+    '  brand:',
+    '    displayName: Plant Care',
+    '    primary: "#2f6f4e"',
+    '    radius: lg',
+    'packages:',
+    '  frontend:',
+    '    template: frontend/next',
+    '    http:',
+    '      port: 3000',
+    '    commands:',
+    '      check: bun run check',
+    '  backend:',
+    '    template: server/bun-express',
+    '    http:',
+    '      port: 4000',
+    '    commands:',
+    '      start: bun run start',
+    '      e2eDb: >-',
+    '        docker compose up -d --wait database',
+    '        && bun run db:e2e',
+    '',
+  ].join('\n')
+  const result = read(text)
+  assert.equal(result.deploy, 'single')
+  assert.equal(result.packages.length, 2)
+  assert.equal(result.packages[0].port, 3000)
+  assert.deepEqual(result.packages[0].commands, { check: 'bun run check' })
+  assert.deepEqual(result.packages[1].commands, {
+    start: 'bun run start',
+    e2eDb: 'docker compose up -d --wait database && bun run db:e2e',
+  })
+})

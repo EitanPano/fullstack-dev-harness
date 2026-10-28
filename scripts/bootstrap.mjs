@@ -8,7 +8,9 @@
 //   node scripts/bootstrap.mjs --fetch [--templates <path>]
 //   node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… [--capability k=v]…
 //     [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]
-//     [--deploy single|split]
+//     [--deploy single|split] [--display-name <text>] [--brand-primary <hex>]
+//     [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]
+//     [--theme system|light|dark] [--density comfortable|compact]
 //
 // Steps: prerequisites → git work tree check (skipped for `--fetch`) → read the lock → locate the
 // catalog (cache clone checked against the locked commit, or a local override) → check the
@@ -30,12 +32,25 @@ const SUPPORTED_SCHEMA_VERSION = 1
 const MIN_BUN = [1, 4]
 const MIN_NODE = 24
 
+// Brand options: forwarded unchanged and only when given. The generator validates them.
+const BRAND_FLAGS = [
+  'display-name',
+  'brand-primary',
+  'brand-neutral',
+  'radius',
+  'font',
+  'theme',
+  'density',
+]
+
 const USAGE =
   'usage: node scripts/bootstrap.mjs --fetch [--templates <path>]\n' +
   '       node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… ' +
   '[--capability k=v]…\n' +
   '         [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]\n' +
-  '         [--deploy single|split]'
+  '         [--deploy single|split] [--display-name <text>] [--brand-primary <hex>]\n' +
+  '         [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]\n' +
+  '         [--theme system|light|dark] [--density comfortable|compact]'
 
 const args = parseArgs(process.argv.slice(2))
 const harnessRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -264,6 +279,9 @@ function generatorArguments(catalogVersion) {
   if (args.answers !== undefined) list.push('--answers', path.resolve(args.answers))
   if (catalogVersion !== undefined) list.push('--catalog-version', catalogVersion)
   if (args.deploy !== undefined) list.push('--deploy', args.deploy)
+  for (const name of BRAND_FLAGS) {
+    if (args.brand[name] !== undefined) list.push('--' + name, args.brand[name])
+  }
   if (args.skipInstall) list.push('--skip-post-generate')
   return list
 }
@@ -367,7 +385,7 @@ function resolveCommand(command) {
 }
 
 function parseArgs(argv) {
-  const parsed = { fetch: false, skipInstall: false, flags: [], capabilities: [] }
+  const parsed = { fetch: false, skipInstall: false, flags: [], capabilities: [], brand: {} }
   const value = (name, i) => {
     const next = argv[i]
     if (next === undefined || next.startsWith('--')) die(`${name} needs a value`)
@@ -385,17 +403,23 @@ function parseArgs(argv) {
     else if (arg === '--answers') parsed.answers = value(arg, ++i)
     else if (arg === '--templates') parsed.templates = value(arg, ++i)
     else if (arg === '--root') parsed.root = value(arg, ++i)
+    else if (arg.startsWith('--') && BRAND_FLAGS.includes(arg.slice(2))) parsed.brand[arg.slice(2)] = value(arg, ++i)
     else if (arg === '--auth') die('--auth is gone; use --flag auth=false')
     else die(`unknown argument ${arg}`)
   }
   if (parsed.fetch) {
     const others = Object.keys(parsed).filter(
       (key) =>
-        !['fetch', 'templates', 'flags', 'capabilities'].includes(key) &&
+        !['fetch', 'templates', 'flags', 'capabilities', 'brand'].includes(key) &&
         parsed[key] !== false &&
         parsed[key] !== undefined,
     )
-    if (others.length > 0 || parsed.flags.length > 0 || parsed.capabilities.length > 0) {
+    if (
+      others.length > 0 ||
+      parsed.flags.length > 0 ||
+      parsed.capabilities.length > 0 ||
+      Object.keys(parsed.brand).length > 0
+    ) {
       die('--fetch accepts only --templates')
     }
   } else if (parsed.stack === undefined || parsed.name === undefined) {

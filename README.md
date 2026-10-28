@@ -14,7 +14,7 @@ What you get after the bootstrap:
 - `docker-compose.yml` with the application images behind the `app` profile and, when a
   database provider was chosen, its service. `--capability database=postgres` (the
   bootstrap passes it when you pick Postgres) wires the server to a `database` service with
-  `db/init.sql`, a `DATABASE_URL`, migrations, and the `migrate` and `testDb` commands; the
+  `db/init.sql`, a `DATABASE_URL`, migrations, and the `migrate`, `testDb` and `e2eDb` commands; the
   catalog README is the reference for the matrix.
 - Five role agents (orchestrator, backend, frontend, reviewer, qa), ten skills, and
   fail-closed hooks that enforce write lanes, refuse destructive commands, and refuse
@@ -23,9 +23,14 @@ What you get after the bootstrap:
 The catalog's stacks: `next-bun-express` is a layered Express 5 API on Bun with an `auth`
 flag, and a Next.js frontend with a client typed from the server's contract;
 `next-python-fastapi` pairs the same frontend with a layered FastAPI API on Python managed by
-uv. `react-bun-express` and `react-python-fastapi` (from catalog v1.2.0; the lock decides which
-release you get) pair a React single-page app with the same two APIs. The catalog README has the
-matrix.
+uv. `react-bun-express` and `react-python-fastapi` pair a React single-page app with the same
+two APIs. Catalog v1.4.0 frontends share one layered foundation (app, widget, feature, entity,
+shared) and take brand inputs at the bootstrap: display name, primary and neutral colours,
+radius, font, default theme and density, written from the product definition's `Design`
+section. The catalog README has the matrix.
+
+A project generated with an older frontend cannot be upgraded in place: a lock bump changes
+only what new bootstraps generate.
 
 Deploy modes: a stack with a server and a single-page app asks `single` (the default: one
 container, the server serves the built frontend and the API on one port, no CORS; needs Docker
@@ -146,11 +151,20 @@ bootstrap generates; an already generated project keeps its packages and their `
 A project scaffolded before the catalog has no `.fullstack/catalog.yaml`, and its
 `backend/AGENTS.md` lacks the sections the new agents point at, so it stays on the
 pre-catalog harness (the last commit before this change). The pointers in the harness name
-sections of the catalog version the lock pinned when the project was generated.
+sections of the catalog version the lock pinned when the project was generated. A project
+whose `.fullstack/catalog.yaml` records a 1.x frontend stays on the harness commit before
+this change: the pointers now name the frontend foundation of catalog v1.4.0.
 
 A project updated to this harness ticks the boxes of `## Ready to plan` in
 `.doc/product-definition.md` that hold and fills its `Design` section before the next loop;
 the dev loop refuses to start otherwise.
+
+After bumping `catalog.lock`, before merging:
+
+1. Grep the harness text (`AGENTS.md`, `README.md`, `.claude/`, `.doc/`, `scripts/`) for the old version's
+   paths, rule names and command names.
+2. Update every hit to the new template's `AGENTS.md`, or record why it stays.
+3. Run the hooks tests and `node scripts/verify.mjs` on a project generated from the new lock.
 
 To try an unreleased catalog, use `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`.
 

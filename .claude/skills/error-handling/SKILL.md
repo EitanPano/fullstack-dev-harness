@@ -84,17 +84,20 @@ provider payloads in a response.
 
 ## Frontend
 
-- The route error boundary catches unexpected failures; every route segment that loads data
-  has a loading state and an error boundary. Their messages are user-safe.
-- How a loader reports an expected failure is in the package's `AGENTS.md › Errors`: a Next
-  loader returns a value (`{ reachable: false, reason }`) so the page renders a state; an SPA
-  loader throws to the route's error boundary.
-- The package's action (a Next server action or an SPA route action) returns the action
-  result its `AGENTS.md › Errors` names for validation and domain failures, shown by its
-  toast library, specific to the action that failed, with a recovery hint (retry, fix the
-  field, sign in again).
-- Never show a raw error message from the server in the UI; map the status to a message
-  the user can act on.
+- Every route group has a `loading` and an `error` state, the root has a last-resort
+  boundary, and every widget has a skeleton that matches its layout. Their messages are
+  user-safe.
+- `call` (`shared/api/call.ts`) is the only reader of a generated-client result. It returns
+  the data or throws an `ActionError` (`shared/lib/action-error.ts`) whose message comes from
+  the feature's copy table keyed by the envelope `code`, then the default copy. The server's
+  `message` is never shown.
+- In Next, a public cached loader lets the `ActionError` propagate and the widget renders
+  `ErrorState` (`shared/ui/pattern/error-state.tsx`); in an SPA a failing loader or refetch
+  reaches the group's `ErrorBoundary`. An unexpected error reaches the nearest boundary.
+- In Next, an action returns the `ActionError` message as `serverError`; in an SPA the
+  handler awaits `mutateAsync`, which rejects, and calls `reportFailure`. Either way field
+  errors appear on their fields, the outcome in a toast, specific to the action that failed,
+  with a recovery hint (retry, fix the field, sign in again). The package's `AGENTS.md › Errors` has the details.
 
 ## Tests
 

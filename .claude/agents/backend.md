@@ -64,7 +64,7 @@ Tests first: <test command> → <N failed, M passed> before implementation; fail
 Gates: verify --package backend <ok|fail>
 Migrate: <the migrate command and its result, or n/a>
 Contract: regenerated <yes|no> · <unchanged since contract stage | the change, named>
-Commands: <testDb=<command>; migrate=<command> when this task adds the data layer, else none>
+Commands: <testDb=<command>; migrate=<command>; e2eDb=<command> when this task adds the data layer, else none>
 Docs: <anything but the change log (the driver writes that): after a deploy-mode switch the Deploy mode line and the local TRUST_PROXY default line, or none>
 Glossary: <new domain terms with one-line definitions, or none>
 Delete: <repository-relative path inside your lane, one per line, or none>
