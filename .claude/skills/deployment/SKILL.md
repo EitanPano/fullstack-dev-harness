@@ -181,6 +181,13 @@ value is the number of proxy hops in front of the server.
   front of `split` is 2: the edge and the frontend's nginx). Ask the user for the new count;
   if there is no answer yet, restore the FILL marker in the production half of the doc line
   and list it as open in the report. Do not carry the old number over or pick one.
+- A Next frontend is itself the hop in front of the API (its server calls it), so it is not an extra one on top of `split`'s count. Set the opt-in `CLIENT_IP_HEADER` (in
+  the shell environment Compose reads) to the header your proxy overwrites with the visitor's
+  address (`x-forwarded-for` or `x-real-ip`); the frontend then forwards it and `TRUST_PROXY`
+  must count the frontend as a hop. Without it all visitors share one bucket: about 30 active
+  signed-in visitors per 15 minutes before refresh and sign-in answer 429. Safe only when
+  visitors cannot reach the frontend directly and the proxy overwrites the header; the recipe
+  is in the frontend package's `AGENTS.md › Deployment`.
 - Too high: a caller chooses its own rate-limit key through `X-Forwarded-For`. Too low: every
   caller is keyed to the nearest proxy, so one caller exhausts the limit for everyone.
 - Record the production value in `.doc/architecture.md › Deployment` (it stays a FILL until
@@ -206,6 +213,11 @@ More than one replica of the server needs, first:
   (rate limits, sessions, the event bus). The template runs as one instance until both exist.
 - Jobs on exactly one replica: `JOBS_ENABLED` true on one and false on the rest.
 
+A Next frontend scales alone, and each replica has its own `'use cache'` store: `updateTag`
+expires only the instance that ran the action. Past one replica, keep `cacheLife` short for data
+that must change quickly, or configure a shared cache handler first
+(the frontend package's `AGENTS.md › Deployment`).
+
 In `single` the frontend scales with the server. `split` lets the static-server image scale
 alone, which is its reason to exist.
 
@@ -228,8 +240,8 @@ than the API needs all of:
 3. A CSRF defence, in both cases (sibling subdomains are same-site): a synchroniser token, or
    a double-submit cookie with a custom header the server requires. Add a test that a
    mutation without it is refused.
-4. An API base URL in the bundle, read only through `src/env.ts`. This gives up the
-   "relative `/api`" rule on purpose; the typed client's `baseUrl` changes with it, and the
+4. An API base URL in the bundle, read only through `src/shared/config/env.ts`. This gives up
+   the "relative `/api`" rule on purpose; the `baseUrl` in `shared/api/client.ts` changes with it, and the
    client sends `credentials: 'include'`, because fetch's same-origin default withholds
    cookies on a cross-origin request.
 

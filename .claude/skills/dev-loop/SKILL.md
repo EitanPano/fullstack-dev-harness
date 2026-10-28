@@ -113,13 +113,15 @@ id and (frontend) the figma URL if any.
    registration, the `contract` command, its report, then stop.
 2. Then, in one message, SendMessage to that backend agent ("continue: implement the rest of
    the plan") and dispatch `frontend`. With no backend stage, or no Contract section, backend
-   and frontend start together in one message.
+   and frontend start together in one message. A backend report's `Commands:` line (the
+   data-layer task adds `testDb`, `migrate` and `e2eDb`) is written into
+   `.fullstack/catalog.yaml` under `packages.<dir>.commands` as soon as it arrives, before any
+   later frontend dispatch and before the next `verify`. A full-stack data-layer task
+   (`database` skill, item 7) therefore runs its backend stage first.
 3. The frontend stops after `check` with `E2E: pending backend` in its report when a backend
-   stage exists. Once the backend reports, SendMessage it "backend ready: run
+   stage exists. Its e2e runs the production build and starts the API itself. Once the backend reports, SendMessage it "backend ready: run
    `verify --package frontend --reuse` (with `testE2e`), fix, update your report".
-4. Apply the deletions below. If a backend report has a `Commands:` line (the data-layer task
-   adds `testDb` and `migrate`), write those commands into `.fullstack/catalog.yaml` under
-   `packages.<dir>.commands` before the next `verify`. Then run
+4. Apply the deletions below. Then run
    `node scripts/verify.mjs --plan <plan> --reuse`. Red goes back to the owner by file as a
    SendMessage continuation and counts as a fix round.
 

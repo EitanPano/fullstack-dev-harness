@@ -125,7 +125,11 @@ helper names are in `backend/AGENTS.md › Adding a module`.
    names, and runs the server's `contract` command, which produces the OpenAPI document (a
    test fails when it is stale).
 3. The frontend runs its `contract` command, which regenerates its types from that
-   document, and calls the typed client from a feature loader; the result is typed,
-   including the error envelope. The frontend never hand-writes an API type.
+   document. A read goes in the entity's loader (`entity/<noun>/server/<noun>.ts` in Next,
+   `entity/<noun>/api/<noun>.ts` in an SPA) and a mutation in the feature
+   (`feature/<action>/server/action.ts`, or `api/` in an SPA); both call the typed client in
+   `shared/api/generated/` through `call`, so the result is typed, including the error
+   envelope. A form schema extends the generated zod schema (`zod.gen`); a limit is never
+   copied from the backend. The frontend never hand-writes an API type.
 4. Both generated files are committed in the same task. A breaking change to a response
    shape is a new plan, not a silent edit.
