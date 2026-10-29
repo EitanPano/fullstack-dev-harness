@@ -14,8 +14,13 @@ each chosen template's own tools.
 ## 0. Preflight
 
 - A git repository: run `git rev-parse --show-toplevel`. When it fails, offer `git init` and
-  say that the scaffold commit becomes the root commit. `scripts/bootstrap.mjs` refuses to run
-  outside a git work tree (`--fetch` writes no project and skips the check).
+  say that the harness becomes the root commit (next item). `scripts/bootstrap.mjs` refuses to
+  run outside a git work tree (`--fetch` writes no project and skips the check).
+- A repository with no commit: run `git rev-parse --verify HEAD`, also in a repository that
+  already existed. When it fails, ask the user to approve committing the
+  untouched harness as the root commit before the scaffold (`chore: import the harness`).
+  Say why: `--finish` needs a HEAD to tell the harness's files from the project's changes, and
+  refuses without one. Commit only on their yes.
 - The tools: Bun 1.4+, Node 24+, git, and each chosen template's `tools` (section 2 checks
   those once the stack is chosen).
 
@@ -34,6 +39,10 @@ mode, tracker, backlog lines). Then:
 2. Collect every gap: a FILL marker the brief does not answer, a value the catalog cannot take,
    a clash with the glossary. Ask about all of them in one message, each with the skill's
    default or recommendation. Do not walk the sections.
+   Infer the Search and sharing answer (do public pages need to be found by search engines or
+   show a rich preview when shared?) from the brief; ask it in the gap message only when the
+   brief is silent. It is written into the product definition and decides the frontend
+   (section 2).
 3. Compare the brief with the template gaps below.
 4. Show one summary to confirm: the forms, the stack and its flags, the database capability,
    the deploy mode, the brand (every flag with its value, the display name included), the
@@ -59,8 +68,9 @@ roles and password rule with those. Each difference is a gap:
 
 Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in order, ask the
 user one question at a time and replace the marker with their answer. Keep answers in
-their words; suggest a default only when they ask. The `Design` section is part of this walk;
-a product with no frontend answers it "n/a". Its brand fields become scaffold flags in
+their words; suggest a default only when they ask. Ask the Search and sharing line (Non-functional
+Requirements) with the form; the answer decides the frontend in section 2. The `Design` section is part of this walk;
+a product with no frontend answers it "n/a", and answers Search and sharing "n/a" too (which resolves that FILL marker). Its brand fields become scaffold flags in
 section 3. Do the same for `.doc/architecture.md`
 (Data store, Data Model, Data migrations, API versioning, Auth, External Dependencies,
 Deployment, except its `Deploy mode` and `TRUST_PROXY` lines, which section 5 fills once the
@@ -104,10 +114,18 @@ start the scaffold while a marker remains in a section the checklist names.
 node scripts/bootstrap.mjs --fetch
 ```
 
-It prints `catalog: <path>` and then `index.yaml`. Present the `stacks:` entries (id and
-summary) and ask which one. For the chosen stack, Read `<catalog>/stacks/<id>/stack.yaml`
-(its `packages:` list: a `template` path and a `dir` each) and each package's
-`<catalog>/<template path>/template.yaml`. Ask every flag the templates declare (show its
+It prints `catalog: <path>` and then `index.yaml`. Do not present the whole `stacks:` list.
+Read each stack's `<catalog>/stacks/<id>/stack.yaml` (its `packages:` list: a `template` path
+and a `dir` each) and each package's `<catalog>/<template path>/template.yaml`. Narrow by the
+Search and sharing answer, deciding by the `static` declaration and never by a stack id:
+
+- "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today).
+- "no": keep the stacks whose frontend declares `static` (a single-page app, React today).
+- A stack with no frontend skips this question.
+
+Ask only the remaining choice (the server today). Show the chosen stack with its reason (for
+example "single-page app: no public page needs search or sharing") and accept an override. Ask
+every flag the templates declare (show its
 `summary` and `default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
 
@@ -177,6 +195,10 @@ The brand flags come from the `Design` form; pass only the fields that hold a va
   re-run.
 - `Tone`, `Reference apps` and `Primary viewport` stay in the form and have no flag.
 - `node scripts/bootstrap.mjs --help` prints the usage and every flag.
+
+Once the generator has run, `bootstrap.mjs` writes the root `README.md` from a template: the
+mechanical sections are filled, and two placeholder lines remain (`<!-- readme:about -->`,
+`<!-- readme:features -->`) for section 5.
 
 It creates the packages the stack lists, under the directories the stack names; a merged
 `docker-compose.yml` and `.gitignore`; `.editorconfig` when absent; and
@@ -265,7 +287,12 @@ what that task delivers, and why the frontend takes part). With a provider, the
 first line is the first in-scope capability from the product definition; without one it is
 the next line. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
 `Stack` row of the components table in `.doc/architecture.md` from `.fullstack/catalog.yaml`:
-the stack id and, per package, its directory, template and version. Fill the Auth Client
+the stack id and, per package, its directory, template and version, plus the reason for the
+frontend choice (the Search and sharing answer). In `README.md`, replace
+`<!-- readme:about -->` with About, written from Purpose and Problem Statement, and
+`<!-- readme:features -->` with Features: the in-scope capabilities from Product Scope, one
+line each, written `- <capability> (planned)` (nothing is built yet); the dev loop removes the
+` (planned)` suffix when a task delivers the capability. Fill the Auth Client
 model line for the frontend kind (section 1). Fill `.doc/architecture.md › Operational
 Concerns › Deployment`: the deploy mode (the top-level `deploy:` of
 `.fullstack/catalog.yaml`; "split" when the file has no `deploy:`, a catalog before v1.2.0)
@@ -287,7 +314,13 @@ Later entries go above it (newest first). Tick the three boxes of `## Ready to p
 
 Create `chore/bootstrap` (never commit on `main`) and summarise what exists, including what
 the scaffold removed, as the bootstrap printed it: the harness's own plans (`.plan/001–…`;
-a product's first plan is `001`) and the auth text (under Auth none). Then ask the
+a product's first plan is `001`) and the auth text (under Auth none). As the last step before
+asking to commit, run `node scripts/bootstrap.mjs --finish`. It refuses while a
+`<!-- readme:` placeholder remains (fill it and run again); writes `.fullstack/harness.json`,
+the harness version record; removes the `.gitignore` dev block and the harness-development
+files (tests, setup scripts, this skill); and warns when the git history still holds the
+harness's commits. Afterwards this skill's own files are gone: that is expected, and the
+commit includes the removals. Then ask the
 user whether to commit the scaffold as `chore(bootstrap): scaffold <project-name>`,
 including `.fullstack/catalog.yaml`; the dev loop starts only from a clean tree, so the
 first task waits for this commit. Commit only on their yes, then point them to `/dev-loop`
@@ -297,7 +330,9 @@ for the first task.
 
 - Run any scaffolder inside an existing package.
 - Browse the catalog cache.
-- Edit `scripts/`, `.claude/`, `catalog.lock` or other harness files.
+- Edit `scripts/`, `.claude/`, `catalog.lock` or other harness files by hand. The one change it
+  makes there is `--finish`, which removes this skill's own files and the harness development
+  files through the script, as designed.
 - Create a real env file; secrets stay in the shell environment.
 - Install a database client or start a database service. The exception: a provider chosen
   at generation was wired by the generator, and its Compose service is started with
