@@ -55,7 +55,9 @@ importers, and list the old path there. The driver removes it.
    `staff-class`). A route is captured only when it is in
    `app/nav.ts`, in `ROUTES` or, signed in, in `SIGNED_IN_ROUTES` (both in
    `frontend/tests/e2e/screens.spec.ts`): add a signed-in route to `SIGNED_IN_ROUTES` and a
-   public route that is not in the nav to `ROUTES`, or the files do not exist.
+   public route that is not in the nav to `ROUTES`, or the files do not exist. A
+   `SIGNED_IN_ROUTES` entry is `{ route }`; a role-gated route adds a `setup` that promotes
+   the account on the e2e database, per `frontend/AGENTS.md › Tests`.
    - Per route, Read the three screenshots (about 1.5k tokens each), apply the rubric's judged
      checks and fix what fails. One fix pass per route, then the partial `verify` with e2e.
    - A route that cannot be captured (a dynamic `/x/[id]` on the fresh e2e database) is
