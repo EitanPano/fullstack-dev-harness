@@ -11,12 +11,15 @@
 //     [--deploy single|split] [--display-name <text>] [--brand-primary <hex>]
 //     [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]
 //     [--theme system|light|dark] [--density comfortable|compact]
+//   node scripts/bootstrap.mjs --finish [--root <dir>]
 //
 // Steps: prerequisites → git work tree check (skipped for `--fetch`) → read the lock → locate the
 // catalog (cache clone checked against the locked commit, or a local override) → check the
 // catalog's schemaVersion → install the catalog tools → (`--fetch` prints the index and stops) →
 // refuse a second run → generate → verify `.fullstack/catalog.yaml` → clear the harness's own
-// history. `--skip-install` maps to the generator's `--skip-post-generate`. Environment:
+// history → write the project README. `--finish` is the last step before the commit: it records
+// the harness version and removes the harness-development files.
+// `--skip-install` maps to the generator's `--skip-post-generate`. Environment:
 // FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE
 // (cache root, default ~/.cache/fullstack-templates).
 import { spawnSync } from 'node:child_process'
@@ -25,12 +28,18 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { authFlagFrom, clearHarnessHistory } from './history.mjs'
+import {
+  MIN_BUN,
+  MIN_NODE,
+  authFlagFrom,
+  clearHarnessHistory,
+  finishProject,
+  writeProjectReadme,
+} from './history.mjs'
 import { readProvenance } from './provenance.mjs'
 
 const SUPPORTED_SCHEMA_VERSION = 1
-const MIN_BUN = [1, 4]
-const MIN_NODE = 24
+const README_TEMPLATE = ['.claude', 'skills', 'bootstrap-project', 'readme-template.md']
 
 // Brand options: forwarded unchanged and only when given. The generator validates them.
 const BRAND_FLAGS = [
@@ -51,6 +60,7 @@ const USAGE =
   '         [--deploy single|split] [--display-name <text>] [--brand-primary <hex>]\n' +
   '         [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]\n' +
   '         [--theme system|light|dark] [--density comfortable|compact]\n' +
+  '       node scripts/bootstrap.mjs --finish [--root <dir>]\n' +
   '       node scripts/bootstrap.mjs --help'
 
 const args = parseArgs(process.argv.slice(2))
@@ -63,6 +73,7 @@ const cacheRoot =
 main()
 
 function main() {
+  if (args.finish) return finish()
   step('Checking prerequisites')
   checkPrerequisites()
   if (!args.fetch) checkGitWorkTree()
@@ -134,7 +145,27 @@ function main() {
     console.log('  nothing to clear')
   }
 
+  step('Writing README.md')
+  try {
+    writeProjectReadme(root, args.name, path.join(harnessRoot, ...README_TEMPLATE), catalog)
+  } catch (error) {
+    fail(`writing README.md failed: ${error.message}`)
+  }
+  console.log('  wrote README.md (replace the readme: markers, then run --finish)')
+
   printNextSteps()
+}
+
+function finish() {
+  step('Finishing the project')
+  let done
+  try {
+    done = finishProject(root)
+  } catch (error) {
+    fail(error.message)
+  }
+  for (const action of done.actions) console.log(`  ${action}`)
+  for (const warning of done.warnings) console.warn(`  warning: ${warning}`)
 }
 
 function checkPrerequisites() {
@@ -386,7 +417,14 @@ function resolveCommand(command) {
 }
 
 function parseArgs(argv) {
-  const parsed = { fetch: false, skipInstall: false, flags: [], capabilities: [], brand: {} }
+  const parsed = {
+    fetch: false,
+    finish: false,
+    skipInstall: false,
+    flags: [],
+    capabilities: [],
+    brand: {},
+  }
   const value = (name, i) => {
     const next = argv[i]
     if (next === undefined || next.startsWith('--')) die(`${name} needs a value`)
@@ -398,6 +436,7 @@ function parseArgs(argv) {
       console.log(USAGE)
       process.exit(0)
     } else if (arg === '--fetch') parsed.fetch = true
+    else if (arg === '--finish') parsed.finish = true
     else if (arg === '--skip-install') parsed.skipInstall = true
     else if (arg === '--stack') parsed.stack = value(arg, ++i)
     else if (arg === '--name') parsed.name = value(arg, ++i)
@@ -426,6 +465,14 @@ function parseArgs(argv) {
     ) {
       die('--fetch accepts only --templates')
     }
+  } else if (parsed.finish) {
+    const allowed = ['finish', 'root', 'flags', 'capabilities', 'brand']
+    const others = Object.keys(parsed).filter(
+      (key) => !allowed.includes(key) && parsed[key] !== false && parsed[key] !== undefined,
+    )
+    const extra =
+      parsed.flags.length + parsed.capabilities.length + Object.keys(parsed.brand).length
+    if (others.length > 0 || extra > 0) die('--finish accepts only --root')
   } else if (parsed.stack === undefined || parsed.name === undefined) {
     die(`--stack and --name are required\n${USAGE}`)
   }

@@ -1,7 +1,8 @@
-// The gate the dev loop branches on: contract freshness, check, testDb, testE2e and the diff
-// checks over one working tree, with a tree hash at both ends. Exit 0 pass, 1 fail, 2 usage or
-// environment error. `node scripts/verify.mjs --plan <plan> [--package <dir>]... [--no-e2e]
-// [--reuse]`, or `[--base <commit>] --out <dir>` outside the loop.
+// The gate the dev loop branches on: contract freshness, check, testDb, testE2e, the diff
+// checks and (full run) the README configuration table over one working tree, with a tree hash
+// at both ends. Exit 0 pass, 1 fail, 2 usage or environment error.
+// `node scripts/verify.mjs --plan <plan> [--package <dir>]... [--no-e2e] [--reuse]`, or
+// `[--base <commit>] --out <dir>` outside the loop.
 // With --reuse a passing step whose key (package subtree, shared inputs, command, Base) is
 // unchanged is taken from an earlier result instead of re-run. A full run with a Base also
 // writes review.diff; --round <n> --round-base <tree> adds review-fix-<n>.diff.
@@ -13,6 +14,7 @@ import { check as hitCheck, diffChecks } from './verify/checks.mjs'
 import { addedLines, changedFiles, git, treeHash } from './verify/git.mjs'
 import { isMain } from './verify/main.mjs'
 import { portStatus, runCommand } from './verify/proc.mjs'
+import { readmeCheck } from './verify/readme.mjs'
 import {
   KEYED,
   carriedPackages,
@@ -391,6 +393,12 @@ export async function runVerify(options) {
       } catch (error) {
         addCheck('retired-terms', false, error.message)
       }
+    }
+    // A partial run is the implementers' run; they cannot write README.md, so only a full
+    // run checks it.
+    if (!partial) {
+      const c = readmeCheck(root)
+      addCheck(c.name, c.ok, c.detail)
     }
     const moved = endTree === startTree ? [] : changedFiles(root, startTree, endTree, scope)
     addCheck('tree-unchanged', moved.length === 0, moved.join(', '))

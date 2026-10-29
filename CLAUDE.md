@@ -6,3 +6,4 @@ imported here so it loads into every session and every sub-agent; Claude Code lo
 rules folder on its own.
 
 @AGENTS.md
+@.doc/conventions.md

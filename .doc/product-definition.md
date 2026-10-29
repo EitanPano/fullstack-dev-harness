@@ -40,6 +40,7 @@ holds a marker. Delete a marker only by replacing it with a decision.
 - Browsers: last two versions of Chrome, Firefox, Safari, Edge <!-- FILL: confirm or change -->
 - Performance: <!-- FILL: e.g. first page under 2 s on a 4G connection -->
 - Locale: <!-- FILL: single language (which) | multiple (which) -->
+- Search and sharing: <!-- FILL: yes | no. Do any public pages need to be found by search engines or show a rich preview when shared? -->
 - Data retention and privacy: <!-- FILL: anything the product must or must not keep -->
 
 ## Design
@@ -72,6 +73,6 @@ reports against it.
 ## Ready to plan
 
 - [ ] No `FILL` marker remains in Purpose, Target Users, Product Scope, Auth and Tenancy, Design or
-      Acceptance Criteria.
+      Acceptance Criteria, nor in the Search and sharing line.
 - [ ] `.doc/architecture.md` has its data model and API sections filled.
 - [ ] `.doc/glossary.md` names every entity used above.

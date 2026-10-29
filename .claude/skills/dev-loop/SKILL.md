@@ -1,6 +1,6 @@
 ---
 name: dev-loop
-description: Take one backlog task from plan to reviewed, tested code through the role agents. Use when the user says "run the loop", "next task", "implement <task>", "start the dev loop", or asks to deliver a backlog item. Drives orchestrator → approval → backend contract → backend and frontend → verify → review and QA in parallel → commit gate, with bounded fix rounds. Requires frontend/ and backend/ to exist (otherwise use bootstrap-project).
+description: Take one backlog task from plan to reviewed, tested code through the role agents. Use when the user says "run the loop", "next task", "implement <task>", "start the dev loop", or asks to deliver a backlog item. Drives orchestrator → approval → backend contract → backend and frontend → verify → review and QA in parallel → commit gate, with bounded fix rounds. Requires the generated packages and .fullstack/catalog.yaml (a fresh clone is set up first).
 ---
 
 # Dev loop
@@ -60,8 +60,8 @@ Role agents cannot delete files (the hooks refuse it). They list a file to remov
 
 ## 0. Preconditions
 
-- `.fullstack/catalog.yaml` exists (the bootstrap ran); otherwise run `bootstrap-project`
-  first.
+- `.fullstack/catalog.yaml` exists (setup ran). Otherwise this is a fresh clone: set it up
+  first (the `bootstrap-project` skill exists only until setup removes it).
 - The working tree is clean and the branch is not `main`. A tree left dirty by the
   bootstrap means its commit gate was never answered: ask the user to approve that
   commit. Any other uncommitted change: list it and stop; never stash or discard it.
@@ -139,7 +139,11 @@ id and (frontend) the figma URL if any.
    `testE2e`), then the UI pass, fix, update your report". Without a backend stage the frontend
    runs the UI pass in its own dispatch.
 4. Once the implementers are dispatched, start the lookahead (below).
-5. Apply the deletions below. Then run
+5. Apply the deletions below. Always run `node scripts/readme.mjs --configuration`: it
+   regenerates the README's Configuration block and is idempotent and cheap. In `README.md`'s
+   Features, remove the ` (planned)` suffix from the line the plan's Goal delivers; add a line
+   only when the Goal adds or changes a user-visible capability and no line matches
+   (infrastructure-only tasks add none). Then run
    `node scripts/verify.mjs --plan <plan> --reuse`. Red goes back to the owner by file as a
    SendMessage continuation and counts as a fix round. A `retired-terms` hit on a legitimate
    use is not red for an implementer: narrow `Retired:` yourself, record it under
@@ -208,7 +212,8 @@ they go to the section 6 summary as open P2s.
    record that run's `tree` as the round's base.
 2. Send the owners (`backend` or `frontend`, by file) every P0/P1 finding and QA FAIL item that
    belongs to them, quoted verbatim, in one message.
-3. Run `git add --intent-to-add .`, then
+3. When the round changed an `.env.example` or the capability, first do section 3 step 5's README work
+   (`readme.mjs --configuration`, the Features line). Run `git add --intent-to-add .`, then
    `node scripts/verify.mjs --plan <plan> --reuse --round <n> --round-base <round base tree>`.
    It also writes `review-fix-<n>.diff`, the diff from the round base.
 4. The reviewer re-reads only that file, in the mode that raised the finding
