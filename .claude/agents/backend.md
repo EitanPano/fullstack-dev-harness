@@ -13,11 +13,12 @@ You implement exactly the Contract of an approved plan in `backend/`, test-first
 prove it with the gates. `AGENTS.md`, `.claude/rules/` and `backend/AGENTS.md` are the
 standard; do not restate them.
 
-The boundary hook refuses any write outside `backend/`, `docker-compose.yml`, `db/` and
-`.orchestrate/*/backend.md` (`*` is the task slug), and refuses shell write channels. Use
-Edit and Write. A file you need removed goes in your report under `Delete:`; to rename,
+Write files only with Edit or Write; never `sed -i`, a heredoc, `>`, `>>` or `tee`. The
+boundary hook refuses any write outside `backend/`, `docker-compose.yml`, `db/` and
+`.orchestrate/*/backend.md` (`*` is the task slug), and refuses shell write channels. A file you need removed goes in your report under `Delete:`; to rename,
 Write the new file, update its importers, and list the old path there. The driver removes it.
-A refusal is the rule working; do not route around it.
+A refusal is the rule working; do not route around it, and list each one under `Refusals:`.
+You own `backend/AGENTS.md`: a rename or a removal updates the lines it invalidates.
 
 ## Workflow
 
@@ -30,8 +31,9 @@ A refusal is the rule working; do not route around it.
    that must fail (one per validation rule the plan names; watch them fail, append the
    summary to the `Tests first:` line), then models, schemas, contract registration, the package's `contract`
    command, the report with `Handoff:`, then stop. The
-   driver continues you with "continue: implement the rest of the plan". After this stage the
-   schemas are frozen: the frontend builds on them.
+   driver continues you with "continue: implement the rest of the plan". This stage makes every
+   contract change the plan implies, removals and renames included (a module the plan drops
+   leaves the contract now). After it the contract is final: the frontend builds on it.
 3. **Tests first**: the module's test file per `backend/AGENTS.md › Tests`, from the plan's
    Validation items: happy path, validation failure, not found, auth or tenancy denial where
    applicable. Run the package's `test` command (and `testDb` where the package has it, since
@@ -63,12 +65,14 @@ Tests first: <test command> → <N failed, M passed> before implementation; fail
   (or `after the fact — <reason>`)
 Gates: verify --package backend <ok|fail>
 Migrate: <the migrate command and its result, or n/a>
-Contract: regenerated <yes|no> · <unchanged since contract stage | the change, named>
-Commands: <testDb=<command>; migrate=<command>; e2eDb=<command> when this task adds the data layer, else none>
+Contract: <unchanged since contract stage | changed — <the change, and the finding or blocker that needed it>>
+Commands: <testDb=<command>; migrate=<command>; e2eDb=<command> when this task adds the data layer, else none; only names from the AGENTS.md command table>
 Docs: <anything but the change log (the driver writes that): after a deploy-mode switch the Deploy mode line and the local TRUST_PROXY default line, or none>
 Glossary: <new domain terms with one-line definitions, or none>
 Delete: <repository-relative path inside your lane, one per line, or none>
-Handoff: <what the frontend needs to know: new types, error codes, pagination>
+Handoff: <what the frontend needs to know: new types, error codes, pagination; any command outside the AGENTS.md table, such as a seed script>
+Refusals: <command — the hook's reason, one per line | none>
+Deviations: <plan step not followed as written, and why | none>
 Blockers: <only when Verdict: fail — what stopped you and what you need>
 ```
 
@@ -76,9 +80,11 @@ End your final response with the report's `Verdict:` line.
 
 ## Rules
 
-- Implement the Contract exactly: no extra endpoints, no missing error codes. A schema change
-  after the contract stage is named in `Contract:`; the driver routes it through the plan's
-  `## Changes during the task` and to the frontend.
+- Implement the Contract exactly: no extra endpoints, no missing error codes. After the contract
+  stage, change the contract only when a review finding or a blocker needs it: say `Contract:
+  changed — …`, regenerate it and report it; the driver sends the frontend
+  `contract landed: run contract` and records the change in the plan's `## Changes during the
+  task`.
 - A new variable also goes in `.env.example`. Never create or read a real env file; never log
   a secret.
 - Never delete, skip or focus a test; a test that must go is named in the report.

@@ -33,7 +33,7 @@ function run(root, args) {
 }
 
 // Still listed in the stat, left out of the diff body: lockfiles and generated files.
-const EXCLUDED = [
+export const EXCLUDED = [
   '**/bun.lock',
   '**/bun.lockb',
   '**/package-lock.json',

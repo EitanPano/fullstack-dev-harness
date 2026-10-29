@@ -9,7 +9,7 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { readProvenance } from './provenance.mjs'
-import { diffChecks } from './verify/checks.mjs'
+import { check as hitCheck, diffChecks } from './verify/checks.mjs'
 import { addedLines, changedFiles, git, treeHash } from './verify/git.mjs'
 import { isMain } from './verify/main.mjs'
 import { portStatus, runCommand } from './verify/proc.mjs'
@@ -24,7 +24,8 @@ import {
   writeJsonAtomic,
 } from './verify/reuse.mjs'
 import { writeReviewPackage } from './verify/review.mjs'
-import { securityPaths } from './verify/security.mjs'
+import { parseRetired, retiredHits } from './verify/retired.mjs'
+import { securityFor } from './verify/security.mjs'
 import { parseSummary, tail } from './verify/summary.mjs'
 
 const MIN = 60_000
@@ -122,6 +123,7 @@ export async function runVerify(options) {
   const fail2 = (reason) => finish(2, { reason, ok: false })
 
   let base = options.base
+  let retired = []
   if (options.plan !== undefined) {
     let text
     try {
@@ -130,6 +132,7 @@ export async function runVerify(options) {
       return fail2(`cannot read the plan ${options.plan}`)
     }
     const plan = parsePlan(text)
+    retired = parseRetired(text)
     if (plan.slug === undefined) return fail2(`${options.plan} has no Branch: line with a slug`)
     outDir ??= path.resolve(root, path.join('.orchestrate', plan.slug))
     base ??= plan.base
@@ -350,10 +353,13 @@ export async function runVerify(options) {
         let ready = true
         // Every server's migrate runs, not only the selected ones: a frontend-only run still
         // needs the backend's database migrated.
+        // A server with `e2eDb` prepares its own database in the e2e chain, so its dev
+        // migrate is skipped; a 1.x server without it keeps the step.
         for (const pkg of catalog.packages.filter((p) => !isFrontend(p) && has(p, 'migrate'))) {
           const db = await ensureDatabase()
           if (!db.ok) refuse(pkg, 'migrate', db.reason)
-          ready = db.ok && (await step(pkg, 'migrate')) && ready
+          else if (has(pkg, 'e2eDb')) skip(pkg, 'migrate', 'skipped: e2eDb prepares the e2e database')
+          ready = db.ok && (has(pkg, 'e2eDb') || (await step(pkg, 'migrate'))) && ready
         }
         // Every package's port, not only the frontend's: the e2e config starts all the servers.
         const busy = []
@@ -377,13 +383,23 @@ export async function runVerify(options) {
         addCheck(c.name, c.ok, c.detail)
       }
     }
+    if (retired.length > 0) {
+      const dirs = (scope ?? catalog.packages.map((pkg) => pkg.dir)).filter(Boolean)
+      try {
+        const c = hitCheck('retired-terms', retiredHits(root, dirs, retired))
+        addCheck(c.name, c.ok, c.detail)
+      } catch (error) {
+        addCheck('retired-terms', false, error.message)
+      }
+    }
     const moved = endTree === startTree ? [] : changedFiles(root, startTree, endTree, scope)
     addCheck('tree-unchanged', moved.length === 0, moved.join(', '))
 
     // The security trigger is a property of the whole change, so only a full run states it.
     if (!partial && base !== undefined) {
-      const paths = securityPaths(changedFiles(root, base, endTree))
-      result.security = { triggered: paths.length > 0, paths }
+      const files = changedFiles(root, base, endTree)
+      const patch = git(root, ['diff', '--unified=0', '--no-color', '--no-renames', base, endTree])
+      result.security = securityFor(files, patch)
     }
     // A step is reusable only if it passed and its inputs were the same when the run ended.
     const endKey = keyFactory(root, endTree, catalog.packages, isFrontend, base)
