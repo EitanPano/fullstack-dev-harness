@@ -585,15 +585,52 @@ test('finishProject refuses when no harness file is tracked', () => {
   assert.throws(() => finishProject(root), /harness files/)
 })
 
-test('finishProject keeps a staged-new and a deleted dev file, and lists them', () => {
+test('finishProject keeps a staged-new dev file and lists it', () => {
   const root = project()
   put(root, 'tmpdev/new.mjs', 'x\n')
   gitOut(root, 'add', 'tmpdev/new.mjs')
-  rmSync(path.join(root, 'tmpdev', 'sub', 'a.mjs'))
   const { actions } = finishProject(root)
   assert.ok(existsSync(path.join(root, 'tmpdev', 'new.mjs')))
   assert.match(actions.join('\n'), /kept[^\n]*tmpdev\/new\.mjs/)
-  assert.match(actions.join('\n'), /kept[^\n]*tmpdev\/sub\/a\.mjs/)
+})
+
+test('finishProject neither removes nor lists a tracked dev file already deleted on disk', () => {
+  const root = project()
+  rmSync(path.join(root, 'tmpdev', 'sub', 'a.mjs'))
+  const { actions } = finishProject(root)
+  assert.doesNotMatch(actions.join('\n'), /tmpdev\/sub\/a\.mjs/)
+  assert.doesNotMatch(actions.join('\n'), /kept[^\n]*\.plan\/001-clean\.md/)
+})
+
+function readmeFor(origin, { harnessUrl = 'https://example.com/h', name = 'plant-care' } = {}) {
+  const { root, template } = readmeFixture({ remote: false })
+  if (origin !== undefined) gitOut(root, 'remote', 'add', 'origin', origin)
+  put(root, '.claude/harness.json', JSON.stringify({ repository: harnessUrl }))
+  writeProjectReadme(root, name, template, catalogRoot())
+  return readFileSync(path.join(root, 'README.md'), 'utf8')
+}
+
+test('the README hides an origin that is the harness repository, with or without .git', () => {
+  for (const origin of ['https://example.com/h', 'HTTPS://example.com/H.git/']) {
+    const text = readmeFor(origin)
+    assert.match(text, /git clone <repository-url>\ncd plant-care\n/, origin)
+  }
+})
+
+test('the README hides a local filesystem origin', () => {
+  for (const origin of ['C:/Dev/harness', '/srv/harness', './harness', '../harness']) {
+    assert.match(readmeFor(origin), /git clone <repository-url>\ncd plant-care\n/, origin)
+  }
+  assert.match(readmeFor('file:///srv/harness'), /git clone <repository-url>\ncd plant-care\n/)
+})
+
+test('the README keeps the origin of a real product repository', () => {
+  const text = readmeFor('https://example.com/me/plant-care.git')
+  assert.match(text, /git clone https:\/\/example\.com\/me\/plant-care\.git\ncd plant-care\n/)
+})
+
+test('the README uses the placeholder and the project name when there is no origin', () => {
+  assert.match(readmeFor(undefined, { name: 'zed' }), /git clone <repository-url>\ncd zed\n/)
 })
 
 test('finishProject lists a modified dev file as kept', () => {

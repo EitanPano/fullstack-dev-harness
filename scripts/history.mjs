@@ -163,9 +163,29 @@ function prerequisites(root, packages, catalogRoot) {
   return lines.join('\n')
 }
 
+const normalizedUrl = (url) =>
+  url
+    .trim()
+    .toLowerCase()
+    .replace(/\/+$/, '')
+    .replace(/\.git$/, '')
+
+// An origin that is a local path or the harness itself (a plain `git clone` of it) is not the
+// product's repository, so the README shows a placeholder instead of leaking it.
 function repositoryUrl(root) {
   const remote = gitIn(root, ['remote', 'get-url', 'origin'])
-  return remote.status === 0 && remote.stdout.trim() !== '' ? remote.stdout.trim() : undefined
+  const url = remote.status === 0 ? remote.stdout.trim() : ''
+  if (url === '' || /^([a-z]:|\/|\.\.?\/|file:)/i.test(url)) return undefined
+  try {
+    const manifest = readFileSync(path.join(root, '.claude', 'harness.json'), 'utf8')
+    const harness = JSON.parse(manifest).repository
+    if (typeof harness === 'string' && normalizedUrl(harness) === normalizedUrl(url)) {
+      return undefined
+    }
+  } catch {
+    // No readable manifest: nothing to compare with, so the origin stands.
+  }
+  return url
 }
 
 // In development the app is the frontend's dev server, which proxies /api; only the Compose
@@ -313,7 +333,10 @@ export function finishProject(root) {
     throw new Error('no harness files are tracked in this repository: nothing to record')
   }
   const { touched, pristine } = headState(root)
-  const devFiles = filesIn(manifest, 'dev', [...files, ...untrackedFiles(root)])
+  // A dev file already gone from disk (bootstrap removed it) is neither removed nor kept.
+  const devFiles = filesIn(manifest, 'dev', [...files, ...untrackedFiles(root)]).filter((file) =>
+    existsSync(path.join(root, file)),
+  )
   const removable = devFiles.filter(
     (file) => pristine.has(file) && groupsOf(manifest, file).length === 1,
   )
