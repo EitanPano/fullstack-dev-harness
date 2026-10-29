@@ -1,6 +1,6 @@
 # The project boundary: harness updates, the frontend choice and the project README
 
-Status: active
+Status: done
 Owner: Eitan
 Last updated: 2026-10-29
 Approval: delegated (2026-10-29, Eitan: "go, yes to both recommendations"), confirming OQ1 and OQ2
@@ -380,3 +380,101 @@ previous files. Catalog v1.5.1 affects only new projects. No project yet carries
     `permissions.ask`.
 - **Validation edits.** V05's duplicate-line command ignores blank lines, and V07 exempts the
   record.
+
+## As built
+
+- **Harness:** eight commits on `feat/project-boundary` (49901dc..87ff3ba), base d67b222.
+- **Catalog:**
+  - #18 (`fix/next-gitignore`) merged into catalog `dev` as aa4cbe1, CI 32/32;
+  - release #19 merged into catalog `main` as 87820a3, CI 64/64;
+  - tag v1.5.1 on 87820a3, published by the release workflow (run 40933781863);
+  - harness `catalog.lock` pins v1.5.1 (239a7f9).
+- **Ledger:** `.superpowers/sdd/017-2026-10-29-project-boundary/progress.md`, rulings R1–R26, where every
+  proof command's output is recorded.
+
+Validation:
+
+- **V01 holds.** The manifest's real-tree tests pass inside the scripts suite: 262/262 on the
+  branch head. Every tracked file is in exactly one group. No `harness` file names a `dev` path
+  outside the allowlist. No `harness` module imports a `dev` one.
+- **V02 holds.** `bootstrap.test.mjs` and `history.test.mjs` cover these cases:
+  - no HEAD, or an empty harness list;
+  - a README placeholder or a missing README;
+  - a staged-new dev file, and one already deleted;
+  - the multi-group guard and an unterminated dev block;
+  - the history warning and the record.
+- **V03 holds.** `readme.test.mjs` and `verify.test.mjs` cover these cases:
+  - optional variables and placeholder secrets;
+  - a deleted unstaged example;
+  - a stale table, a missing block and a missing README;
+  - partial runs skipping the check.
+- **V04 holds.** `harness-update.test.mjs` passes 27/27. It covers these cases:
+  - the record keys deletions and collisions;
+  - a reclassified file is kept;
+  - the settings merge, and a non-permission edit counts as a local edit;
+  - a null `settings` and an unknown `format` are refused;
+  - `minCatalog` names the newest compatible tag;
+  - a dirty tree and a non-repository root are refused;
+  - the atomic apply restores after a failure past the hook check;
+  - the real shipped hooks pass the three payloads.
+- **V05 holds.** PB1 ran in `…-proof-017`: a "no" brief, Bun, no database, about 6.5 minutes.
+  - The bootstrap's `verify` passed: backend check 419, frontend check 254, e2e 40, nothing
+    skipped. The dev check and the Compose app check passed too.
+  - `--finish` exited 0 and the scaffold was committed (ef77cfc).
+  - No `dev` file is left; `.plan/000-backlog.md` stays.
+  - `.gitignore` has no duplicate line and no `.next/` or `next-env.d.ts`.
+  - The README follows the structure, with no `readme:` marker, and
+    `readme.mjs --configuration` leaves the tree clean.
+  - `.doc/conventions.md` is present, and `.fullstack/harness.json` records the commit and the
+    harness files.
+- **V06 holds.**
+  - PB1 inferred "no" from the brief and chose `react-bun-express`, deploy `single`, with the
+    reason "single-page app: no public page needs search or sharing" in the summary and in the
+    Stack row.
+  - PB2 (`…-proof-017-next`, stopped at the summary) inferred "yes" and chose
+    `next-bun-express`, with the reason "server-rendered (Next): public recipe pages need search
+    and sharing previews".
+  - Both offered an override.
+- **V07 holds.** PB3 applied a scratch release (`…-proof-017-release`) to PB1's project four times:
+  - **Clean run:** exit 0. Only the edited hook, the removed and the added harness file, and
+    the record changed.
+  - **Hand-edited harness file:** the update stopped (exit 1), named the file and wrote
+    nothing.
+  - **Broken hook:** the hook check failed, everything was restored and the backup path was
+    printed; the tree and HEAD were unchanged.
+  - **Project allow entry:** the entry was kept, and the record's `settings` stayed the
+    release's own.
+- **V08 holds.**
+  - `tools/tests/real-catalog.test.ts` covers all four stacks.
+  - Catalog CI passed: 32/32 on #18 and 64/64 on #19.
+  - PB1's React `.gitignore` has no Next lines.
+- **V09 holds.**
+  - hooks 1702/1702 (unchanged);
+  - scripts 262/262 (163 before the plan);
+  - `AGENTS.md` at 1,200 words.
+- **V10 holds.**
+  - Each task got a Sonnet review, with fix rounds on H1, H2, H4 and H5a.
+  - An Opus whole-branch review found six Important issues, fixed in one wave. Its Opus
+    re-review found three deleted tests, which were restored.
+  - PB1's two defects were fixed and re-reviewed.
+  - No P0 or P1 finding is open; the minors are parked in the ledger.
+
+Found by the proof and fixed (87ff3ba):
+
+- A project made by `git clone` of the harness got the harness URL in its README.
+- `--finish` listed already-deleted plans as kept.
+
+Follow-ups (proposed backlog for the harness, not done here):
+
+- `harness-update.mjs`: `main()` loads the project manifest unwrapped (a stack trace on a bad
+  format). `localEdits` refuses on an edited file that a release reclassifies to `project`.
+- `history.mjs`: `templateTools` reads `min` only in the one-line YAML style, and keeps the first
+  minimum on dedupe.
+- `bootstrap-project` SKILL.md (PB2): lines ~51–56, which read the server `AGENTS.md` for template
+  gaps, conflict with ~160–162, which allow only three catalog files. It is also unclear how much
+  of `architecture.md` and `glossary.md` to fill before the summary.
+- `verify.mjs --help` exits 2. This predates the plan.
+- The remaining parked minors are listed in the ledger.
+
+Release: harness v1.0.0 is tagged on `main` after this branch merges (OQ1). The release commit sets
+`version` in `.claude/harness.json`.
