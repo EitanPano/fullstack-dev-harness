@@ -8,7 +8,8 @@ this file.
 | --- | --- | --- |
 | `<slug>/backend.md`, `<slug>/frontend.md`, `<slug>/qa.md` | the stage's agent | the dev loop, the reviewers, QA |
 | `<slug>/review.md`, `<slug>/review-security.md` | the reviewer (general, security) | the dev loop, the implementers, later reviews |
-| `<slug>/ticket.md` | the orchestrator | the dev loop |
+| `<slug>/plan.md` | the orchestrator (the draft; the driver promotes it to `.plan/`) | the dev loop, the approver |
+| `<slug>/ticket.md` | the orchestrator, or the driver when the tracker is `none` | the dev loop |
 | `<slug>/verify.json` | `scripts/verify.mjs` (the full run; carries `tree`, `ok` and `security`) | the dev loop, the reviewers, QA |
 | `<slug>/verify-partial.json` | `scripts/verify.mjs` (the last `--package` or `--no-e2e` run; backend and frontend share one file; its passing steps are reused per package) | the implementers |
 | `<slug>/review.diff`, `<slug>/review-fix-<n>.diff` | `scripts/verify.mjs` (the full run with a Base; the fix-round diff) | the reviewers |
