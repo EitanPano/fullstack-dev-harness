@@ -204,6 +204,10 @@ for (const role of ['backend', 'qa']) {
     passes(command, { role })
   }
 }
+// D8: the orchestrator reads code at plan N's Base, read-only.
+for (const command of ['git show c61dafb:AGENTS.md', 'git show HEAD:frontend/package.json']) {
+  passes(command, { role: 'orchestrator' })
+}
 passes('Get-Content backend/AGENTS.md', { role: 'backend', tool: 'PowerShell' })
 
 // Lane writes for Edit and Write payloads.
@@ -225,8 +229,19 @@ for (const tool of ['Write', 'Edit']) {
   lane(tool, 'backend/src/x.ts', 'frontend', true)
   lane(tool, 'backend/tests/x.test.ts', 'qa', false)
   lane(tool, 'backend/src/x.ts', 'qa', true)
-  lane(tool, '.plan/001-x.md', 'orchestrator', false)
+  lane(tool, '.plan/001-x.md', 'orchestrator', true)
+  lane(tool, '.plan/000-backlog.md', 'orchestrator', true)
+  lane(tool, '.plan/017-2026-10-30-x.md', 'orchestrator', true)
+  lane(tool, '.orchestrate/../plan.md', 'orchestrator', true)
+  // The shared matcher folds case on win32 only.
+  lane(tool, '.orchestrate/x/PLAN.md', 'orchestrator', process.platform !== 'win32')
   lane(tool, 'backend/src/x.ts', 'orchestrator', true)
+  lane(tool, '.orchestrate/016-visual-loop/plan.md', 'orchestrator', false)
+  lane(tool, '.orchestrate/016-visual-loop/ticket.md', 'orchestrator', false)
+  lane(tool, 'frontend/src/x.ts', 'orchestrator', true)
+  lane(tool, '.orchestrate/016-visual-loop/backend.md', 'orchestrator', true)
+  lane(tool, '.orchestrate/016-visual-loop/review.md', 'orchestrator', true)
+  lane(tool, '.orchestrate/016-visual-loop/plan.md', 'backend', true)
   lane(tool, '.orchestrate/012-lean-loop/review.md', 'reviewer', false)
   lane(tool, 'backend/src/x.ts', 'reviewer', true)
   lane(tool, 'backend/src/x.ts', 'general-purpose', false)

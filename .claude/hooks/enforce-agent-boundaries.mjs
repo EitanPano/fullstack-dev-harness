@@ -43,8 +43,9 @@ const WRITE_LANES = {
   frontend: ['frontend/', '.orchestrate/*/frontend.md'],
   // QA may add coverage but never feature source.
   qa: ['.orchestrate/*/qa.md', 'frontend/tests/', 'backend/tests/'],
-  // The orchestrator plans and records tickets; it never touches application code.
-  orchestrator: ['.plan/', '.orchestrate/*/ticket.md'],
+  // The orchestrator writes plan drafts and tickets under .orchestrate/; the driver promotes
+  // a draft into .plan/. It never touches application code.
+  orchestrator: ['.orchestrate/*/plan.md', '.orchestrate/*/ticket.md'],
   // Reviewers read everything and write their reports.
   reviewer: ['.orchestrate/*/review.md', '.orchestrate/*/review-security.md'],
   // Generic implementers (superpowers, ad-hoc dispatch) are not role agents: unrestricted,
