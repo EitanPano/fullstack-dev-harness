@@ -6,7 +6,8 @@ import { test } from 'node:test'
 import { parsePlan } from '../verify.mjs'
 import { diffChecks } from './checks.mjs'
 import { carriedPackages, readSources } from './reuse.mjs'
-import { securityPaths } from './security.mjs'
+import { parseRetired, retiredHits } from './retired.mjs'
+import { gateFiles, securityFor, securityPaths } from './security.mjs'
 import { parseSummary } from './summary.mjs'
 
 test('bun test summary', () => {
@@ -212,5 +213,119 @@ test('a malformed result file is no source, for the reuse reader and the carry-f
     assert.deepEqual(carriedPackages(dir, {}), {})
   } finally {
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+const SWALLOW = 'await expect(x).toBeFocused().catch(() => undefined)'
+const swallowed = (file, text) =>
+  diffChecks([{ file, line: 1, text }]).find((c) => c.name === 'no-swallowed-assertion')
+
+test('no-swallowed-assertion fails on a caught expect chain in a test file only', () => {
+  const hit = swallowed('frontend/tests/e2e/nav.spec.ts', SWALLOW)
+  assert.equal(hit.ok, false)
+  assert.match(hit.detail, /nav\.spec\.ts:1/)
+  assert.equal(swallowed('frontend/src/shared/lib/focus.ts', SWALLOW).ok, true)
+  assert.equal(swallowed('frontend/tests/unit/a.test.ts', 'expect(a).toBe(1)').ok, true)
+  assert.equal(swallowed('frontend/tests/unit/a.test.ts', 'load().catch(() => undefined)').ok, true)
+})
+
+test('no-swallowed-assertion fails on a Python except AssertionError in a test file', () => {
+  const line = '    except AssertionError:'
+  assert.equal(swallowed('backend/tests/test_a.py', line).ok, false)
+  assert.equal(swallowed('backend/tests/test_a.py', '    except (ValueError, AssertionError):').ok, false)
+  assert.equal(swallowed('backend/src/app/a.py', line).ok, true)
+  assert.equal(swallowed('backend/tests/test_a.py', '    except ValueError:').ok, true)
+})
+
+const patch = (file, ...lines) =>
+  [`diff --git a/${file} b/${file}`, `--- a/${file}`, `+++ b/${file}`, '@@ -1 +1 @@', ...lines, ''].join('\n')
+
+test('the gate line trigger fires on an added or removed gate line, wherever the file is', () => {
+  const added = patch('backend/src/api/user/routes.ts', '+  requireRole(UserRole.admin),')
+  assert.deepEqual(gateFiles(added), ['backend/src/api/user/routes.ts'])
+  const removed = patch('backend/src/app/api/user/routes.py', '-    dependencies=[Depends(require_role)],')
+  assert.deepEqual(gateFiles(removed), ['backend/src/app/api/user/routes.py'])
+  const ui = patch('frontend/src/feature/auth/ui/login-form.tsx', '+const a = roleAction(role)')
+  assert.deepEqual(gateFiles(ui), ['frontend/src/feature/auth/ui/login-form.tsx'])
+  const both = patch('a.ts', '+accountAction') + patch('b.mjs', '-require_caller(r)')
+  assert.deepEqual(gateFiles(both), ['a.ts', 'b.mjs'])
+})
+
+test('the gate line trigger needs a whole identifier on a changed line of a code file', () => {
+  assert.deepEqual(gateFiles(patch('a.ts', '+const requireRoleList = []')), [])
+  assert.deepEqual(gateFiles(patch('a.ts', '+const myrequireAuth = 1')), [])
+  assert.deepEqual(gateFiles(patch('README.md', '+uses requireRole')), [])
+  assert.deepEqual(gateFiles(patch('db/migrations/0001.sql', '+-- requireRole')), [])
+  assert.deepEqual(gateFiles(patch('backend/migrations/0002.ts', '+requireRole()')), [])
+  // A context line is not a change: the diff header carries it, not a +/- line.
+  assert.deepEqual(gateFiles('diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@ requireRole\n+x\n'), [])
+})
+
+test('securityPaths adds the seed and auth-entity globs and drops auth/ui', () => {
+  const hit = [
+    'backend/src/infra/scripts/seed.ts',
+    'backend/src/app/infra/scripts/seed.py',
+    'backend/src/models/user/enum.ts',
+    'backend/src/app/models/user/enums.py',
+  ]
+  const miss = [
+    'frontend/src/feature/auth/ui/login-form.tsx',
+    'backend/src/models/post/enum.ts',
+    'backend/src/api/seeder/routes.ts/x/y.ts',
+  ]
+  assert.deepEqual(securityPaths([...hit, ...miss]), hit)
+})
+
+test('securityPaths joins the files the line trigger names', () => {
+  const files = ['backend/src/api/user/routes.ts', 'frontend/src/feature/auth/ui/login-form.tsx', 'x.ts']
+  assert.deepEqual(securityPaths(files), [])
+  assert.deepEqual(securityPaths(files, ['backend/src/api/user/routes.ts']), [
+    'backend/src/api/user/routes.ts',
+  ])
+  assert.deepEqual(securityPaths(files, ['gone.ts']), [])
+})
+
+test('parseRetired reads the first Retired: line, one term per backtick span', () => {
+  assert.deepEqual(parseRetired('Base: abc\nRetired: `OldName`, `old_name`\n'), ['OldName', 'old_name'])
+  assert.deepEqual(parseRetired('Retired: `a`\nRetired: `b`\n'), ['a'])
+  assert.deepEqual(parseRetired('Retired: none\n'), [])
+  assert.deepEqual(parseRetired('Retired: nothing in backticks\n'), [])
+  assert.deepEqual(parseRetired('Branch: x/y\n'), [])
+  assert.deepEqual(parseRetired('Retired: `a`, `a`, ``\n'), ['a'])
+})
+
+test('the gate line trigger knows the guards and the fail-closed re-checks', () => {
+  for (const name of ['requireAccount', 'assertRole', '_assert_role']) {
+    assert.deepEqual(gateFiles(patch('a.ts', `+  ${name}(caller)`)), ['a.ts'], name)
+  }
+  assert.deepEqual(gateFiles(patch('a.py', '-    _assert_role(caller, "admin")')), ['a.py'])
+  assert.deepEqual(gateFiles(patch('a.ts', '+const myassertRole = 1')), [])
+  assert.deepEqual(gateFiles(patch('a.ts', '+const requireAccountList = 1')), [])
+})
+
+test('a failed git diff sets the security trigger instead of dropping it', () => {
+  const files = ['a.ts', 'b.ts']
+  assert.deepEqual(securityFor(files, { ok: false, out: '' }), { triggered: true, paths: files })
+  assert.deepEqual(securityFor(['x.ts'], { ok: true, out: '' }), { triggered: false, paths: [] })
+  const hit = patch('a.ts', '+requireRole()')
+  assert.deepEqual(securityFor(files, { ok: true, out: hit }), { triggered: true, paths: ['a.ts'] })
+})
+
+test('retired-terms matches a listed file path, and a failed git call throws', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { spawnSync } = await import('node:child_process')
+  const root = mkdtempSync(path.join(tmpdir(), 'retired-'))
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: root })
+    mkdirSync(path.join(root, 'backend', 'api', 'note'), { recursive: true })
+    writeFileSync(path.join(root, 'backend', 'api', 'note', 'x.ts'), 'export const a = 1\n')
+    const hits = retiredHits(root, ['backend'], ['API/note/'])
+    assert.equal(hits.length, 1)
+    assert.equal(hits[0].file, 'backend/api/note/x.ts')
+    assert.deepEqual(retiredHits(root, ['backend'], ['api/other/']), [])
+    assert.throws(() => retiredHits(path.join(root, 'missing'), ['backend'], ['x']), /git/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
   }
 })

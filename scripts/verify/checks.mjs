@@ -31,10 +31,14 @@ const TEST_SKIP = [
 // `database` gate, not this check, proves those suites ran.
 const STORE_SEAM = /(?:\bpytest\.mark\.)?\bskipif\((?=[^\n]*\breason=STORE_SKIP_REASON\b)/
 const EXCLUDE = /\.exclude\(/
+// One line only: an `expect(…)` chain split over several lines is not caught. A false positive
+// is accepted: `expect(await load().catch(() => null)).toBe(null)` matches too.
+const SWALLOWED = /\bexpect\s*\([^;]*\)\s*\.catch\(/
+const PY_SWALLOWED = /^\s*except\b[^#]*\bAssertionError\b/
 
 const isTestPath = (file) => TEST_PATH.some((pattern) => pattern.test(file.replaceAll('\\', '/')))
 
-function check(name, hits) {
+export function check(name, hits) {
   const shown = hits.slice(0, 10).map((hit) => `${hit.file}:${hit.line} ${hit.text.trim()}`)
   if (hits.length > 10) shown.push(`and ${hits.length - 10} more`)
   return { name, ok: hits.length === 0, detail: shown.join('; ') }
@@ -50,5 +54,14 @@ export function diffChecks(added) {
     return TEST_SKIP.some((pattern) => pattern.test(text))
   })
   const excludes = code.filter((e) => E2E_SPEC.test(e.file) && EXCLUDE.test(e.text))
-  return [check('no-focused-or-skipped-test', skips), check('no-axe-exclude', excludes)]
+  const swallowed = code.filter((entry) => {
+    if (!isTestPath(entry.file)) return false
+    if (entry.file.endsWith('.py')) return PY_SWALLOWED.test(entry.text)
+    return SWALLOWED.test(entry.text)
+  })
+  return [
+    check('no-focused-or-skipped-test', skips),
+    check('no-axe-exclude', excludes),
+    check('no-swallowed-assertion', swallowed),
+  ]
 }
