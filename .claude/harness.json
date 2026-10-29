@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "unreleased",
+  "version": "v1.0.0",
   "repository": "https://github.com/EitanPano/fullstack-dev-harness",
   "rootCommit": "70de9c16a76df9307b15ee4ccdeeee3897a0e34b",
   "minCatalog": "v1.5.0",
