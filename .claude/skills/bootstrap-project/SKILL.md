@@ -1,6 +1,6 @@
 ---
 name: bootstrap-project
-description: Turn a fresh clone of this harness into a running full-stack project. Use when .fullstack/catalog.yaml does not exist yet, when the user asks to "start the project", "set up the app", "create the full-stack project" or "bootstrap", or when .doc/ still holds FILL markers. Walks the product forms, picks a stack from the template catalog, asks the flags and capabilities its templates declare, runs scripts/bootstrap.mjs, verifies every gate, and writes the first backlog line.
+description: Turn a fresh clone of this harness into a running full-stack project. Use when .fullstack/catalog.yaml does not exist yet, when the user asks to "start the project", "set up the app", "create the full-stack project" or "bootstrap", or when .doc/ still holds FILL markers. Takes a pasted product brief in one shot (fills the forms, asks the gaps once, shows one summary) or walks the product forms section by section, picks a stack from the template catalog, asks the flags and capabilities its templates declare, runs scripts/bootstrap.mjs, verifies every gate, and writes the first backlog line.
 ---
 
 # Bootstrap a project
@@ -20,6 +20,42 @@ each chosen template's own tools.
   those once the stack is chosen).
 
 ## 1. Decide the product with the user
+
+### With a pasted brief (one-shot intake)
+
+A user may paste a brief that answers the forms (the shape of the P1 proof prompt: purpose,
+scope, authentication and roles, design, data store, data model, glossary, stack, flags, deploy
+mode, tracker, backlog lines). Then:
+
+1. Fill every form from it, in the user's words: `.doc/product-definition.md` (Design
+   included), `.doc/architecture.md` and `.doc/glossary.md`. Map each stack, flag, capability,
+   deploy-mode and brand answer to its scaffold flag (sections 2 and 3), with the mappings that
+   section 3 states.
+2. Collect every gap: a FILL marker the brief does not answer, a value the catalog cannot take,
+   a clash with the glossary. Ask about all of them in one message, each with the skill's
+   default or recommendation. Do not walk the sections.
+3. Compare the brief with the template gaps below.
+4. Show one summary to confirm: the forms, the stack and its flags, the database capability,
+   the deploy mode, the brand (every flag with its value, the display name included), the
+   template gaps and the first backlog lines. Scaffold only after a yes.
+
+Template gaps. Read the server template's auth defaults at the catalog tag `catalog.lock` pins:
+the entity and gates in its `AGENTS.md › Authentication`, the password bounds in
+`models/user/constants` (`USER_LIMITS.password`), the roles in `.doc/architecture.md › Auth`.
+Today they are the entity `user`, the roles `user` and `admin`, and a password of 8 to 128
+characters (an example; the pinned tag decides). Compare the brief's entity names,
+roles and password rule with those. Each difference is a gap:
+
+- Record it in the summary and in `.doc/architecture.md › Auth` as a decision for the first
+  task that needs it (for example "roles `member` and `staff` replace `user` and `admin`;
+  decided in the task that adds the first gate"). The skill changes no template code.
+- That task's plan carries `Retired:` with the template's old terms (`writing-plans`), role
+  values in literal form (`'admin'`, `UserRole.admin`), never a bare word the entity or a path
+  shares (`user`). Without it the rename arrives unannounced, inside a later task's plan (P3a, task 2).
+- Re-read the generated package's `AGENTS.md › Authentication` after section 3 and add any gap
+  the defaults above missed.
+
+### With no brief (section by section)
 
 Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in order, ask the
 user one question at a time and replace the marker with their answer. Keep answers in
@@ -140,6 +176,7 @@ The brand flags come from the `Design` form; pass only the fields that hold a va
   cannot make pass contrast) it names the flag: report it, ask for another value, then
   re-run.
 - `Tone`, `Reference apps` and `Primary viewport` stay in the form and have no flag.
+- `node scripts/bootstrap.mjs --help` prints the usage and every flag.
 
 It creates the packages the stack lists, under the directories the stack names; a merged
 `docker-compose.yml` and `.gitignore`; `.editorconfig` when absent; and
@@ -171,6 +208,8 @@ The browser install runs from the frontend package directory, so the package's p
 Playwright installs its own browser revision (the catalog's `tools/lib/browsers.ts` does the
 same). `verify` can outlive the Bash tool's timeout: run it with `run_in_background: true`
 and wait for the completion notification.
+While `verify` runs, nothing edits the working tree (no form edits, no file writes): `verify`
+hashes the tree, and a concurrent edit fails or invalidates the run.
 
 `verify` runs the gates of every package in `.fullstack/catalog.yaml` and replaces the
 hand-run list. It is run without a base because the scaffold is not committed yet. It must
