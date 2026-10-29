@@ -6,6 +6,7 @@ Last updated: YYYY-MM-DD
 Branch: feat/<slug>
 Base: <commit the branch was created from>
 Stages: backend, frontend, qa
+Retired: `<exact name or path the task renames or removes>`, … | none
 
 ## Goal
 
@@ -24,6 +25,7 @@ acceptance criteria (AC numbers) it satisfies.>
 ## Open Questions
 
 1. <Question? At most 3, 5 lines each> Recommended: <answer>.
+   > <the approver's answer, written here by the driver; indented or not, blockquote lines do not count toward the cap>
 
 ## Contract
 
@@ -35,10 +37,11 @@ acceptance criteria (AC numbers) it satisfies.>
 
 ## UX
 
-<Only when there is a frontend stage. Per route: its primary action; its loading, empty and
-error states; its phone layout. No copy strings.>
+<Only when there is a frontend stage. Per route: its pattern (`list`, `detail`, `form`, `auth`,
+`dashboard`, `confirm`, `landing`), primary action, loading, empty and error states, tone and phone layout
+(`ui-design` skill). No copy strings.>
 
-- `/<route>` — <primary action> — loading: <…> · empty: <…> · error: <…> — phone: <…>
+- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>
 
 ## Steps
 

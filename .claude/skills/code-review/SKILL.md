@@ -8,8 +8,12 @@ description: Review a change against this repository's standards. Use when actin
 One reviewer applies the whole checklist below (`mode: general`). `mode: security` deepens
 priority 1 only; the driver adds it when `verify.json` has `security.triggered: true`, which
 `verify` computes: the diff touches auth, session, security or middleware code, the proxy,
-CORS configuration, an env module, a Dockerfile or `docker-compose.yml`. Migrations and SQL do
-not trigger it; the general reviewer covers the data model (priorities 1 and 2).
+CORS configuration, an env module, a Dockerfile or `docker-compose.yml`, deploy configuration
+(`**/nginx/**`, `**/.dockerignore`, `**/next.config.*`), a seed file
+(`**/*seed*`) or the user model (`**/models/user/**`); or a changed line (added or removed) in a
+code file names a gate (`requireAuth`, `requireRole`, `requireAccount`, `assertRole`, `require_auth`,
+`require_role`, `require_caller`, `_assert_role`, `roleAction`, `accountAction`), wherever the file is. A UI file under
+`**/auth/ui/**` fires only by that line rule. Migrations and SQL do not trigger it; the general reviewer covers the data model (priorities 1 and 2).
 
 Be critical. Surface real problems and say them plainly; do not soften, do not pad with
 praise. A review with no findings states what was checked and why it holds.
@@ -74,6 +78,9 @@ failure-path test, an error state, a change-log line).
 
 ## Evidence
 
+`verify`'s `retired-terms` check covers the plan's `Retired:` strings, so flag a leftover old
+name only when the list missed it.
+
 Every finding names `file:line`, quotes the problem in one line, states the consequence,
 and gives the fix. "Looks wrong" is not a finding; run the test or read the schema when
 in doubt. `.orchestrate/<slug>/verify.json` is the gate evidence (and QA's report, when it exists): do
@@ -99,6 +106,8 @@ Verdict: <pass | fail>
 
 ## Checked and holds
 - <what was examined and found correct, one line each>
+
+Refusals: <command — the hook's reason, one per line | none>
 ```
 
 A `fix-diff:` re-review rewrites the file with the earlier content kept and a new

@@ -9,7 +9,7 @@ in its `AGENTS.md`.
 
 ## Security
 
-- Never commit or expose secrets (tokens, API keys, passwords, connection strings).
+- Never commit or expose secrets (tokens, keys, passwords, connection strings).
 - Real secrets live in the shell environment or a secret manager, never in the working tree.
   `.env.example` files hold placeholders only.
 
@@ -33,23 +33,23 @@ in its `AGENTS.md`.
 
 | Path | What it is | Who writes it |
 | --- | --- | --- |
-| `AGENTS.md`, `CLAUDE.md` | These rules, and the file that loads them | Humans |
+| `AGENTS.md`, `CLAUDE.md` | These rules, and their loader | Humans |
 | `.doc/` | Product definition, architecture, glossary | Humans, bootstrap skill |
 | `.plan/000-backlog.md` | The task queue | Humans and the dev loop |
-| `.plan/NNN-YYYY-MM-DD-*.md` | One plan per task | Orchestrator |
+| `.plan/NNN-YYYY-MM-DD-*.md` | One plan per task, promoted from the draft | Driver |
 | `.claude/` | `agents/`, `skills/`, `rules/`, `hooks/` | Humans |
 | `catalog.lock` | The pinned catalog version; a bump is a reviewed change | Humans |
 | `.fullstack/catalog.yaml` | Stack, versions, flags, commands, ports per package | The bootstrap |
 | `scripts/` | `bootstrap.mjs`, `verify.mjs` | Humans |
-| `frontend/`, `backend/` | Generated packages, each with its own `AGENTS.md` | Frontend, backend agent |
+| `frontend/`, `backend/` | Generated packages | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | Compose stack, database init | Backend agent |
-| `.orchestrate/<slug>/` | Loop output per task: reports, `ticket.md`, `verify.json`, `verify-partial.json`, `review.diff`, `review-fix-<n>.diff` | The loop |
+| `.orchestrate/<slug>/` | Loop output per task: `plan.md` (the orchestrator's draft), reports, `ticket.md`, `verify.json`, `verify-partial.json`, `review.diff`, `review-fix-<n>.diff` | The loop |
 
 Never create a `docs/` directory. `.orchestrate/` is git-ignored except its README.
 
 ## Stack
 
-- Bun 1.4+, Node 24+ and git; Node also runs the harness scripts and hooks. A package's own
+- Bun 1.4+, Node 24+ and git. A package's own
   tools (uv for Python) are checked at the bootstrap.
 - Docker Compose is the deployment target and hosts local infrastructure (`deployment` skill).
 - The stack comes from the catalog (`https://github.com/EitanPano/fullstack-templates`)
@@ -61,7 +61,7 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 | `install` | Dependencies from the lockfile. |
 | `dev` | Development server with reload. |
 | `start` | Run the server once, with no file watcher; a frontend's e2e starts the API with it. |
-| `check` | Every gate, no Docker; exit 0 is done (a package with `testDb` skips store suites). |
+| `check` | Every gate, no Docker; exit 0 is done. |
 | `typecheck`, `lint`, `format` | One gate; the layer-boundary lint; rewrite files. |
 | `test`, `testDb`, `e2eDb`, `testE2e` | Unit; whole suite on the test database; prepare the e2e database; e2e with accessibility scan. |
 | `contract`, `migrate` | OpenAPI out, or types regenerated; apply the data model change. |
@@ -72,7 +72,7 @@ Never run a scaffolder inside an existing package, except `bunx shadcn@4.21.4 ad
 
 ## Architecture
 
-Two packages and one generated contract. Layer maps and examples: each package's `AGENTS.md`.
+Two packages and one generated contract. Layer maps: each package's `AGENTS.md`.
 
 - Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
   `middleware/`, `services/`, `infra/`. Modules meet only through controllers; a service
@@ -110,9 +110,10 @@ Done means every item holds, with evidence in the reports.
 4. Errors follow `error-handling`. No secrets, stack traces or query text leave the server.
 5. A schema or endpoint change ran both `contract` commands and committed both results; a
    data-model change ships what `database` requires and passes `testDb`.
-6. UI changes meet the frontend's `AGENTS.md › Styling`; the accessibility scan passes.
+6. UI changes meet the frontend's `AGENTS.md › Styling`; the frontend reports `UI pass:`
+   and QA `UX:` lines (open rubric findings are P2); the accessibility scan passes.
 7. `.doc/architecture.md` has a change-log entry when routes, auth boundaries or the data
-   model changed (the driver writes it at finish); new domain terms are in `.doc/glossary.md`.
+   model changed; new domain terms are in `.doc/glossary.md`.
 8. The review stage reports no open P0 or P1 finding.
 
 ## Skills
@@ -123,6 +124,7 @@ Done means every item holds, with evidence in the reports.
 | `dev-loop` | Taking one backlog task from plan to reviewed code |
 | `writing-plans` | Creating, revising or superseding a plan in `.plan/` |
 | `writing-tests` | Adding or reviewing unit, integration or e2e tests |
+| `ui-design` | Planning a route's UX, composing a page, judging a screenshot |
 | `api-design` | Adding or changing an endpoint, its schemas or the contract |
 | `error-handling` | Shaping an error response, status code, retry or failure UX |
 | `database` | The engine; any table, index, migration or data-access file |

@@ -170,3 +170,12 @@ test('a brand flag with no value is refused', () => {
   assert.equal(result.status, 1)
   assert.match(result.stderr, /--radius/)
 })
+
+test('--help prints the usage and exits 0; an unknown argument still fails', () => {
+  const help = spawnSync(process.execPath, [script, '--help'], { encoding: 'utf8' })
+  assert.equal(help.status, 0, help.stderr)
+  assert.match(help.stdout, /usage: node scripts\/bootstrap\.mjs/)
+  const bad = spawnSync(process.execPath, [script, '--nope'], { encoding: 'utf8' })
+  assert.equal(bad.status, 1)
+  assert.match(bad.stderr, /unknown argument --nope/)
+})

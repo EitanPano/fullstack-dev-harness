@@ -653,6 +653,97 @@ test('a full run records whether the change touches security paths', async () =>
   assert.equal(read(fx, 'verify-partial.json').security, undefined)
 })
 
+const withRetired = (fx, line) =>
+  writeFileSync(
+    path.join(fx.root, '.plan', '001-test.md'),
+    'Branch: harness `feat/lean-loop`, cut from dev\nBase: ' + fx.sha + '\n' + line + '\n',
+  )
+const retiredCheck = (fx, name = 'verify.json') => read(fx, name).checks.find((c) => c.name === 'retired-terms')
+
+test('retired-terms fails on a leftover in package source and in AGENTS.md', async () => {
+  const fx = await fixture()
+  withRetired(fx, 'Retired: `OldName`, `legacy_x`')
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), 'export const a = oldname\n')
+  writeFileSync(path.join(fx.root, 'frontend', 'AGENTS.md'), '# x\nuse legacy_x here\n')
+  const { exit } = await runVerify(opts(fx).options)
+  const check = retiredCheck(fx)
+  assert.equal(exit, 1)
+  assert.equal(check.ok, false)
+  assert.match(check.detail, /backend\/app\.ts:1/)
+  assert.match(check.detail, /frontend\/AGENTS\.md:2/)
+})
+
+test('retired-terms passes when the only hit is in a migration, the plan or .orchestrate', async () => {
+  const fx = await fixture()
+  withRetired(fx, 'Retired: `OldName`')
+  mkdirSync(path.join(fx.root, 'backend', 'migrations'))
+  writeFileSync(path.join(fx.root, 'backend', 'migrations', '0002_drop.ts'), 'OldName\n')
+  writeFileSync(path.join(fx.root, 'backend', '0003.sql'), 'drop table OldName;\n')
+  const { exit } = await runVerify(opts(fx).options)
+  assert.equal(exit, 0)
+  assert.equal(retiredCheck(fx).ok, true)
+})
+
+test('retired-terms does not run without a Retired: term', async () => {
+  const fx = await fixture()
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), 'OldName\n')
+  for (const line of ['Retired: none', 'Retired: nothing quoted', '']) {
+    withRetired(fx, line)
+    assert.equal((await runVerify(opts(fx).options)).exit, 0)
+    assert.equal(retiredCheck(fx), undefined)
+  }
+})
+
+test('a partial run scans only its own packages for retired terms', async () => {
+  const fx = await fixture()
+  withRetired(fx, 'Retired: `OldName`')
+  writeFileSync(path.join(fx.root, 'backend', 'app.ts'), 'OldName\n')
+  const mine = opts(fx, { packages: ['frontend'], noE2e: true })
+  assert.equal((await runVerify(mine.options)).exit, 0)
+  assert.equal(retiredCheck(fx, 'verify-partial.json').ok, true)
+  const theirs = opts(fx, { packages: ['backend'], noE2e: true })
+  assert.equal((await runVerify(theirs.options)).exit, 1)
+  assert.equal(retiredCheck(fx, 'verify-partial.json').ok, false)
+})
+
+test('a swallowed assertion fails the diff checks on a test path', async () => {
+  const fx = await fixture()
+  mkdirSync(path.join(fx.root, 'frontend', 'tests'))
+  const line = 'await expect(x).toBeFocused().catch(() => undefined)\n'
+  writeFileSync(path.join(fx.root, 'frontend', 'app.ts'), line)
+  assert.equal((await runVerify(opts(fx).options)).exit, 0)
+  writeFileSync(path.join(fx.root, 'frontend', 'tests', 'a.test.ts'), line)
+  const { exit } = await runVerify(opts(fx).options)
+  const check = read(fx).checks.find((entry) => entry.name === 'no-swallowed-assertion')
+  assert.equal(exit, 1)
+  assert.match(check.detail, /frontend\/tests\/a\.test\.ts:1/)
+})
+
+test('a server with e2eDb skips the dev migrate before e2e, one without keeps it', async () => {
+  const marker = 'node ../stub.mjs marker'
+  const fx = await fixture({ commands: { backend: { migrate: marker, e2eDb: 'node ../stub.mjs prep' } } })
+  const { exit } = await runVerify(opts(fx).options)
+  assert.equal(exit, 0)
+  assert.equal(runs(fx).includes('marker'), false)
+  assert.equal(read(fx).packages.backend.migrate.ok, true)
+  assert.match(read(fx).packages.backend.migrate.reason, /e2eDb/)
+  const old = await fixture({ commands: { backend: { migrate: marker } } })
+  await runVerify(opts(old).options)
+  assert.ok(runs(old).includes('marker'))
+})
+
+test('a gate line in a changed file triggers the security review, a login form alone does not', async () => {
+  const fx = await fixture()
+  mkdirSync(path.join(fx.root, 'backend', 'api'))
+  mkdirSync(path.join(fx.root, 'frontend', 'feature', 'auth', 'ui'), { recursive: true })
+  writeFileSync(path.join(fx.root, 'frontend', 'feature', 'auth', 'ui', 'login-form.tsx'), 'export const f = 1\n')
+  await runVerify(opts(fx).options)
+  assert.equal(read(fx).security.triggered, false)
+  writeFileSync(path.join(fx.root, 'backend', 'api', 'routes.ts'), 'router.use(requireRole(admin))\n')
+  await runVerify(opts(fx).options)
+  assert.deepEqual(read(fx).security, { triggered: true, paths: ['backend/api/routes.ts'] })
+})
+
 // Reuse tests: `lines` are the log lines of a run, `reusedLines` the steps it took from a file.
 const reusedLines = (lines) => lines.filter((line) => line.includes('reused ('))
 const stepLine = (lines, label) => lines.find((line) => line.includes(label))

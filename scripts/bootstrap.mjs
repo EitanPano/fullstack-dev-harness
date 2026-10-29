@@ -50,7 +50,8 @@ const USAGE =
   '         [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]\n' +
   '         [--deploy single|split] [--display-name <text>] [--brand-primary <hex>]\n' +
   '         [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]\n' +
-  '         [--theme system|light|dark] [--density comfortable|compact]'
+  '         [--theme system|light|dark] [--density comfortable|compact]\n' +
+  '       node scripts/bootstrap.mjs --help'
 
 const args = parseArgs(process.argv.slice(2))
 const harnessRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -393,7 +394,10 @@ function parseArgs(argv) {
   }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
-    if (arg === '--fetch') parsed.fetch = true
+    if (arg === '--help') {
+      console.log(USAGE)
+      process.exit(0)
+    } else if (arg === '--fetch') parsed.fetch = true
     else if (arg === '--skip-install') parsed.skipInstall = true
     else if (arg === '--stack') parsed.stack = value(arg, ++i)
     else if (arg === '--name') parsed.name = value(arg, ++i)

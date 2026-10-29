@@ -180,7 +180,9 @@ test('parseArgs reads the documented flags', () => {
     latest: false,
     json: true,
     projectDir: undefined,
+    help: false,
   })
+  assert.equal(parseArgs(['--help']).help, true)
   assert.equal(parseArgs(['--latest']).latest, true)
   assert.equal(parseArgs(['--project-dir', 'd']).projectDir, 'd')
   assert.throws(() => parseArgs(['--nope']), /usage/)
@@ -235,4 +237,64 @@ test('the CLI runs through a directory link instead of exiting 0 silently', () =
   })
   assert.equal(run.status, 2)
   assert.match(run.stderr, /usage/)
+})
+
+const resume = (time, body) => ({
+  type: 'user',
+  timestamp: `2026-10-26T${time}Z`,
+  message: { role: 'user', content: `The coordinator sent a message while you were working: ${body}` },
+})
+const toolResult = (time) => ({
+  type: 'user',
+  timestamp: `2026-10-26T${time}Z`,
+  message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'x' }] },
+})
+
+test('an agent row splits at each SendMessage continuation, not at a tool result', () => {
+  const dir = tempRoot()
+  const file = path.join(dir, 'agent-b1.jsonl')
+  writeFileSync(
+    file,
+    jsonl([
+      user('10:00:00'),
+      ...assistant('10:00:10', 'm1', 'claude-sonnet-5-5', usage(1, 1, 1, 1), [tool('t1')]),
+      toolResult('10:00:20'),
+      ...assistant('10:05:10', 'm2', 'claude-sonnet-5-5', usage(1, 1, 1, 1), [tool('t2')]),
+      resume('10:20:00', 'continue'),
+      ...assistant('10:20:05', 'm3', 'claude-sonnet-5-5', usage(1, 1, 1, 1), [tool('t3'), tool('t4')]),
+      ...assistant('10:30:00', 'm4', 'claude-sonnet-5-5', usage(1, 1, 1, 1), [text]),
+      resume('10:40:00', 'fix'),
+      ...assistant('10:41:00', 'm5', 'claude-sonnet-5-5', usage(1, 1, 1, 1), [tool('t5')]),
+    ]),
+  )
+  const agent = readTranscript(file)
+  assert.deepEqual(
+    agent.segments.map((s) => [s.kind, s.start, s.minutes, s.tools]),
+    [
+      ['dispatch', '2026-10-26T10:00:10Z', 5, 2],
+      ['continuation', '2026-10-26T10:20:00Z', 10, 2],
+      ['continuation', '2026-10-26T10:40:00Z', 1, 1],
+    ],
+  )
+  assert.equal(agent.tools, 5)
+  const out = formatStats({
+    session: 's',
+    agents: [{ ...agent, agentType: 'backend', description: 'x: y', model: 'm' }],
+    bySlug: {},
+    byModel: {},
+    driver: { minutes: 0, tools: 0, outputTokens: 0, contextTokens: 0 },
+  })
+  assert.equal(out.split('\n').filter((l) => l.includes('continuation')).length, 2)
+})
+
+test('an agent with no continuation has one dispatch segment', () => {
+  const { projectDir, session } = fixture()
+  const stats = sessionStats(projectDir, session)
+  assert.deepEqual(stats.agents[0].segments.map((s) => s.kind), ['dispatch'])
+})
+
+test('--help prints the usage and exits 0', () => {
+  const run = spawnSync(process.execPath, [script, '--help'], { encoding: 'utf8' })
+  assert.equal(run.status, 0)
+  assert.match(run.stdout, /usage/)
 })

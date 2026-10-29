@@ -2,7 +2,7 @@
 name: qa
 description: QA engineer who tries to break the delivered feature. Reads verify.json as the gate evidence, adds at least one adversarial test, checks each acceptance criterion and Validation item with evidence, and writes .orchestrate/<slug>/qa.md. Never edits feature source. Dispatched by the dev-loop skill in parallel with the reviewers.
 model: sonnet
-skills: [writing-tests]
+skills: [writing-tests, ui-design]
 disallowedTools: Agent
 maxTurns: 80
 ---
@@ -13,8 +13,9 @@ Your job is to break things. You verify the delivered task against the plan's `V
 list and the acceptance criteria in `.doc/product-definition.md`, with evidence, and you add
 tests that the implementers did not think of.
 
-The boundary hook lets you write only `.orchestrate/*/qa.md` (`*` is the task slug),
-`frontend/tests/` and `backend/tests/`, through Edit/Write only. A refused write to feature
+Write files only with Edit or Write; never `sed -i`, a heredoc, `>`, `>>` or `tee`. The
+boundary hook lets you write only `.orchestrate/*/qa.md` (`*` is the task slug),
+`frontend/tests/` and `backend/tests/`. A refused write to feature
 source is the rule working: report the fix, never apply it. The change is uncommitted: read it
 with `git diff <Base>` (the plan's `Base:` commit). You run in parallel with the reviewers;
 do not wait for their reports.
@@ -42,19 +43,23 @@ service: run against the services the repository defines.
    test per new behaviour, and every named test is in `git diff <Base>`. A missing or
    inconsistent line is a P1 finding owned by that stage. An `after the fact — <reason>` line
    is judged on its reason: one that holds is a PASS, an absent or hollow one is a P1.
-4. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
+4. **UX pass** (`ui-design` skill), before any test run, because Playwright clears
+   `test-results/` at the start of every run: for each route in the plan's `UX` section, Read
+   `frontend/test-results/screens/<route>-phone-light.png`, `<route>-phone-dark.png` and
+   `<route>-desktop-light.png` (`home` for `/`, a nested route slugged: `/staff/class` is
+   `staff-class`; the frontend report's `Handoff` lists them, with the checks it left open).
+   Apply the rubric's judged checks against the plan's `UX` line and
+   `.doc/product-definition.md › Design`. A rubric failure is a P2 and opens no fix round; a
+   broken journey or a WCAG AA failure is a P1. Each is a finding owned by frontend. Record one
+   `UX:` line per route; a route the frontend report marks `not captured (<reason>)` is a P2,
+   any other route with no screenshot a P1.
+5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
    state, missing or malformed input, boundary sizes, repeated rapid submission, another
    tenant's id, an unauthenticated call. Put them under `backend/tests/` or
    `frontend/tests/`; they must pass or they are findings.
-5. **Criteria**: for each Validation item and each acceptance criterion the task claims,
+6. **Criteria**: for each Validation item and each acceptance criterion the task claims,
    mark PASS or FAIL with the test name and result or the command and its output. "The code
    looks right" is never evidence.
-6. **UX pass**: for each route the task adds or changes, Read the `phone` project's
-   screenshot (named in the frontend report's `Handoff`) and check it against the plan's `UX`
-   section, `.doc/product-definition.md › Design` and `.claude/rules/ui-and-styling.md`: the
-   shell is present, nothing overflows horizontally, text and controls are readable at that
-   width. Record PASS or FAIL per route with the file path; a FAIL is a finding owned by
-   frontend. Where the package has no `phone` project, write `UX: n/a (no phone project)`.
 7. **Report**: write `.orchestrate/<slug>/qa.md`:
 
 ```
@@ -64,7 +69,8 @@ Verdict: <pass | fail>
 
 Gates: verify.json tree <hash> <ok|fail|missing> · e2e <N passed, M failed>
 Adversarial tests added: <file: test name, one per line>
-UX: <route — PASS|FAIL — path, one per line | n/a>
+UX: <route> — PASS|P2|P1 — <check numbers> — <path>, one per route
+Refusals: <command — the hook's reason, one per line | none>
 
 Validation:
 - V01 — PASS|FAIL — <evidence>
@@ -72,7 +78,7 @@ Acceptance criteria:
 - AC01 — PASS|FAIL — <evidence>
 
 Findings:
-- <file:line> — expected <x>, actual <y> — owner: <backend|frontend|driver>
+- P1|P2 — <file:line> — expected <x>, actual <y> — owner: <backend|frontend|driver>
 Delete: <paths inside frontend/tests/ or backend/tests/ only, or none>
 ```
 

@@ -10,7 +10,7 @@ import { isMain } from './verify/main.mjs'
 
 const USAGE =
   'usage: node scripts/loop-stats.mjs [--project <repo dir>] [--project-dir <transcript dir>] ' +
-  '[--session <id> | --latest] [--json]'
+  '[--session <id> | --latest] [--json] [--help]'
 
 export function encodeProjectPath(dir) {
   return dir.replace(/[^A-Za-z0-9-]/g, '-')
@@ -26,6 +26,23 @@ const minutesBetween = (from, to) =>
 // One assistant message is written as one line per content block with the same id and usage, so
 // usage counts once per id and tool calls once per tool_use id. Minutes run from the first to the
 // last assistant line: whatever an orphaned background process logs after that is ignored.
+// A SendMessage continuation is a user line with string (or text-block) content that starts with
+// CONTINUATION; it opens a new segment, so one agent row splits into the dispatch and each
+// continuation, each with its own start, minutes and tool count.
+const CONTINUATION = /^The coordinator sent a message while you were working:/
+
+function continuationTime(event) {
+  if (event.type !== 'user') return undefined
+  const content = event.message?.content
+  const body =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content.find((block) => block?.type === 'text')?.text
+        : undefined
+  return typeof body === 'string' && CONTINUATION.test(body) ? (event.timestamp ?? null) : undefined
+}
+
 export function readTranscript(file) {
   const seen = new Map()
   const tools = new Set()
@@ -33,6 +50,7 @@ export function readTranscript(file) {
   let firstAssistant
   let lastAssistant
   let model
+  const segments = [{ start: undefined, first: undefined, last: undefined, tools: 0 }]
   for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
     let event
     try {
@@ -42,14 +60,25 @@ export function readTranscript(file) {
     }
     if (event === null || typeof event !== 'object') continue
     if (event.timestamp !== undefined) start ??= event.timestamp
+    const resumedAt = continuationTime(event)
+    if (resumedAt !== undefined) {
+      segments.push({ start: resumedAt ?? undefined, first: undefined, last: undefined, tools: 0 })
+      continue
+    }
     if (event.type !== 'assistant') continue
+    const segment = segments[segments.length - 1]
+    segment.first ??= event.timestamp
+    segment.last = event.timestamp ?? segment.last
     firstAssistant ??= event.timestamp
     lastAssistant = event.timestamp ?? lastAssistant
     model ??= event.message?.model
     const id = event.message?.id ?? `line-${seen.size}`
     seen.set(id, event.message?.usage ?? seen.get(id) ?? {})
     for (const block of event.message?.content ?? []) {
-      if (block?.type === 'tool_use') tools.add(block.id ?? `${id}-${tools.size}`)
+      if (block?.type !== 'tool_use') continue
+      const toolId = block.id ?? `${id}-${tools.size}`
+      if (!tools.has(toolId)) segment.tools += 1
+      tools.add(toolId)
     }
   }
   let outputTokens = 0
@@ -62,7 +91,15 @@ export function readTranscript(file) {
       (usage.cache_creation_input_tokens ?? 0)
   }
   const minutes = minutesBetween(firstAssistant, lastAssistant)
-  return { start, minutes, model, tools: tools.size, outputTokens, contextTokens }
+  const parts = segments
+    .filter((part) => part.first !== undefined)
+    .map((part, index) => ({
+      kind: index === 0 && part === segments[0] ? 'dispatch' : 'continuation',
+      start: part.start ?? part.first,
+      minutes: minutesBetween(part.start ?? part.first, part.last),
+      tools: part.tools,
+    }))
+  return { start, minutes, model, tools: tools.size, outputTokens, contextTokens, segments: parts }
 }
 
 function total(rows) {
@@ -131,18 +168,27 @@ export function formatStats(stats) {
   const lines = [`session ${stats.session}`, '']
   lines.push('start     min   tools  out      context  type             description        model')
   for (const a of stats.agents) {
+    // With continuations the row shows the dispatch alone; tokens and the totals stay per agent.
+    const dispatch = a.segments?.length > 1 && a.segments[0].kind === 'dispatch' ? a.segments[0] : a
     const time = a.start === undefined ? '--:--:--' : a.start.slice(11, 19)
     lines.push(
       [
         time.padEnd(9),
-        a.minutes.toFixed(1).padStart(5),
-        String(a.tools).padStart(7),
+        dispatch.minutes.toFixed(1).padStart(5),
+        String(dispatch.tools).padStart(7),
         kilo(a.outputTokens).padStart(8),
         mega(a.contextTokens).padStart(9),
         `  ${a.agentType.padEnd(16)}`,
         `${a.description}  ${a.model}`,
       ].join(' '),
     )
+    for (const part of (a.segments ?? []).filter((p) => p.kind === 'continuation')) {
+      const at = part.start === undefined ? '--:--:--' : part.start.slice(11, 19)
+      lines.push(
+        `  + ${at}`.padEnd(9 + 2) +
+          ` ${part.minutes.toFixed(1).padStart(5)} ${String(part.tools).padStart(7)}  continuation`,
+      )
+    }
   }
   const row = (name, t) =>
     `  ${name.padEnd(24)} ${t.agents} agents  ${t.minutes.toFixed(1)} min  ${t.tools} tools  ` +
@@ -176,6 +222,7 @@ export function parseArgs(argv) {
     session: undefined,
     latest: false,
     json: false,
+    help: false,
   }
   const takes = { '--project': 'project', '--project-dir': 'projectDir', '--session': 'session' }
   for (let i = 0; i < argv.length; i++) {
@@ -183,6 +230,7 @@ export function parseArgs(argv) {
     if (arg in takes) options[takes[arg]] = valueAfter(argv, ++i, arg)
     else if (arg === '--latest') options.latest = true
     else if (arg === '--json') options.json = true
+    else if (arg === '--help') options.help = true
     else throw new Error(USAGE)
   }
   return options
@@ -199,6 +247,10 @@ function latestSession(projectDir) {
 if (isMain(import.meta.url, process.argv[1])) {
   try {
     const options = parseArgs(process.argv.slice(2))
+    if (options.help) {
+      console.log(USAGE)
+      process.exit(0)
+    }
     const projectDir = options.projectDir ?? projectDirFor(options.project ?? process.cwd())
     if (!existsSync(projectDir)) throw new Error(`no transcript folder at ${projectDir}`)
     const session = options.session ?? latestSession(projectDir)
