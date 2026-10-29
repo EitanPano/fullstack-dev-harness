@@ -11,7 +11,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
   authFlagFrom,
@@ -36,8 +36,13 @@ const mixed = [
   '',
 ].join('\n')
 
+const made = []
+after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })))
+
 function tempRoot() {
-  return mkdtempSync(path.join(tmpdir(), 'history-'))
+  const dir = mkdtempSync(path.join(tmpdir(), 'history-'))
+  made.push(dir)
+  return dir
 }
 
 test('resolveAuthMarkers keeps an inline row without its marker when auth is on', () => {

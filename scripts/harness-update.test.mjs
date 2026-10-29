@@ -18,6 +18,16 @@ import { buildRecord, readRecord, writeRecord } from './manifest.mjs'
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), 'harness-update.mjs')
 const made = []
+// The updater leaves its backups in os.tmpdir(); the children get a temp root the tests own.
+const TMP_ROOT = mkdtempSync(join(tmpdir(), 'hu-tmproot-'))
+made.push(TMP_ROOT)
+const childEnv = (extra = {}) => ({
+  ...process.env,
+  TMP: TMP_ROOT,
+  TEMP: TMP_ROOT,
+  TMPDIR: TMP_ROOT,
+  ...extra,
+})
 after(() => made.forEach((dir) => rmSync(dir, { recursive: true, force: true })))
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -123,7 +133,10 @@ function project(files, { lock = 'v1.5.0', commit = null } = {}) {
 }
 
 function run(root, ...args) {
-  const result = spawnSync('node', [SCRIPT, '--root', root, ...args], { encoding: 'utf8' })
+  const result = spawnSync('node', [SCRIPT, '--root', root, ...args], {
+    encoding: 'utf8',
+    env: childEnv(),
+  })
   return { status: result.status, out: result.stdout + result.stderr }
 }
 
@@ -280,7 +293,7 @@ test('--version fetches into the cache from the project repository', () => {
   const proj = project(release('1.0.0', {}, { repository: src }))
   const cache = mkdtempSync(join(tmpdir(), 'hu-cache-'))
   made.push(cache)
-  const env = { ...process.env, FULLSTACK_HARNESS_CACHE: cache }
+  const env = childEnv({ FULLSTACK_HARNESS_CACHE: cache })
   const result = spawnSync('node', [SCRIPT, '--root', proj, '--version', 'v1.1.0'], {
     encoding: 'utf8',
     env,
@@ -313,8 +326,9 @@ test('lists the seeds when the old commit is unknown', () => {
 })
 
 test('--help prints the usage and a missing source is a usage error', () => {
-  assert.equal(spawnSync('node', [SCRIPT, '--help'], { encoding: 'utf8' }).status, 0)
-  assert.equal(spawnSync('node', [SCRIPT], { encoding: 'utf8' }).status, 2)
+  const opts = { encoding: 'utf8', env: childEnv() }
+  assert.equal(spawnSync('node', [SCRIPT, '--help'], opts).status, 0)
+  assert.equal(spawnSync('node', [SCRIPT], opts).status, 2)
 })
 
 test('a failure after the hook check restores everything and prints no advice', () => {
