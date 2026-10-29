@@ -111,7 +111,13 @@ function runWithFakeGenerator(extraArgs) {
     } catch {
       forwarded = undefined
     }
-    return { result, forwarded }
+    let readme
+    try {
+      readme = readFileSync(path.join(root, 'README.md'), 'utf8')
+    } catch {
+      readme = undefined
+    }
+    return { result, forwarded, readme }
   } finally {
     rmSync(catalog, { recursive: true, force: true })
     rmSync(root, { recursive: true, force: true })
@@ -178,4 +184,50 @@ test('--help prints the usage and exits 0; an unknown argument still fails', () 
   const bad = spawnSync(process.execPath, [script, '--nope'], { encoding: 'utf8' })
   assert.equal(bad.status, 1)
   assert.match(bad.stderr, /unknown argument --nope/)
+})
+
+test('the main run replaces the README with the project one, no token left', () => {
+  const { result, readme } = runWithFakeGenerator([])
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(readme, /^# y$/m)
+  assert.match(readme, /<!-- readme:about -->/)
+  assert.match(readme, /<!-- configuration:start -->/)
+  assert.doesNotMatch(readme, /{{/)
+})
+
+function finishIn(setup) {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-finish-'))
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: root })
+    setup(root)
+    return spawnSync(process.execPath, [script, '--finish', '--root', root], { encoding: 'utf8' })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+test('--finish refuses a tree without .fullstack/catalog.yaml', () => {
+  const result = finishIn(() => {})
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /catalog.yaml/)
+})
+
+test('--finish refuses a README that still holds a placeholder', () => {
+  const result = finishIn((root) => {
+    mkdirSync(path.join(root, '.fullstack'))
+    writeFileSync(path.join(root, '.fullstack', 'catalog.yaml'), 'packages:\n')
+    writeFileSync(path.join(root, 'README.md'), '<!-- readme:features -->\n')
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /README.md.*<!-- readme:features -->/)
+})
+
+test('--finish takes no other argument, and --help lists it', () => {
+  const mixed = spawnSync(process.execPath, [script, '--finish', '--stack', 'x'], {
+    encoding: 'utf8',
+  })
+  assert.equal(mixed.status, 1)
+  assert.match(mixed.stderr, /--finish accepts only --root/)
+  const help = spawnSync(process.execPath, [script, '--help'], { encoding: 'utf8' })
+  assert.match(help.stdout, /--finish/)
 })

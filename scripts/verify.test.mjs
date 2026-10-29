@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { renderConfiguration, replaceConfiguration } from './readme.mjs'
 import { parseArgs, runVerify } from './verify.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -124,6 +125,13 @@ async function fixture({ commands = {}, ports, noDb = false, plan = true } = {})
   writeFileSync(path.join(root, 'stub.mjs'), STUB)
   writeFileSync(path.join(root, 'docker-stub.mjs'), DOCKER)
   writeFileSync(path.join(root, '.gitignore'), '.orchestrate/\n')
+  // The generated Configuration table of a project with no example env files.
+  const none = [
+    '<!-- configuration:start -->',
+    'This project reads no environment variables.',
+    '<!-- configuration:end -->',
+  ].join('\n')
+  writeFileSync(path.join(root, 'README.md'), `# Fixture\n\n${none}\n`)
   writeFileSync(path.join(root, 'backend', 'contract.json'), 'v1')
   writeFileSync(path.join(root, 'backend', 'app.ts'), 'export const a = 1\n')
   writeFileSync(path.join(root, 'frontend', 'app.ts'), 'export const b = 1\n')
@@ -1150,6 +1158,79 @@ test('a failing git call leaves no review package and exits 2', async () => {
   const round = { n: 1, base: bad }
   assert.throws(() => writeReviewPackage(fx.root, out, { base: fx.base30, tree, round }), /git/)
   assert.equal(existsSync(path.join(out, 'review.diff')), false)
+})
+
+const EXAMPLE = '.env.example'
+const readmeOf = (fx) => path.join(fx.root, 'README.md')
+const regenerate = (fx) =>
+  writeFileSync(
+    readmeOf(fx),
+    replaceConfiguration(readFileSync(readmeOf(fx), 'utf8'), renderConfiguration(fx.root)),
+  )
+
+test('readme fails on a variable missing from the table and passes once regenerated', async () => {
+  const fx = await fixture()
+  writeFileSync(path.join(fx.root, 'backend', EXAMPLE), '# Port.\nPORT=4000\n')
+  const { exit, result } = await runVerify(opts(fx).options)
+  assert.equal(exit, 1)
+  const check = result.checks.find((c) => c.name === 'readme')
+  assert.equal(check.ok, false)
+  assert.match(check.detail, /node scripts\/readme\.mjs --configuration/)
+  regenerate(fx)
+  assert.equal((await runVerify(opts(fx).options)).exit, 0)
+})
+
+test('a deleted, unstaged example file is recorded as a readme result, not a crash', async () => {
+  const fx = await fixture()
+  writeFileSync(path.join(fx.root, 'backend', EXAMPLE), 'PORT=4000\n')
+  git(fx.root, 'add', '-A')
+  git(fx.root, 'commit', '-qm', 'example')
+  regenerate(fx)
+  git(fx.root, 'commit', '-qam', 'table')
+  rmSync(path.join(fx.root, 'backend', EXAMPLE))
+  const { exit, result } = await runVerify(opts(fx).options)
+  assert.equal(exit, 1)
+  assert.equal(result.checks.find((c) => c.name === 'readme').ok, false)
+  regenerate(fx)
+  assert.equal((await runVerify(opts(fx).options)).exit, 0)
+})
+
+test('readme fails on an extra variable in the table', async () => {
+  const fx = await fixture()
+  writeFileSync(path.join(fx.root, 'backend', EXAMPLE), 'PORT=4000\n')
+  regenerate(fx)
+  assert.equal((await runVerify(opts(fx).options)).exit, 0)
+  writeFileSync(path.join(fx.root, 'backend', EXAMPLE), '')
+  const { exit, result } = await runVerify(opts(fx).options)
+  assert.equal(exit, 1)
+  assert.equal(result.checks.find((c) => c.name === 'readme').ok, false)
+})
+
+test('readme fails on a missing README.md and on a missing block', async () => {
+  const fx = await fixture()
+  rmSync(readmeOf(fx))
+  const missing = await runVerify(opts(fx).options)
+  assert.equal(missing.exit, 1)
+  assert.match(missing.result.checks.find((c) => c.name === 'readme').detail, /README\.md is missing/)
+  writeFileSync(readmeOf(fx), '# No block\n')
+  const bare = await runVerify(opts(fx).options)
+  assert.equal(bare.exit, 1)
+  assert.match(bare.result.checks.find((c) => c.name === 'readme').detail, /marker/)
+})
+
+test('a CRLF README with a correct block passes', async () => {
+  const fx = await fixture()
+  writeFileSync(readmeOf(fx), readFileSync(readmeOf(fx), 'utf8').replaceAll('\n', '\r\n'))
+  assert.equal((await runVerify(opts(fx).options)).exit, 0)
+})
+
+test('--package and --no-e2e runs skip the readme check', async () => {
+  const fx = await fixture()
+  rmSync(readmeOf(fx))
+  const packaged = await runVerify(opts(fx, { packages: ['backend'] }).options)
+  assert.equal(packaged.exit, 0)
+  assert.equal(read(fx, 'verify-partial.json').checks.some((c) => c.name === 'readme'), false)
+  assert.equal((await runVerify(opts(fx, { noE2e: true }).options)).exit, 0)
 })
 
 describe('verify', { concurrency: 6 }, () => {

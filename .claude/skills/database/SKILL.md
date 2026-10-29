@@ -87,7 +87,7 @@ type changes with the engine. One task, planned and reviewed like any other, del
      does, `<e2eDb> && <start>` for the API. The **driver** reads three files, by exact path and
      without browsing, in the catalog release `catalog.lock` pins (cache root
      `FULLSTACK_TEMPLATES_CACHE`, default `~/.cache/fullstack-templates`, then the version
-     folder; `bootstrap-project` forbids listing or searching it), under
+     folder; it is never listed or searched), under
      `frontend/<next|react>/base/` for the frontend's template: `scripts/e2e-database-url.ts`,
      `tests/unit/e2e-database-url.test.ts` and `playwright.config.ts`. It hands their content
      in the frontend dispatch, never in the plan, which only names the step. Resolve the

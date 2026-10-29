@@ -64,7 +64,10 @@ failure-path test, an error state, a change-log line).
    explain.
 6. **Deployment and operations**: data change shipped with its migration or index, env variable in
    the package's env module (named in its `AGENTS.md`) and `.env.example`, Docker build still
-   valid, change log updated.
+   valid, change log updated. A change whose plan Goal adds or changes a user-visible capability
+   has its Features line in `README.md` with the ` (planned)` suffix removed (or added as a new
+   line), and the README's Configuration block matches the
+   `.env.example` files (the full `verify` run enforces the latter).
 
 ## Severity
 

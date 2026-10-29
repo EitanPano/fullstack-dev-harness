@@ -24,10 +24,11 @@ The catalog's stacks: `next-bun-express` is a layered Express 5 API on Bun with 
 flag, and a Next.js frontend with a client typed from the server's contract;
 `next-python-fastapi` pairs the same frontend with a layered FastAPI API on Python managed by
 uv. `react-bun-express` and `react-python-fastapi` pair a React single-page app with the same
-two APIs. Catalog v1.4.0 frontends share one layered foundation (app, widget, feature, entity,
-shared) and take brand inputs at the bootstrap: display name, primary and neutral colours,
-radius, font, default theme and density, written from the product definition's `Design`
-section. The catalog README has the matrix.
+two APIs. The frontend is chosen by need: React by default, Next only when public pages must be
+found by search engines or show a rich preview when shared. Catalog v1.4.0 frontends share one
+layered foundation (app, widget, feature, entity, shared) and take brand inputs at the
+bootstrap: display name, primary and neutral colours, radius, font, default theme and density,
+written from the product definition's `Design` section. The catalog README has the matrix.
 
 A project generated with an older frontend cannot be upgraded in place: a lock bump changes
 only what new bootstraps generate.
@@ -53,9 +54,11 @@ skill moves a project between the modes.
 
 ## Clone checklist
 
-1. Create a repository from this template (or `git clone` and remove the remote). The
-   bootstrap needs a git work tree: it checks first and offers `git init` (the scaffold commit
-   becomes the root commit), and `scripts/bootstrap.mjs` refuses to run outside one.
+1. Click "Use this template" to create a repository from it. A `git clone` instead keeps the
+   harness's own commits in your history, and setup warns about them. The bootstrap needs a git
+   work tree: it checks first and offers `git init` (after which it asks you to approve
+   committing the untouched harness as the root commit, which `--finish` needs), and
+   `scripts/bootstrap.mjs` refuses to run outside one.
 2. Open it in Claude Code and accept the workspace trust dialog. Until you do, Claude Code
    ignores the `permissions.allow` list in `.claude/settings.json` (the hooks still run), so
    a headless `claude -p` run in a fresh clone falls back to its permission mode for every
@@ -74,38 +77,18 @@ skill moves a project between the modes.
    first. Approve the plan by editing its `Status:` line; review the reports in
    `.orchestrate/<slug>/` before you commit.
 
-## How work moves
-
-1. A task is one line in `.plan/000-backlog.md`.
-2. The orchestrator drafts the plan into `.orchestrate/<slug>/plan.md`, with a `UX` line per route (pattern, primary action, states, tone). You approve the draft; the driver then cuts the task's branch and promotes it to `.plan/NNN-YYYY-MM-DD-<slug>.md`. Once a task's implementers are running, the orchestrator plans the next backlog line in the background.
-3. The backend agent implements the plan's Contract and regenerates the server's contract (the
-   contract stage); then the backend and frontend agents work in parallel, the frontend
-   regenerating its types and implementing the feature. Both test first. After e2e has captured the screens, the frontend agent runs a UI pass: it reads three screenshots per route (phone light, phone dark, desktop light) against the `ui-design` rubric and fixes what fails.
-4. `node scripts/verify.mjs --plan <plan> --reuse` runs the gates and writes
-   `.orchestrate/<slug>/verify.json` (run in the background; it can outlive a foreground
-   timeout). When the data-layer task adds `testDb` and `migrate`, the driver records them in
-   `.fullstack/catalog.yaml` from the backend's `Commands:` line first.
-5. One reviewer (plus a security reviewer when `verify.json` says `security.triggered`) and QA
-   run in parallel. P0 and P1 findings go back to the implementer, at most two fix rounds, each
-   re-reviewed on its own diff. QA adds adversarial tests, runs a UX pass over the same screenshots (a rubric failure is a P2; a broken journey or a WCAG AA failure is a P1), and checks each acceptance
-   criterion with evidence.
-6. The driver writes the change log, runs `verify` once more on the final tree, and checks that
-   `git write-tree` equals the verified tree, then you decide whether to commit. Role agents never
-   commit, merge, push or rewrite history; the driver commits only on your yes.
-
-The whole procedure is in `.claude/skills/dev-loop/SKILL.md`; the rules every agent
-follows are in `AGENTS.md` and `.claude/rules/`.
-
 ## Repository map
 
 | Path | Purpose |
 | --- | --- |
 | `AGENTS.md` | Rules, stack, architecture, definition of done; the single source of truth |
-| `CLAUDE.md` | Loads `AGENTS.md` into Claude Code |
+| `CLAUDE.md` | Loads `AGENTS.md` and `.doc/conventions.md` into Claude Code |
+| `.claude/README.md` | The agent manual: the loop, guardrails and recovery, integrations, harness updates |
+| `.claude/harness.json` | The manifest of harness, project and development files, and the version (`unreleased` between releases) |
 | `catalog.lock` | The pinned catalog version: repository, tag, commit |
 | `.fullstack/catalog.yaml` | Stack, templates, flags, commands and ports per package; written by the bootstrap |
 | `<package>/AGENTS.md` | Shipped by the template: the package's layer map and its agent-facing sections |
-| `.doc/` | Product definition, architecture, glossary: fill-in forms |
+| `.doc/` | Product definition, architecture, glossary: fill-in forms; `conventions.md` for the project's own agent rules |
 | `.plan/` | Backlog and one plan per task (promoted from the draft) |
 | `.claude/agents/` | Role definitions |
 | `.claude/rules/` | Conventions: code style, naming, UI and styling, git workflow |
@@ -113,6 +96,8 @@ follows are in `AGENTS.md` and `.claude/rules/`.
 | `.claude/hooks/` | Guardrails, wired by `.claude/settings.json` |
 | `scripts/bootstrap.mjs` | Fetches the catalog pinned in `catalog.lock` and runs its generator |
 | `scripts/verify.mjs` | The gate: every package's checks, writing `verify.json` |
+| `scripts/readme.mjs` | Generates the Configuration table of the product README (the rest is written at setup) |
+| `scripts/harness-update.mjs` | Updates a project's harness files from a release |
 | `.orchestrate/<slug>/` | Generated by the loop (draft `plan.md`, reports, reviews, ticket, `verify.json`); git-ignored |
 | `.cursor/`, `.github/copilot-instructions.md` | Pointers to `AGENTS.md` for other tools |
 
@@ -123,30 +108,18 @@ follows are in `AGENTS.md` and `.claude/rules/`.
    that mount and register a module.
 3. Run the package's `contract` then `check` commands.
 
-## Guardrails and recovery
+## What setup leaves in a project
 
-The hooks in `.claude/hooks/` fail closed: a hook that crashes, times out or cannot start
-blocks the tool call. If `node` is missing from Claude Code's `PATH`, every tool call
-(Read and Edit included) is blocked until that is fixed. To recover, put
-`{ "disableAllHooks": true }` in `.claude/settings.local.json` (git-ignored) or edit
-`.claude/settings.json` by hand, then restore the hooks once `node` resolves. On a
-Claude Code older than 2.1.295 the hooks run but fail open, so upgrade before relying on
-them.
+The bootstrap's finish step (`node scripts/bootstrap.mjs --finish`) turns the clone into a
+product repository. It leaves a generated product `README.md` (replacing this file), no harness
+tests or setup scripts, and the harness version in `.fullstack/harness.json`. How work moves, the
+guardrails and recovery, the integrations and updating the harness are in `.claude/README.md`,
+the agent manual that ships to every project.
 
-The hooks have a test suite: `node --test ".claude/hooks/test/*.test.mjs"`. Any change to
-`.claude/hooks/` must pass it.
+## Older projects and lock bumps
 
-## Optional integrations
-
-- **Linear**: set `tracker: linear` in the backlog header and add the Linear MCP server
-  to a `.mcp.json`; the loop falls back to local ticket files when the tool is absent.
-- **Figma**: add a `figma:<url>` marker to a backlog line and the Figma MCP server; the
-  frontend agent reads the frame when the tool is present.
-
-## Updating the harness in an existing project
-
-Harness files (`AGENTS.md`, `.claude/`, `scripts/`, `catalog.lock`) are plain files; pull
-them from a newer template and review the diff. A lock bump changes only what the next
+A project bootstrapped before the version record has no `.fullstack/harness.json`; it updates by
+hand (see `.claude/README.md › Updating the harness`). A lock bump changes only what the next
 bootstrap generates; an already generated project keeps its packages and their `AGENTS.md`.
 
 A project scaffolded before the catalog has no `.fullstack/catalog.yaml`, and its
@@ -162,10 +135,23 @@ the dev loop refuses to start otherwise.
 
 After bumping `catalog.lock`, before merging:
 
-1. Grep the harness text (`AGENTS.md`, `README.md`, `.claude/`, `.doc/`, `scripts/`) for the old version's
-   paths, rule names and command names.
+1. Grep the harness text (`AGENTS.md`, `README.md`, `.claude/`, `.doc/`, `scripts/`) for the
+   old version's paths, rule names and command names.
 2. Update every hit to the new template's `AGENTS.md`, or record why it stays.
 3. Run the hooks tests and `node scripts/verify.mjs` on a project generated from the new lock.
 
 To try an unreleased catalog, use `--templates <path>` or `FULLSTACK_TEMPLATES_DIR`.
 
+## Changing the hooks
+
+Any change to `.claude/hooks/` must pass the hooks suite
+(`node --test ".claude/hooks/test/*.test.mjs"`) before it merges. A broken hook blocks every
+tool call, so make the change in a worktree, not in the live checkout.
+
+## Releasing the harness
+
+1. Run the hooks suite (`node --test ".claude/hooks/test/*.test.mjs"`) and the scripts suite
+   (`node --test "scripts/**/*.test.mjs"`).
+2. Set `version` in `.claude/harness.json` in the release commit; between releases it reads
+   `unreleased`.
+3. Tag `vMAJOR.MINOR.PATCH` on `main` through the `cutting-a-release` skill.
