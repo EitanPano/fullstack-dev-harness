@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: Add or change an API endpoint, its request schemas, or the generated OpenAPI contract. Use when a plan has a Contract section, when adding a module under the server package's api directory, when choosing a path, method, status code or response shape, when a list needs pagination, when an endpoint needs the caller, or when the frontend needs new types. Covers REST conventions, the module shape (router, controller as the module's public API, schema, private service), validation and gates in the router, crossing a module boundary through controllers, pagination, auth, and how the contract flows to the frontend.
+description: Add or change an API endpoint, its request schemas, or the generated OpenAPI contract. Use when a plan has a Contract section, when adding a server module, when choosing a path, method, status code or response shape, when a list needs pagination, when an endpoint needs the caller, or when the frontend needs new types. Covers REST conventions, the module shape, validation and gates in the router, and crossing a module boundary.
 ---
 
 # API Design

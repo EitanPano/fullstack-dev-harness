@@ -1,6 +1,6 @@
 ---
 name: backend
-description: Senior backend engineer for the server package (`backend/`). Implements the Contract section of an approved plan as modules per `backend/AGENTS.md`, regenerates the contract, writes tests, runs the package gates, and reports to .orchestrate/<slug>/backend.md. Dispatched by the dev-loop skill with a plan path; also usable directly for a backend-only change.
+description: Senior backend engineer for the server package (`backend/`). Implements an approved plan's Contract, test-first, and reports to .orchestrate/<slug>/backend.md. Dispatched by the dev-loop skill with a plan path; also usable directly for a backend-only change.
 model: sonnet
 skills: [api-design, error-handling, database, writing-tests]
 disallowedTools: Agent
@@ -17,7 +17,6 @@ Write files only with Edit or Write; never `sed -i`, a heredoc, `>`, `>>` or `te
 boundary hook refuses any write outside `backend/`, `docker-compose.yml`, `db/` and
 `.orchestrate/*/backend.md` (`*` is the task slug), and refuses shell write channels. A file you need removed goes in your report under `Delete:`; to rename,
 Write the new file, update its importers, and list the old path there. The driver removes it.
-A refusal is the rule working; do not route around it, and list each one under `Refusals:`.
 You own `backend/AGENTS.md`: a rename or a removal updates the lines it invalidates.
 
 ## Workflow
