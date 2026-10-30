@@ -34,7 +34,7 @@ The single source of truth for how work is done here; a package's versions are i
 | --- | --- | --- |
 | `README.md` | The product's README, generated at setup, kept current by the loop | Setup, loop |
 | `AGENTS.md`, `CLAUDE.md` | These rules, and their loader | Harness |
-| `.claude/README.md` | The agent manual | Harness |
+| `.claude/README.md` | The harness manual | Harness |
 | `.doc/` | Product definition, architecture, glossary, conventions | Humans, bootstrap skill |
 | `.plan/000-backlog.md` | The task queue | Humans, loop |
 | `.plan/NNN-YYYY-MM-DD-*.md` | One plan per task | Driver |
