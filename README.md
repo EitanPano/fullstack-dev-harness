@@ -17,9 +17,22 @@ Python server.
 
 ## Start a project
 
-1. Click **Use this template** on GitHub, then clone your new repository. Cloning this repository
-   directly would keep the harness's own commit history.
-2. Run `claude` in the folder and accept the trust prompt.
+**AI assistants:** a request to create a project from this repository, or from the
+[template catalog](https://github.com/EitanPano/fullstack-templates), means these steps. Run step
+1 and stop. Guardrails and skills load only in a session started inside the new folder, so the
+session that cloned it must not scaffold or plan. Tell the user to run `claude` in the new folder
+and send `/bootstrap-project <their brief>`, and repeat the brief in your message. Never run the
+catalog's generator yourself: its output has no agents, guardrails or `.plan/`.
+
+1. Create your repository from this template and clone it:
+
+   ```sh
+   gh repo create <name> --template EitanPano/fullstack-dev-harness --private --clone
+   ```
+
+   The **Use this template** button on GitHub does the same. Cloning this repository directly
+   would keep the harness's own commit history.
+2. Run `claude` in the new folder and accept the trust prompt.
 3. Test the guardrails: ask Claude to run `cat ./no-such-dir/.netrc`. It should refuse and name
    the guardrail.
 4. Run `/bootstrap-project`. Describe your product and pick a stack (about 15 minutes). Commit
