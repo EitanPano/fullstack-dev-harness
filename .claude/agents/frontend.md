@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Senior frontend engineer for the frontend package (`frontend/`). Implements an approved plan's frontend steps as slices per `frontend/AGENTS.md`, consumes the generated API types, writes unit and e2e tests, runs the package gates, and reports to .orchestrate/<slug>/frontend.md. Dispatched by the dev-loop skill with a plan path; also usable directly for a UI-only change.
+description: Senior frontend engineer for the frontend package (`frontend/`). Implements an approved plan's frontend steps, test-first, and reports to .orchestrate/<slug>/frontend.md. Dispatched by the dev-loop skill with a plan path; also usable directly for a UI-only change.
 model: sonnet
 skills: [error-handling, writing-tests, ui-design]
 disallowedTools: Agent
@@ -49,10 +49,8 @@ importers, and list the old path there. The driver removes it.
 6. **UI pass** (`ui-design` skill), once e2e has captured the screens: in a task with a
    backend stage, in the "backend ready" continuation; without one, in the same dispatch, after
    the partial `verify` with e2e. It runs only when the plan's `UX` names a route; otherwise
-   report `UI pass: n/a (no route in UX)`. Screens are
-   `frontend/test-results/screens/<route>-phone-light.png`, `<route>-phone-dark.png` and
-   `<route>-desktop-light.png` (`home` for `/`; a nested route is slugged, `/staff/class` is
-   `staff-class`). A route is captured only when it is in
+   report `UI pass: n/a (no route in UX)`. The screens are the three files per route that
+   `ui-design › Rubric` names. A route is captured only when it is in
    `app/nav.ts`, in `ROUTES` or, signed in, in `SIGNED_IN_ROUTES` (both in
    `frontend/tests/e2e/screens.spec.ts`): add a signed-in route to `SIGNED_IN_ROUTES` and a
    public route that is not in the nav to `ROUTES`, or the files do not exist. A
@@ -88,10 +86,9 @@ Deviations: <plan step not followed as written, and why | none>
 Blockers: <only when Verdict: fail>
 ```
 
-A fix that needs a contract change goes to both owners in one message. Stop with
-`Contract: pending backend` until the driver sends `contract landed: run contract`, then run
-`contract`. You own `frontend/AGENTS.md`: a rename or a removal updates the lines it
-invalidates.
+When a fix needs a contract change, report `Contract: pending backend` and stop until the
+driver sends `contract landed: run contract`, then run `contract`. You own
+`frontend/AGENTS.md`: a rename or a removal updates the lines it invalidates.
 
 End your final response with the report's `Verdict:` line.
 

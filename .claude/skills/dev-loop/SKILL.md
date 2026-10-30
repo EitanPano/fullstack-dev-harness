@@ -1,6 +1,6 @@
 ---
 name: dev-loop
-description: Take one backlog task from plan to reviewed, tested code through the role agents. Use when the user says "run the loop", "next task", "implement <task>", "start the dev loop", or asks to deliver a backlog item. Drives orchestrator → approval → backend contract → backend and frontend → verify → review and QA in parallel → commit gate, with bounded fix rounds. Requires the generated packages and .fullstack/catalog.yaml (a fresh clone is set up first).
+description: Take one backlog task from plan to reviewed, tested code through the role agents. Use when the user says "run the loop", "next task", "implement <task>", "start the dev loop", or asks to deliver a backlog item. Requires .fullstack/catalog.yaml (a fresh clone is set up first).
 ---
 
 # Dev loop
@@ -34,18 +34,15 @@ The evidence is `node scripts/verify.mjs --plan <plan>`: contract freshness, `ch
 `testDb`, `testE2e` and the diff checks for every package, written to
 `.orchestrate/<slug>/verify.json`. Exit 0 passes, 1 fails, 2 is a usage or environment
 error. The driver always passes `--reuse`: when the tree equals the last passing run's, it
-exits 0 without running anything. Otherwise `--reuse` reuses, per step (`contract`, `check`,
-`testDb`, `testE2e`), a passing result whose key matches (the package's subtree hash, the
-shared inputs, the command line, the Base) and prints `reused (<file>, <time>)`; a failing
-step is never reused, and the cross-package checks always run. The key does not cover
-environment variables, git-ignored `.env*` files or toolchains: after changing any of them,
-run `verify` without `--reuse`. An implementer's `--package
-<dir>` or `--no-e2e` run is partial: it writes `verify-partial.json` (backend and frontend
-share the file, each keeping the other's entries) and never satisfies `--reuse` as a whole run,
-but its passing steps are reused per package. A partial run reads only its selected packages'
-directories, so a sibling's concurrent edit does not fail it. A full run also records
-`security: { triggered, paths }` in `verify.json` and, with a Base, writes the review package
-`review.diff` (section 4).
+exits 0 without running anything. Otherwise `--reuse` reuses, per step, a passing result whose
+key matches (the package's subtree hash, the shared inputs, the command line, the Base) and
+prints `reused (<file>, <time>)`; a failing step is never reused, and the cross-package checks
+always run. The key does not cover environment variables, git-ignored `.env*` files or
+toolchains: after changing any of them, run `verify` without `--reuse`. An implementer's
+`--package <dir>` or `--no-e2e` run is partial: it writes `verify-partial.json` (shared by
+backend and frontend) and never satisfies `--reuse` as a whole run, but its passing steps are
+reused per package. A full run also records `security: { triggered, paths }` in `verify.json`
+and, with a Base, writes the review package `review.diff` (section 4).
 
 `verify` can outlive the Bash tool's timeout. The driver runs its full run with the Bash
 tool's `run_in_background: true` and waits for the completion notification. A role agent
@@ -65,10 +62,9 @@ Role agents cannot delete files (the hooks refuse it). They list a file to remov
 - The working tree is clean and the branch is not `main`. A tree left dirty by the
   bootstrap means its commit gate was never answered: ask the user to approve that
   commit. Any other uncommitted change: list it and stop; never stash or discard it.
-- `.doc/product-definition.md` has no `FILL` marker in Scope, Users, Auth, Design (when the
-  stack has a frontend) or Acceptance Criteria, and the three boxes of its `## Ready to plan`
-  are ticked. If a marker remains or a box is open, the bootstrap did not finish: stop and ask
-  the user to finish it.
+- The three boxes of `## Ready to plan` in `.doc/product-definition.md` are ticked and each one
+  holds. If a box is open or a section it names still has a `FILL` marker, the bootstrap did not
+  finish: stop and ask the user to finish it. A stack with no frontend answers Design "n/a".
 
 ## 1. Pick the task
 
@@ -92,7 +88,7 @@ this instruction:
 Size check before showing the draft: `grep -vc '^[[:space:]]*> ' <draft>` at most 120 (answers under an Open
 Question are `> ` lines and do not count), `grep -c '^- V[0-9]' <draft>` at most 8, the numbered
 Open Questions at most 3. Over a cap: re-dispatch the orchestrator once with "bring the plan
-within the caps of writing-plans › Sizing a product task, or split the task". Over again: show
+within the caps of `writing-plans › Sizing a product task`, or split the task". Over again: show
 the draft with the counts and let the user decide. Add backlog lines a plan proposes under `Out`
 only on the user's yes.
 
@@ -131,8 +127,9 @@ id and (frontend) the figma URL if any.
    data-layer task adds `testDb`, `migrate` and `e2eDb`; only names from the `AGENTS.md` command
    table count, any other command stays in the report's `Handoff:`) is written into
    `.fullstack/catalog.yaml` under `packages.<dir>.commands` as soon as it arrives, before any
-   later frontend dispatch and before the next `verify`. A full-stack data-layer task
-   (`database` skill, item 7) therefore runs its backend stage first.
+   later frontend dispatch and before the next `verify`. A full-stack data-layer task therefore
+   runs its backend stage first; read `.claude/skills/database/data-layer-task.md` before you
+   dispatch its frontend stage, which needs three template files from you (item 7).
 3. The frontend stops after `check` with `E2E: pending backend` in its report when a backend
    stage exists. Its e2e runs the production build and starts the API itself. Once the backend
    reports, SendMessage it "backend ready: run `verify --package frontend --reuse` (with
@@ -151,7 +148,9 @@ id and (frontend) the figma URL if any.
 
 Implementer reports carry a `Tests first:` line; QA judges it. A report with `Blockers:` is
 read and either fixed in the plan with the user or the implementer is re-dispatched once with
-the blocker quoted (a field read, not a `Verdict:` branch).
+the blocker quoted (a field read, not a `Verdict:` branch). An agent that ends with no report
+(a turn limit, a crash) is continued once with "write your report from where you stopped"; still
+none, hand it to the user.
 
 **Reports.** After each stage and fix round, read three fields. Copy each implementer
 `Deviations:` entry into the plan's `## Changes during the task` before dispatching the review
@@ -181,17 +180,7 @@ Once `verify` passes, run `git add --intent-to-add .` so new files appear in
 `git diff <Base>`. Then, in one message, dispatch:
 
 - `reviewer` with `mode: general`;
-- `reviewer` with `mode: security` when `verify.json` has `security.triggered: true` (`verify`
-  matches the diff against auth, session, security and middleware code (`**/auth/**`,
-  `**/session/**`, `**/*session*`, `**/security/**`, `**/middleware/**`), `**/proxy.ts`,
-  `**/shared/auth/**`, CORS configuration (`**/cors.*`), `**/Dockerfile`,
-  `docker-compose.yml` and each package's env module (`**/config/env.ts`, `**/config/env.py`,
-  `**/src/env.ts`), deploy configuration (`**/nginx/**`, `**/.dockerignore`,
-  `**/next.config.*`), seed files (`**/*seed*`) and the user model (`**/models/user/**`); a
-  changed line, added or removed, in a code file (`.ts .tsx .js .jsx .mjs .cjs .py`) that names a
-  gate (`requireAuth`, `requireRole`, `requireAccount`, `assertRole`, `require_auth`,
-  `require_role`, `require_caller`, `_assert_role`, `roleAction`, `accountAction`) adds that file wherever it is, a UI file under `**/auth/ui/**`
-  included; migrations and `.sql` files do not trigger it);
+- `reviewer` with `mode: security` when `verify.json` has `security.triggered: true`;
 - `qa`.
 
 The reviewers read the review package `.orchestrate/<slug>/review.diff` once (the diff against

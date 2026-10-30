@@ -25,6 +25,7 @@ The single source of truth for how work is done here; a package's versions are i
   runtime's inline code and stdin programs.
 - A file a role agent needs removed goes in its report under `Delete:`; the driver removes it
   inside that agent's lane only.
+- Never route around a refusal; report it.
 - Lanes stop accidents; they are no sandbox (use Claude Code's or a container). Recovery:
   `.claude/README.md`.
 
@@ -35,7 +36,7 @@ The single source of truth for how work is done here; a package's versions are i
 | `README.md` | The product's README, generated at setup, kept current by the loop | Setup, loop |
 | `AGENTS.md`, `CLAUDE.md` | These rules, and their loader | Harness |
 | `.claude/README.md` | The harness manual | Harness |
-| `.doc/` | Product definition, architecture, glossary, conventions | Humans, bootstrap skill |
+| `.doc/` | Product definition, architecture, glossary, conventions | Humans, bootstrap, driver |
 | `.plan/000-backlog.md` | The task queue | Humans, loop |
 | `.plan/NNN-YYYY-MM-DD-*.md` | One plan per task | Driver |
 | `.claude/` | `agents/`, `skills/`, `rules/`, `hooks/`; `harness.json`, the file manifest | Harness |
@@ -92,7 +93,7 @@ Two packages, one generated contract; layer maps: each package's `AGENTS.md`.
 ## Rules
 
 In `.claude/rules/`: `code-style.md` (`scripts/`, hooks), `naming.md`, `ui-and-styling.md`
-(`frontend/`), `git-workflow.md` (approval before commit, merge or tag; Conventional Commits).
+(`frontend/`), `git-workflow.md` (approval before commit, merge, push or tag; Conventional Commits).
 
 ## Definition of done
 
@@ -100,8 +101,7 @@ Done means every item holds, with evidence.
 
 1. `node scripts/verify.mjs --plan <plan> --reuse` exits 0: each touched package's `check`
    (and `testDb`, none skipped) and the e2e suite. Evidence: `.orchestrate/<slug>/verify.json`.
-   A run with `--package` or `--no-e2e` is partial: it writes `verify-partial.json`, never
-   satisfies `--reuse` as a whole run; its passing steps are reused per package.
+   A run with `--package` or `--no-e2e` is partial and never stands in for it.
 2. Every new behaviour has a happy-path unit test and a failure or empty one, with the red run
    in the report (`Tests first:`). Every new user journey has an e2e test (with a frontend).
 3. No test was deleted, skipped or focused. `verify` enforces the focus and skip spellings;

@@ -1,6 +1,6 @@
 ---
 name: bootstrap-project
-description: Turn a fresh clone of this harness into a running full-stack project. Use when .fullstack/catalog.yaml does not exist yet, when the user asks to "start the project", "set up the app", "create the full-stack project" or "bootstrap", or when .doc/ still holds FILL markers. Takes a pasted product brief in one shot (fills the forms, asks the gaps once, shows one summary) or walks the product forms section by section, picks a stack from the template catalog, asks the flags and capabilities its templates declare, runs scripts/bootstrap.mjs, verifies every gate, and writes the first backlog line.
+description: Turn a fresh clone of this harness into a running project. Use when .fullstack/catalog.yaml does not exist yet, when .doc/ still holds FILL markers, when the user pastes a product brief, or when the user asks to start, set up, create or bootstrap the project. Covers the product forms, the stack choice, the scaffold and the first backlog lines.
 ---
 
 # Bootstrap a project
@@ -10,6 +10,9 @@ templates: `catalog.lock` pins a release of the template catalog, and the bootst
 that catalog's generator. This skill supplies the product, the stack choice and the
 database decision, and proves the result works. Prerequisites: Bun 1.4+, Node 24+, git, and
 each chosen template's own tools.
+
+After a context compaction, Read this file again: a re-attached skill keeps only its first 5,000
+tokens, and this one is longer. Its last sections are the commit gate.
 
 ## 0. Preflight
 
@@ -28,16 +31,17 @@ each chosen template's own tools.
 
 ### With a pasted brief (one-shot intake)
 
-A user may paste a brief that answers the forms (the shape of the P1 proof prompt: purpose,
-scope, authentication and roles, design, data store, data model, glossary, stack, flags, deploy
-mode, tracker, backlog lines). Then:
+A user may paste a brief that answers the forms (purpose, scope, authentication and roles,
+design, data store, data model, glossary, stack, flags, deploy mode, tracker, backlog lines).
+Then:
 
 1. Fill every form from it, in the user's words: `.doc/product-definition.md` (Design
-   included), `.doc/architecture.md` and `.doc/glossary.md`. Map each stack, flag, capability,
+   included), `.doc/architecture.md` and `.doc/glossary.md`, the same markers the walk below
+   asks about, and leave the ones section 5 writes. Map each stack, flag, capability,
    deploy-mode and brand answer to its scaffold flag (sections 2 and 3), with the mappings that
    section 3 states.
-2. Collect every gap: a FILL marker the brief does not answer, a value the catalog cannot take,
-   a clash with the glossary. Ask about all of them in one message, each with the skill's
+2. Collect every gap: a marker from step 1 the brief does not answer, a value the catalog cannot
+   take, a clash with the glossary. Ask about all of them in one message, each with the skill's
    default or recommendation. Do not walk the sections.
    Infer the Search and sharing answer (do public pages need to be found by search engines or
    show a rich preview when shared?) from the brief; ask it in the gap message only when the
@@ -48,11 +52,8 @@ mode, tracker, backlog lines). Then:
    the deploy mode, the brand (every flag with its value, the display name included), the
    template gaps and the first backlog lines. Scaffold only after a yes.
 
-Template gaps. Read the server template's auth defaults at the catalog tag `catalog.lock` pins:
-the entity and gates in its `AGENTS.md › Authentication`, the password bounds in
-`models/user/constants` (`USER_LIMITS.password`), the roles in `.doc/architecture.md › Auth`.
-Today they are the entity `user`, the roles `user` and `admin`, and a password of 8 to 128
-characters (an example; the pinned tag decides). Compare the brief's entity names,
+Template gaps. Every server template ships the same auth defaults: the entity `user`, the roles
+`user` and `admin`, and a password of 8 to 128 characters. Compare the brief's entity names,
 roles and password rule with those. Each difference is a gap:
 
 - Record it in the summary and in `.doc/architecture.md › Auth` as a decision for the first
@@ -60,9 +61,10 @@ roles and password rule with those. Each difference is a gap:
   decided in the task that adds the first gate"). The skill changes no template code.
 - That task's plan carries `Retired:` with the template's old terms (`writing-plans`), role
   values in literal form (`'admin'`, `UserRole.admin`), never a bare word the entity or a path
-  shares (`user`). Without it the rename arrives unannounced, inside a later task's plan (P3a, task 2).
-- Re-read the generated package's `AGENTS.md › Authentication` after section 3 and add any gap
-  the defaults above missed.
+  shares (`user`). Without it the rename arrives unannounced, inside a later task's plan.
+- After section 3, confirm those defaults in the generated package: the entity and gates in its
+  `AGENTS.md › Authentication`, the password bounds in `models/user/constants`
+  (`USER_LIMITS.password`). Add any gap they show.
 
 ### With no brief (section by section)
 
@@ -72,9 +74,10 @@ their words; suggest a default only when they ask. Ask the Search and sharing li
 Requirements) with the form; the answer decides the frontend in section 2. The `Design` section is part of this walk;
 a product with no frontend answers it "n/a", and answers Search and sharing "n/a" too (which resolves that FILL marker). Its brand fields become scaffold flags in
 section 3. Do the same for `.doc/architecture.md`
-(Data store, Data Model, Data migrations, API versioning, Auth, External Dependencies,
-Deployment, except its `Deploy mode` and `TRUST_PROXY` lines, which section 5 fills once the
-stack is chosen) and `.doc/glossary.md` (one row per entity named in the scope).
+(other components, other data flows, Data store, Data Model, Data migrations, API versioning,
+Auth, External Dependencies, Deployment, except the Data store's `Local service` and the
+`Deploy mode` and `TRUST_PROXY` lines, which section 5 fills once the stack is chosen) and
+`.doc/glossary.md` (one row per entity named in the scope).
 
 The Data store question is the `database` skill's: engine, client library, or decide
 later. Record the answer as given (the engine the user names, or "decide later", plus the
@@ -277,38 +280,45 @@ migrations and test database, described in the package's `AGENTS.md › Adding t
 layer`. Production secrets are listed in the package's `.env.example`; development runs
 with defaults and warns.
 
-## 5. First backlog lines
+## 5. Finish the forms
 
-Follow the grammar at the top of `.plan/000-backlog.md`. When no database provider was
-passed at generation, the first line is `- [ ] add the <engine> data layer` for a named
-engine, or `- [ ] add the data layer` when the answer was "decide later", with
-` | stack:backend` appended only when the stack has no frontend (the `database` skill says
-what that task delivers, and why the frontend takes part). With a provider, the
-first line is the first in-scope capability from the product definition; without one it is
-the next line. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers. Fill the
-`Stack` row of the components table in `.doc/architecture.md` from `.fullstack/catalog.yaml`:
-the stack id and, per package, its directory, template and version, plus the reason for the
-frontend choice (the Search and sharing answer). In `README.md`, replace
-`<!-- readme:about -->` with About, written from Purpose and Problem Statement, and
-`<!-- readme:features -->` with Features: the in-scope capabilities from Product Scope, one
-line each, written `- <capability> (planned)` (nothing is built yet); the dev loop removes the
-` (planned)` suffix when a task delivers the capability. Fill the Auth Client
-model line for the frontend kind (section 1). Fill `.doc/architecture.md › Operational
-Concerns › Deployment`: the deploy mode (the top-level `deploy:` of
-`.fullstack/catalog.yaml`; "split" when the file has no `deploy:`, a catalog before v1.2.0)
-and the local `TRUST_PROXY` default (`false` in `single`, 1 in `split`). Leave the
-production `TRUST_PROXY` marker: the value is the user's to decide (the `deployment` skill).
-When a provider was passed, fill the Data store section from what was generated: engine
-and version from the provider service's image in `docker-compose.yml` (or the package's
-`AGENTS.md › Adding the data layer`), the client library and the local service (the
-provider's Compose service and its connection variable) from the package's
-`AGENTS.md › Adding the data layer` and
-`.fullstack/catalog.yaml`.
+Do each item; the dev loop refuses to start until the last one holds.
 
-End by replacing the Change Log's FILL line in `.doc/architecture.md` with
-`- <YYYY-MM-DD>: initial architecture accepted; <stack id>, deploy <mode>, <engine or in-memory store>.`
-Later entries go above it (newest first). Tick the three boxes of `## Ready to plan` in
-`.doc/product-definition.md` once each holds; the dev loop refuses to start while one is open.
+1. **Backlog.** Follow the grammar at the top of `.plan/000-backlog.md`. When no database
+   provider was passed at generation, the first line is `- [ ] add the <engine> data layer` for
+   a named engine, or `- [ ] add the data layer` when the answer was "decide later", with
+   ` | stack:backend` appended only when the stack has no frontend (the `database` skill says
+   what that task delivers, and why the frontend takes part). With a provider, the first line
+   is the first in-scope capability from the product definition; without one it is the next
+   line. Set `tracker:` in the backlog header to `linear` or `none` as the user prefers.
+2. **Stack.** Fill the `Stack` row of the components table in `.doc/architecture.md` from
+   `.fullstack/catalog.yaml`: the stack id and, per package, its directory, template and
+   version, plus the reason for the frontend choice (the Search and sharing answer).
+3. **README.** In `README.md`, replace `<!-- readme:about -->` with About, written from Purpose
+   and Problem Statement, and `<!-- readme:features -->` with Features: the in-scope capabilities
+   from Product Scope, one line each, written `- <capability> (planned)` (nothing is built yet);
+   the dev loop removes the ` (planned)` suffix when a task delivers the capability.
+4. **Client model.** Fill the Auth Client model line for the frontend kind (section 1).
+5. **Deployment.** Fill `.doc/architecture.md › Operational Concerns`, its Deployment list: the
+   deploy mode (the top-level `deploy:` of `.fullstack/catalog.yaml`; "n/a" when the file has no
+   `deploy:`, a stack with no frontend or no server) and the local `TRUST_PROXY` default
+   (`false` in `single`, 1 in `split`).
+6. **Data store.** When a provider was passed, fill the Data store section and the components
+   table's `Data store` row from what was generated: engine and version from the provider
+   service's image in `docker-compose.yml` (or the package's `AGENTS.md › Adding the data
+   layer`), the client library and the local service (the provider's Compose service and its
+   connection variable) from the package's `AGENTS.md › Adding the data layer` and
+   `.fullstack/catalog.yaml`. With no provider, write `none yet: the data-layer task writes it`
+   in the `Local service` line and that row, so the first task is not blocked by them.
+7. **Change Log.** Replace its FILL line in `.doc/architecture.md` with
+   `- <YYYY-MM-DD>: initial architecture accepted; <stack id>, deploy <mode>, <engine or in-memory store>.`
+   Later entries go above it (newest first).
+8. **Ready to plan.** Three markers may stay open, each until its own decision: the production
+   `TRUST_PROXY` (the user's to decide, the `deployment` skill), the production target, and Data
+   migrations when no provider was chosen. Every other marker holds an answer. "Decide later" is
+   an answer for the Data store engine alone: a marker the user cannot answer stays, is named in
+   the summary, and blocks the first plan that depends on it. Then tick the three boxes of
+   `## Ready to plan` in `.doc/product-definition.md`, once each holds.
 
 ## 6. Branch, commit gate and hand over
 

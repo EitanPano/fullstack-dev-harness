@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Create, revise, or supersede an implementation plan in .plan/. Use whenever the user asks for a plan, an approach, or a design doc for a task, when revising an existing plan after feedback, or when the dev loop asks the orchestrator for a plan. Defines the .plan/ lifecycle, the NNN-YYYY-MM-DD-topic.md filename, required metadata, the Stages and Contract sections, and the required sections.
+description: Create, revise, or supersede an implementation plan in .plan/. Use whenever the user asks for a plan, an approach, or a design doc for a task, when revising an existing plan after feedback, or when the dev loop asks the orchestrator for a plan. Covers the .plan/ lifecycle, the filename, required metadata and sections, and sizing.
 ---
 
 # Writing Plans

@@ -1,6 +1,6 @@
 ---
 name: error-handling
-description: Design or review how errors are detected, classified, logged, and returned. Use when adding an API error response, choosing an HTTP status code, shaping an error payload, writing retry logic, adding error logging, or surfacing a failure in the UI. Covers the error type and envelope, the status-code table, what gets logged, retry policy, the frontend error boundaries, and required failure-path tests.
+description: Design or review how errors are detected, classified, logged, and returned. Use when adding an API error response, choosing an HTTP status code for a failure, shaping an error payload, writing retry logic, adding error logging, or surfacing a failure in the UI. Covers the error envelope, the status-code table, what gets logged, retry policy and failure-path tests.
 ---
 
 # Error Handling

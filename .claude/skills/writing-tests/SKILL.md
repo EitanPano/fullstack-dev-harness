@@ -1,6 +1,6 @@
 ---
 name: writing-tests
-description: Write or review unit, integration, and end-to-end tests. Use when adding tests for a new feature, writing a regression test for a bug fix, deciding what needs coverage, or judging whether a test suite is good enough to ship. Covers the test-first order, required coverage areas, the suites per package, the test database, fixtures, flakiness rules, and what counts as a deleted or skipped test.
+description: Write or review unit, integration, and end-to-end tests. Use when adding tests for a new feature, writing a regression test for a bug fix, deciding what needs coverage, or judging whether a test suite is good enough to ship. Covers the test-first order, required coverage, the suites per package, fixtures, flakiness rules, and what counts as a deleted or skipped test.
 ---
 
 # Writing Tests
@@ -19,15 +19,8 @@ stage report as `Tests first:`; QA checks the names against the diff. This holds
 backend's contract stage too: it writes the request-schema tests that must fail (one per
 validation rule the plan names) before it writes the schemas.
 
-The gate is `node scripts/verify.mjs --plan <plan>`: contract freshness, `check`, `testDb`
-where the package has it, `testE2e` and the diff checks, written to
-`.orchestrate/<slug>/verify.json`. An implementer runs it with `--package <dir> --reuse` (partial),
-in the foreground with `timeout: 600000`, and never ends its turn while it runs; the driver
-runs the full run in the background, and that run is the evidence. QA runs the package's
-`format` command (it rewrites the whole package; after a passing `verify` only QA's new or
-edited files should change), then the test runner on its files, then
-`git diff --name-only <tree>` (`<tree>` from `verify.json`); a listed file outside its lane
-goes under `Findings:` with `owner: driver`. The next full `verify` covers them.
+The gate is `node scripts/verify.mjs --plan <plan>`, and the driver's full run is the evidence.
+Each role's agent file says how it runs or reads it.
 
 A stage report that shows tests written after the fact is acceptable only when the
 report says why (`Tests first: after the fact — <reason>`); QA judges the reason.
