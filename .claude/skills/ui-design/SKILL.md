@@ -1,6 +1,6 @@
 ---
 name: ui-design
-description: Turn a brief into page decisions and judge a screen against a rubric. Use when planning a route's UX section, when the frontend agent composes a page or runs its UI pass, or when QA reads screenshots. Covers page decisions, the page patterns composed from the pattern components, copy rules, and the ten-check rubric with its severity.
+description: Turn a brief into page decisions and judge a screen against a rubric. Use when planning a route's UX section, when the frontend agent composes a page or runs its UI pass, or when QA reads screenshots. Covers page decisions, page patterns, copy rules and the ten-check rubric.
 ---
 
 # UI design
@@ -72,8 +72,9 @@ all ten in `shared/ui/pattern/`). Use one before writing a layout by hand.
 
 ## Rubric
 
-Ten checks applied to the screenshots `frontend/test-results/screens/<route>-phone-light.png`,
-`-phone-dark.png`, `-desktop-light.png` (`home` for `/`; `/staff/class` is `staff-class`). Machine-checked ones are enforced by the screens spec
+Ten checks applied to three screenshots per route: `frontend/test-results/screens/<route>-phone-light.png`,
+`<route>-phone-dark.png` and `<route>-desktop-light.png` (`home` for `/`; a nested route is
+slugged, `/staff/class` is `staff-class`). Machine-checked ones are enforced by the screens spec
 and `verify`; the passes judge only the judged ones.
 
 1. One obvious primary action. Judged.

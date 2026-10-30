@@ -2,7 +2,7 @@
 
 Applies to every session and every agent.
 
-- Never commit, merge, or push a tag without explicit approval from the user.
+- Never commit, merge, push or tag without explicit approval from the user.
 - Implementation work happens on a dedicated branch, never on `main`. One task or
   workstream per branch: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`, `docs/<topic>`,
   lowercase, singular domain terms.

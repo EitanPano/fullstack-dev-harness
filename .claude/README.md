@@ -57,6 +57,8 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 - Any other `settings.json` key (project hooks, `env`, MCP enablement, `permissions.ask`) counts
   as a local edit and is lost under `--overwrite`. Keep those, and personal permissions, in
   `.claude/settings.local.json`.
+- `/code-review` runs this project's `code-review` skill, which replaces Claude Code's built-in
+  command of that name. The built-in cloud review stays reachable as `/ultrareview`.
 
 ## Running environment
 
@@ -94,29 +96,6 @@ release is cached in `~/.cache/fullstack-dev-harness/<version>/`; `FULLSTACK_HAR
 overrides that directory. The command rewrites the guardrails, so Claude Code asks for your
 permission before it runs (`permissions.ask`).
 
-A lock bump changes only what the next bootstrap generates. A generated project keeps its packages
-and their `AGENTS.md`, so an older frontend cannot be upgraded in place.
-
-### Manual update
-
-A project with no `.fullstack/harness.json` predates the version record, and the command refuses
-it. Copy the files the release's `.claude/harness.json` lists under `harness` over your own, then
-add your entries back to the `permissions` lists of `.claude/settings.json`.
-
-### Older projects
-
-The harness points at sections of the catalog version the lock pinned when the project was
-generated, so some projects stay on an older harness:
-
-- No `.fullstack/catalog.yaml`: the project predates the catalog and its `backend/AGENTS.md` lacks
-  the sections the agents point at. It stays on harness commit `7ca23af`.
-- A 1.x frontend recorded in `.fullstack/catalog.yaml`: the harness now names the frontend
-  foundation of catalog v1.4.0. The project stays on harness commit `b8019b8`.
-
-A project updated across these changes ticks the boxes of `## Ready to plan` in
-`.doc/product-definition.md` that hold and fills its `Design` section before the next loop; the dev
-loop refuses to start otherwise.
-
 - **What it replaces:** only the files `.claude/harness.json` lists as `harness`, plus the
   `.gitignore` harness block. It deletes harness files a release dropped, and never touches
   project files.
@@ -136,15 +115,34 @@ loop refuses to start otherwise.
   form) as advice, and never applies it.
 - **Version record:** `.fullstack/harness.json` records the installed harness version.
 
-A project bootstrapped before this change has no `.fullstack/harness.json`, so the command cannot
-run. Update by hand: copy the harness files listed in a release's `.claude/harness.json` into the
-project and review the diff. That path leaves no record, and the full `verify` fails until the
-project's `README.md` has the two Configuration markers. Add them around a Configuration section
-and let the script fill it:
+A lock bump changes only what the next bootstrap generates. A generated project keeps its packages
+and their `AGENTS.md`, so an older frontend cannot be upgraded in place.
+
+### Manual update
+
+A project with no `.fullstack/harness.json` predates the version record, and the command refuses
+it. Copy the files the release's `.claude/harness.json` lists under `harness` over your own, add
+your entries back to the `permissions` lists of `.claude/settings.json`, and review the diff. That
+path leaves no record, and the full `verify` fails until the project's `README.md` has the two
+Configuration markers. Add them around a Configuration section:
 
 ```
 <!-- configuration:start -->
 <!-- configuration:end -->
 ```
 
-then run `node scripts/readme.mjs --configuration`.
+then run `node scripts/readme.mjs --configuration` to fill it.
+
+### Older projects
+
+The harness points at sections of the catalog version the lock pinned when the project was
+generated, so some projects stay on an older harness:
+
+- No `.fullstack/catalog.yaml`: the project predates the catalog and its `backend/AGENTS.md` lacks
+  the sections the agents point at. It stays on harness commit `7ca23af`.
+- A 1.x frontend recorded in `.fullstack/catalog.yaml`: the harness names the frontend foundation
+  of catalog v1.4.0. The project stays on harness commit `b8019b8`.
+
+A project updated past either commit ticks the boxes of `## Ready to plan` in
+`.doc/product-definition.md` that hold and fills its `Design` section before the next loop; the
+dev loop refuses to start otherwise.

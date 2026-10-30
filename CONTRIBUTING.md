@@ -18,6 +18,31 @@ Every tracked file belongs to one group in `.claude/harness.json`: `harness` fil
 with the harness, `project` files belong to the product after setup, and `dev` files are removed at
 setup. A `harness` file may name a `dev` file only through the manifest's `references` list.
 
+## Changing the instruction files
+
+`AGENTS.md`, `.claude/agents/`, `.claude/skills/` and `.claude/rules/` are prompts: an agent
+re-reads them on every turn, and loop runs have proved most of their sentences. Change one only
+for a defect, a duplicate or a measured cost.
+
+- One home per fact. A fact a script computes lives in the script; a doc says where to read the
+  result. An agent's preloaded skill is not repeated in the agent's body.
+- A skill's description says when to use it and the topics it covers, never its steps. An agent
+  follows a narrated workflow instead of the body; a session with no topic words greps instead of
+  invoking.
+- Measure a description change in real sessions: run each prompt through `claude -p` on both trees
+  and count `Skill` calls. Asking a model to pick from the list scores far higher than a session
+  deciding for itself, so it cannot show a loss.
+- A procedure one task in a project needs goes in a supporting file beside the `SKILL.md`, named
+  from it with the condition that sends a reader there.
+- Name a current fact, not its history. Text for older catalogs goes when `minCatalog` passes them.
+- `dev-loop` stays under 5,000 tokens: its sessions are long, and after a compaction a re-attached
+  skill keeps only its first 5,000 tokens. Its commit gate is at the end.
+- The skill listing shares a budget with every plugin the user has, about 8,000 characters by
+  default; past it, descriptions drop from the least-invoked skills first.
+
+`scripts/docs.test.mjs` holds the budgets and checks the pointers. A budget moves only with a
+reason in the plan that moves it.
+
 ## Changing the hooks
 
 Any change to `.claude/hooks/` must pass the hooks suite before it merges. A broken hook blocks

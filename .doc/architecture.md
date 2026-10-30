@@ -32,7 +32,6 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
    leave as the error envelope.
 4. Mutations go through the same data layer (the frontend's actions) and refresh the
    affected route.
-
 5. Events: a controller publishes through the server's event service; a subscriber in
    `infra/subscribers/` reacts and may call controllers.
 6. Jobs: files in `infra/jobs/`, run by the scheduler; set `JOBS_ENABLED` on one
@@ -87,11 +86,8 @@ The harness ships no database. A provider chosen at the bootstrap wires one; oth
 <!-- noauth:   Adding accounts is a planned change; a scaffold with the `auth` flag on is the -->
 <!-- noauth:   reference. -->
 - Client model: <!-- FILL: written by the bootstrap per frontend kind. Server-rendered: the
-  frontend's server is the backend's client (no browser fetch). The template does not forward
-  `X-Forwarded-For` yet, so the frontend auth task must add it, with the backend running
-  with `TRUST_PROXY` set; otherwise every caller shares one rate-limit key. SPA: the
-  browser calls `/api` on the page's own origin, no CORS, `TRUST_PROXY` is the hop count in
-  front of the server -->
+  frontend's server is the backend's client (no browser fetch). SPA: the browser calls `/api` on
+  the page's own origin, no CORS, `TRUST_PROXY` is the hop count in front of the server -->
 <!-- auth-start -->
 - A rate-limiter key is `rl:<name>:<sha256(subject)>`, so no address or target sits in the
   store in clear. A refresh with neither cookie nor body token answers 400.
@@ -145,9 +141,8 @@ None in the template. A vendor goes in `services/<vendor>` and is selected by
   runs the stack locally.
   - Deploy mode: <!-- FILL: single | split. `single`: one image, the server serves the
     SPA's files; `split`: one image per package. Written by the bootstrap from
-    `.fullstack/catalog.yaml` `deploy:`, or "split" when it has none (a catalog before
-    v1.2.0), or "n/a" when the stack has no frontend or no server. The `deployment` skill
-    changes it; this line wins over provenance. -->
+    `.fullstack/catalog.yaml` `deploy:`, or "n/a" when it has none (a stack with no frontend or
+    no server). The `deployment` skill changes it; this line wins over provenance. -->
   - `TRUST_PROXY` hop count: local default <!-- FILL: written by the bootstrap: `false` in
     `single`, 1 in `split` -->; production <!-- FILL: the production value, decided with the
     host: 1 behind a PaaS edge, 2 behind a CDN and a load balancer -->

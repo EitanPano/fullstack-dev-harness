@@ -1,19 +1,16 @@
 ---
 name: code-review
-description: Review a change against this repository's standards. Use when acting as the reviewer agent, when the user asks for a review of a branch or diff, or when deciding whether a stage is done. Covers the six-priority checklist, the security mode, the P0/P1/P2 scale, what counts as evidence, how to read an uncommitted change, and the report format the dev loop parses.
+description: Review a change against this repository's standards. Use when acting as the reviewer agent, when the user asks for a review of a branch or diff, or when deciding whether a stage is done. Covers the six-priority checklist, the P0/P1/P2 scale, what counts as evidence, and the report format.
 ---
 
 # Code Review
 
 One reviewer applies the whole checklist below (`mode: general`). `mode: security` deepens
-priority 1 only; the driver adds it when `verify.json` has `security.triggered: true`, which
-`verify` computes: the diff touches auth, session, security or middleware code, the proxy,
-CORS configuration, an env module, a Dockerfile or `docker-compose.yml`, deploy configuration
-(`**/nginx/**`, `**/.dockerignore`, `**/next.config.*`), a seed file
-(`**/*seed*`) or the user model (`**/models/user/**`); or a changed line (added or removed) in a
-code file names a gate (`requireAuth`, `requireRole`, `requireAccount`, `assertRole`, `require_auth`,
-`require_role`, `require_caller`, `_assert_role`, `roleAction`, `accountAction`), wherever the file is. A UI file under
-`**/auth/ui/**` fires only by that line rule. Migrations and SQL do not trigger it; the general reviewer covers the data model (priorities 1 and 2).
+priority 1 only; the driver adds it when `verify.json` has `security.triggered: true`. `verify`
+computes that from the diff, `security.paths` lists the files that fired, and
+`scripts/verify/security.mjs` holds the rule. Migrations and SQL do not trigger it; the general
+reviewer covers the data model (priorities 1 and 2). A defect outside security found in
+`mode: security` is still a finding, in the same report, at its own severity.
 
 Be critical. Surface real problems and say them plainly; do not soften, do not pad with
 praise. A review with no findings states what was checked and why it holds.
@@ -22,7 +19,8 @@ praise. A review with no findings states what was checked and why it holds.
 
 The change is uncommitted. Inside the loop, `verify` prepared a review package,
 `.orchestrate/<slug>/review.diff`: the working tree against the plan's `Base:` commit, with
-the stat of every file and lockfiles and generated files left out of the body. Read it once;
+the stat of every file and lockfiles and generated files left out of the body. Read it once,
+paging through a long file until the last file in its stat;
 open code outside it only for a named risk, one check per risk; never re-run the suites
 (`verify.json` is the evidence). A `fix-diff: <path>` re-review reads only that file
 (`review-fix-<n>.diff`). Outside the loop, read `git diff <Base>` (`main` unless the user

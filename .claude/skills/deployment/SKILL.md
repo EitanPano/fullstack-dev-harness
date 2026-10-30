@@ -1,6 +1,6 @@
 ---
 name: deployment
-description: Choose or change how the project ships. Use when a plan or the user asks to move between the `single` and `split` deploy modes, to set or review `TRUST_PROXY` for a production host, to scale past one replica, to serve the frontend from a static host or CDN, or to put the app on a non-loopback host. Covers choosing a mode, both switches as file-level steps, running the app profile, the proxy hop count, the Compose 2.35.0 floor, the static-host change, and what scaling needs.
+description: Choose or change how the project ships. Use when a plan or the user asks to move between the `single` and `split` deploy modes, to set or review `TRUST_PROXY` for a production host, to scale past one replica, to serve the frontend from a static host or CDN, or to put the app on a non-loopback host. Covers the app profile, the proxy hop count, the Compose 2.35.0 floor and what scaling needs.
 ---
 
 # Deployment
@@ -34,8 +34,8 @@ Every `docker compose` command below that inspects or stops the stack (`config`,
 - Current mode: `.doc/architecture.md › Operational Concerns › Deployment`. It wins over the
   `deploy:` line in `.fullstack/catalog.yaml`, which records only what was generated and is
   never edited. While the doc line still holds its FILL marker, use the provenance line (`deploy:` in
-  `.fullstack/catalog.yaml`). A
-  `.fullstack/catalog.yaml` with no `deploy:` line predates catalog v1.2.0 and is `split`.
+  `.fullstack/catalog.yaml`). A `.fullstack/catalog.yaml` with no `deploy:` line is a stack with no
+  frontend or no server: neither mode applies.
 - A server-rendered frontend (Next) is always `split`. Nothing below applies to switching it.
 - A single-page app (a frontend whose `template.yaml` declares `static`) starts `single`: one
   container, one port, no CORS, no API URL in the bundle. Move to `split` when the frontend
@@ -141,10 +141,8 @@ Every `docker compose` command below that inspects or stops the stack (`config`,
   `MSYS_NO_PATHCONV=1` set, or generate keys that do not start with `/`.
 - `docker compose --profile app up --build` at the repository root runs the whole stack from
   each package's Dockerfile: one image in `single`, one per package in `split`.
-- With a database, the `<dir>-migrate` one-shot service (catalog v1.1.0 and later) runs the
-  migrations before the server. On an older catalog's output, run the server package's
-  `migrate` inside the stack first (its `AGENTS.md › Adding the data layer` says how). The
-  `migrate` command stays for local development.
+- With a database, the `<dir>-migrate` one-shot service runs the migrations before the server.
+  The `migrate` command stays for local development.
 - Reusing a Compose project name reuses its volumes (a database from an earlier run keeps its
   data). Pass a fresh `-p <name>` for a clean proof, and the same one to every later command.
 - Stop with `docker compose -p <name> --profile app down`. Without `--profile app` the
@@ -190,8 +188,8 @@ value is the number of proxy hops in front of the server.
   is in the frontend package's `AGENTS.md › Deployment`.
 - Too high: a caller chooses its own rate-limit key through `X-Forwarded-For`. Too low: every
   caller is keyed to the nearest proxy, so one caller exhausts the limit for everyone.
-- Record the production value in `.doc/architecture.md › Deployment` (it stays a FILL until
-  decided). The shell environment or the secret manager supplies it; no file in the tree does.
+- Record the production value in `.doc/architecture.md › Operational Concerns › Deployment` (it
+  stays a FILL until decided). The shell environment or the secret manager supplies it; no file in the tree does.
 
 ## 7. Production hosts
 
