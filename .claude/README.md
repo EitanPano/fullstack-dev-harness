@@ -1,4 +1,4 @@
-# Agent manual
+# Harness manual
 
 How the dev harness works in this project: the loop, the guardrails and how to recover from them,
 the running environment, the optional integrations, and how to update the harness. The rules every

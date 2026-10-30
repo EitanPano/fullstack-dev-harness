@@ -40,7 +40,7 @@ To add work later, write one line in `.plan/000-backlog.md` and run `/dev-loop` 
 
 ## Learn more
 
-- [Agent manual](.claude/README.md): how work moves, recovery, updates
+- [Harness manual](.claude/README.md): how work moves, recovery, updates
 - [Project rules](AGENTS.md): stack, architecture, definition of done
 - [Template catalog](https://github.com/EitanPano/fullstack-templates): stacks and options
 - [Contributing](CONTRIBUTING.md): changing or releasing the harness

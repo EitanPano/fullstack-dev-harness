@@ -40,8 +40,8 @@ bootstrap clones the pinned catalog into `~/.cache/fullstack-templates/<version>
 
 The bootstrap's finish step (`node scripts/bootstrap.mjs --finish`) turns the clone into a product
 repository. It leaves a generated product `README.md`, no harness tests or setup scripts, and the
-harness version in `.fullstack/harness.json`. `.claude/README.md`, the agent manual, ships to every
-project.
+harness version in `.fullstack/harness.json`. `.claude/README.md`, the harness manual, ships to
+every project.
 
 ## Releasing the harness
 
