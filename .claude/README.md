@@ -1,8 +1,9 @@
 # Agent manual
 
 How the dev harness works in this project: the loop, the guardrails and how to recover from them,
-the optional integrations, and how to update the harness. The rules every agent follows are in
-`AGENTS.md` and `.claude/rules/`. This file ships with the harness and is replaced on an update.
+the running environment, the optional integrations, and how to update the harness. The rules every
+agent follows are in `AGENTS.md` and `.claude/rules/`. This file ships with the harness and is
+replaced on an update.
 
 ## How work moves
 
@@ -42,8 +43,9 @@ included) is blocked until that is fixed. To recover, put `{ "disableAllHooks": 
 the hooks once `node` resolves. On a Claude Code older than 2.1.295 the hooks run but fail open,
 so upgrade before relying on them.
 
-Check that the hooks run: ask Claude to run `cat ~/.netrc` and expect a refusal that names the
-guardrail.
+Check that the hooks run: ask Claude to run `cat ./no-such-dir/.netrc` and expect a refusal that
+names the guardrail. The path does not exist, so the check exposes nothing if the hooks are dead. A
+refusal of `.env` alone proves nothing: the permission rules can refuse it with dead hooks.
 
 Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a container.
 
@@ -55,6 +57,17 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 - Any other `settings.json` key (project hooks, `env`, MCP enablement, `permissions.ask`) counts
   as a local edit and is lost under `--overwrite`. Keep those, and personal permissions, in
   `.claude/settings.local.json`.
+
+## Running environment
+
+- Bun, Node and git must be on the `PATH` that Claude Code sees. On Windows, Git Bash backs the Bash
+  tool.
+- On Linux, the frontend package's `AGENTS.md › Tests` names the browser install.
+- Until you accept the workspace trust dialog, Claude Code ignores the `permissions.allow` list in
+  `.claude/settings.json` (the hooks still run), so a headless `claude -p` run in a fresh clone
+  falls back to its permission mode for every command.
+- A headless `claude -p` run stops background agents after ten minutes unless
+  `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` is set in its environment.
 
 ## Optional integrations
 
@@ -80,6 +93,29 @@ node scripts/harness-update.mjs --from <path>
 release is cached in `~/.cache/fullstack-dev-harness/<version>/`; `FULLSTACK_HARNESS_CACHE`
 overrides that directory. The command rewrites the guardrails, so Claude Code asks for your
 permission before it runs (`permissions.ask`).
+
+A lock bump changes only what the next bootstrap generates. A generated project keeps its packages
+and their `AGENTS.md`, so an older frontend cannot be upgraded in place.
+
+### Manual update
+
+A project with no `.fullstack/harness.json` predates the version record, and the command refuses
+it. Copy the files the release's `.claude/harness.json` lists under `harness` over your own, then
+add your entries back to the `permissions` lists of `.claude/settings.json`.
+
+### Older projects
+
+The harness points at sections of the catalog version the lock pinned when the project was
+generated, so some projects stay on an older harness:
+
+- No `.fullstack/catalog.yaml`: the project predates the catalog and its `backend/AGENTS.md` lacks
+  the sections the agents point at. It stays on harness commit `7ca23af`.
+- A 1.x frontend recorded in `.fullstack/catalog.yaml`: the harness now names the frontend
+  foundation of catalog v1.4.0. The project stays on harness commit `b8019b8`.
+
+A project updated across these changes ticks the boxes of `## Ready to plan` in
+`.doc/product-definition.md` that hold and fills its `Design` section before the next loop; the dev
+loop refuses to start otherwise.
 
 - **What it replaces:** only the files `.claude/harness.json` lists as `harness`, plus the
   `.gitignore` harness block. It deletes harness files a release dropped, and never touches
