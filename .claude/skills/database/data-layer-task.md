@@ -42,8 +42,9 @@ type changes with the engine. One task, planned and reviewed like any other, del
      without browsing, in the catalog release `catalog.lock` pins (cache root
      `FULLSTACK_TEMPLATES_CACHE`, default `~/.cache/fullstack-templates`, then the version
      folder; it is never listed or searched), under
-     `frontend/<next|react>/base/` for the frontend's template: `scripts/e2e-database-url.ts`,
-     `tests/unit/e2e-database-url.test.ts` and `playwright.config.ts`. It hands their content
+     `frontend/<id>/base/` for the frontend's template: `scripts/e2e-database-url.ts`,
+     `tests/unit/e2e-database-url.test.ts` (`.spec.ts` in `angular`) and
+     `playwright.config.ts`. It hands their content
      in the frontend dispatch, never in the plan, which only names the step. Resolve the
      markers in the config: keep `@server:database` lines and blocks, drop `@noserver:database`
      lines, strip the marker comments, and fill `__SERVER_E2E_DB_COMMAND__`,

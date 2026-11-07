@@ -23,15 +23,18 @@ props are in the package's `frontend/AGENTS.md › Styling`; read it, do not res
   titles are `h2`.
 - Spacing rhythm: `gap-2` inside a control group, `gap-4` between fields, `gap-6` or `gap-8`
   between sections. `Page` already sets `gap-6`.
-- Container width by pattern: form `max-w-xl`, list `max-w-3xl`, dashboard full width.
+- Container width by pattern: form at the width the package's styling sets, list `max-w-3xl`,
+  dashboard full width.
 - Status by `Badge` tone, always with its text label; never colour alone.
 - Density from the brief: a dense brief tightens rows, never the touch targets.
 
 ## Page patterns
 
 Pattern components: `Page`, `PageHeader`, `Section`, `EmptyState`, `ErrorState`,
-`ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog` (both frontends ship
-all ten in `shared/ui/pattern/`). Use one before writing a layout by hand.
+`ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog`. Use one before
+writing a layout by hand. These names are the React and Next ones; a package's
+`AGENTS.md › Styling` lists its equivalents (Angular, in `shared/components/`:
+`page-header`, `empty-state`, `error-state`, `skeleton`, `form-field`, `form-actions`, `auth-card`).
 
 - **list**: `Page` > `PageHeader` (title, the create action) > `Section` with the rows in a
   `max-w-3xl` column. Row: name, a status `Badge`, secondary text muted, row actions at the
@@ -40,10 +43,10 @@ all ten in `shared/ui/pattern/`). Use one before writing a layout by hand.
 - **detail**: `Page` > `PageHeader` (the entity's name, edit as the primary action, delete as
   a ghost or outline button that opens a `ConfirmDialog`) > `Section`s titled by meaning
   (facts, history). Loading: `CardSkeleton` per section.
-- **form**: `Page` > `PageHeader` > one `max-w-xl` form of the `shared/ui/form` bindings,
-  `gap-4` between fields, fields grouped in `Section`s when over six, `FormActions` last
-  (submit primary, cancel outline). Field errors sit under the field; a submit failure is an
-  `ErrorState` or an alert above `FormActions`, in the user's words.
+- **form**: `Page` > `PageHeader` > one form of the package's form bindings, at the form
+  width its styling sets, `gap-4` between fields, fields grouped in `Section`s when over six,
+  `FormActions` last (submit primary, cancel outline). Field errors sit under the field; a
+  submit failure is an `ErrorState` or an alert above `FormActions`, in the user's words.
 - **auth**: `AuthCard` alone in the page, no `PageHeader`; its title is the `h1`. One primary
   action; the switch to the other auth route is a link beneath.
 - **dashboard** (a dashboard or a table view): `Page` > `PageHeader` > `Section`s at full

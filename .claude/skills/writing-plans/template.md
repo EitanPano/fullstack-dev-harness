@@ -56,13 +56,11 @@ One line per module or feature; no copy strings, no code.
 
 ### Frontend
 
-1. `frontend/src/entity/<noun>/` — the noun's types, read loader and presentational components.
-2. `frontend/src/feature/<action>/` — the action's form schema, mutation and interactive leaf.
-3. `frontend/src/widget/<section>/` — the page section and its skeleton.
-4. `frontend/src/app/(group)/<route>/` — the page, plus (SPA) its entry and loader in
-   `app/routes.tsx`; a top-level screen's entry in `app/nav.ts`; a segment-level loading and
-   error pair only when the route needs its own copy (the group's cover it otherwise).
-5. `frontend/tests/` — the unit test and the e2e test.
+1. One line per step of the package's `frontend/AGENTS.md › Adding a feature`, in its order,
+   each naming its path. React: entity, feature, widget, route. Angular: models, service,
+   store, feature, route and nav, view partial, copy keys. A top-level screen gets its nav
+   entry; a route needs its own loading and error copy only when its group's do not fit.
+2. `frontend/tests/` — the unit test and the e2e test.
 
 ## Validation
 
