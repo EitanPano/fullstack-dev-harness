@@ -103,7 +103,7 @@ marker in the Auth section with the line for the chosen frontend:
   address. The opt-in `CLIENT_IP_HEADER` makes the frontend forward the visitor's address
   (the `deployment` skill, section 6); without it all visitors share one rate-limit bucket,
   about 30 active signed-in visitors per 15 minutes.
-- Single-page app (React): the browser calls `/api` on the page's own origin (the
+- Single-page app (React, Angular): the browser calls `/api` on the page's own origin (the
   server in `single`, the frontend image's proxy in `split`), so there is no CORS and no
   API URL in the bundle. Rate limits key on the client address, so `TRUST_PROXY` is the
   hop count in front of the server (`false` in `single` locally, `1` in `split`).
@@ -123,7 +123,7 @@ and a `dir` each) and each package's `<catalog>/<template path>/template.yaml`. 
 Search and sharing answer, deciding by the `static` declaration and never by a stack id:
 
 - "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today).
-- "no": keep the stacks whose frontend declares `static` (a single-page app, React today).
+- "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular).
 - A stack with no frontend skips this question.
 
 Ask only the remaining choice (the server today). Show the chosen stack with its reason (for
@@ -133,7 +133,7 @@ every flag the templates declare (show its
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
 
 Ask the deploy mode only when the chosen stack has a server and its frontend's
-`template.yaml` declares `static` (a single-page app such as React). Put the tradeoff in
+`template.yaml` declares `static` (a single-page app: React, Angular). Put the tradeoff in
 two lines and map the answer to `--deploy <single|split>`:
 
 - `single` (the default): one container and one port; the server serves the built
@@ -245,8 +245,8 @@ version from the provenance file, and record it in the final message.
 Then start each package's `dev` command (an SPA's server first, as the frontend's
 `AGENTS.md` says) and open the frontend's `http.health` path on its
 `http.port` (a Next frontend on its port; an SPA's dev server on its `http.port`, which
-proxies `/api` to the server): the page must reach the server (the `HealthBadge` in
-`widget/system-status` proves the typed client reaches it).
+proxies `/api` to the server): the page must reach the server (the health screen proves the typed
+client reaches it).
 
 Stop the dev servers by port. On Windows a `--reload` server leaves its child holding the port
 after the parent is stopped, and the port's owner is then the dead reloader, so stop the owner
