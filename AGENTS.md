@@ -69,7 +69,7 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 
 `testDb`, `e2eDb` and `migrate` exist once a database does: the data-layer task names them in
 its backend report (`Commands:`); the driver records them.
-Never run a scaffolder inside an existing package, except `bunx shadcn@4.21.4 add <name>`.
+Never run a scaffolder inside an existing package, except one the package's `AGENTS.md` names.
 
 ## Architecture
 
@@ -78,11 +78,10 @@ Two packages, one generated contract; layer maps: each package's `AGENTS.md`.
 - Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
   `middleware/`, `services/`, `infra/`. Modules meet only through controllers; never import
   another module's service.
-- Frontend: `app/` (routes only), `widget/<section>/`, `feature/<action>/`, `entity/<noun>/`,
-  `shared/`; imports point down that list (lint enforces it).
-- The typed client in `shared/api/generated/` comes from the contract; only a slice's `server/`
-  (Next) or `api/` (SPA) segment and `shared/auth` import it; a `model.ts` may import its
-  types and `zod.gen` schemas.
+- Frontend: layers, import direction and where an addition goes are the package's
+  `AGENTS.md`; lint enforces the direction.
+- The typed client comes from the contract into the agents file's directory; only the data
+  layer it names imports the runtime; a model may import its types and `zod.gen` schemas.
 - Auth sits behind the server's `auth` flag; its model changes only by plan.
 - HTTP: singular paths, JSON only, the `error-handling` envelope, a request id on every
   response. The server's request schemas are the single source for the OpenAPI document; both

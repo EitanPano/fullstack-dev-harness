@@ -85,19 +85,21 @@ provider payloads in a response.
 ## Frontend
 
 - Every route group has a `loading` and an `error` state, the root has a last-resort
-  boundary, and every widget has a skeleton that matches its layout. Their messages are
+  boundary, and every data section has a skeleton that matches its layout. Their messages are
   user-safe.
-- `call` (`shared/api/call.ts`) is the only reader of a generated-client result. It returns
-  the data or throws an `ActionError` (`shared/lib/action-error.ts`) whose message comes from
-  the feature's copy table keyed by the envelope `code`, then the default copy. The server's
-  `message` is never shown.
-- In Next, a public cached loader lets the `ActionError` propagate and the widget renders
-  `ErrorState` (`shared/ui/pattern/error-state.tsx`); in an SPA a failing loader or refetch
-  reaches the group's `ErrorBoundary`. An unexpected error reaches the nearest boundary.
+- The one reader of a generated-client result, the place `AGENTS.md › Errors` names, turns a
+  failure into a typed error. React and Next: `call` throws an `ActionError` carrying the copy
+  table's entry for the envelope `code`. Angular: the interceptor builds an `ApiError` with
+  the `code`, which the awaiting handler maps through the copy table. Server `message`
+  is never shown.
+- In Next, a public cached loader lets the `ActionError` propagate and the data section renders
+  the package's error-state component; in an SPA a failing loader or refetch
+  reaches the route's error state. An unexpected error reaches the nearest boundary.
 - In Next, an action returns the `ActionError` message as `serverError`; in an SPA the
-  handler awaits `mutateAsync`, which rejects, and calls `reportFailure`. Either way field
-  errors appear on their fields, the outcome in a toast, specific to the action that failed,
-  with a recovery hint (retry, fix the field, sign in again). The package's `AGENTS.md › Errors` has the details.
+  awaiting handler catches the error (React: `mutateAsync`, `reportFailure`). Either
+  way field errors appear on their fields, the outcome in a toast specific to the action that
+  failed, with a recovery hint (retry, fix the field, sign in again). A toast never fires
+  from an interceptor or an effect. See the package's `AGENTS.md › Errors`.
 
 ## Tests
 

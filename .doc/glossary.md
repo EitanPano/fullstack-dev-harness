@@ -16,9 +16,11 @@ docs use these words and no synonyms. Add a term here before using it anywhere e
 
 ## Actions
 
-Features are named by actions, so a product's glossary also holds verbs. List each action
-beside the nouns, in the same table, with `feature/<action>` in the Used as column (for
-example `refresh`: re-read an entity's data, `feature/refresh-health`).
+A frontend slice is named as its package's `AGENTS.md` says: React and Next features are
+actions (`feature/<action>`); Angular features are nouns or screen groups (`features/<noun>`) and
+mirror the server's modules where one exists. The glossary still lists each action
+beside the nouns, in the same table (for example `refresh`: re-read an entity's data,
+`feature/refresh-health`).
 
 ## Rules
 

@@ -68,12 +68,12 @@ bootstrap; otherwise the data-layer task adds `testDb` and names it in the packa
   through the block the package names and run under `testDb`, against the test database.
   `check` never needs Docker and skips these suites once the package has `testDb`. Until the product has a database, the test resets the
   in-memory store before each test. The `database` skill defines the test database.
-- Frontend: unit tests cover components, loaders, actions, and each feature's `model.ts`
-  (its form schema) and copy table. Components get props and are asserted through roles and
-  text. Loaders and actions run with the API stubbed at the network boundary, through the real
-  `call`; no test starts the server. A Next client leaf imports its own action, so a component
-  test mocks that action module and the toast library; an SPA route renders in a memory router
-  with the API stubbed. Each package's `AGENTS.md › Tests` gives the pattern.
+- Frontend: unit tests cover components, the data layer, and each feature's form schema file
+  and copy table. Components get props and are asserted through roles and text. Data calls
+  run with the API stubbed at the network boundary, through the package's real result helper
+  or interceptor; no test starts the server. Each package's `AGENTS.md › Tests` gives the
+  pattern, including how a component or route renders (Next: mock the action module and the
+  toast library; an SPA: the package's router test harness).
 - Frontend e2e: one test per user journey, with an accessibility scan on every new page.
   Locate by role and label, never CSS selectors. Journeys run on the `phone` project;
   `desktop` runs the shell and screens specs. A check for one viewport carries a `@phone` or
