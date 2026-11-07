@@ -16,11 +16,11 @@ docs use these words and no synonyms. Add a term here before using it anywhere e
 
 ## Actions
 
-A frontend slice is named as its package's `AGENTS.md` says: React and Next features are
-actions (`feature/<action>`); Angular features are nouns or screen groups (`features/<noun>`) and
-mirror the server's modules where one exists. The glossary still lists each action
-beside the nouns, in the same table (for example `refresh`: re-read an entity's data,
-`feature/refresh-health`).
+A frontend slice is named as its package's `AGENTS.md` says: Next features are actions
+(`feature/<action>`); React and Angular features mirror the server's modules or a screen group
+(`features/<noun>`), so a frontend module shares the server module's noun. The glossary still
+lists each action beside the nouns, in the same table (for example `refresh`: re-read an
+entity's data, `feature/refresh-health` in Next).
 
 ## Rules
 

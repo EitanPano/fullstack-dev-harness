@@ -88,15 +88,15 @@ provider payloads in a response.
   boundary, and every data section has a skeleton that matches its layout. Their messages are
   user-safe.
 - The one reader of a generated-client result, the place `AGENTS.md › Errors` names, turns a
-  failure into a typed error. React and Next: `call` throws an `ActionError` carrying the copy
-  table's entry for the envelope `code`. Angular: the interceptor builds an `ApiError` with
-  the `code`, which the awaiting handler maps through the copy table. Server `message`
+  failure into a typed error. Next's `call` throws an `ActionError` with the `code`'s copy;
+  React's `call` returns an `ApiError` the hook exposes and `.unwrap()` rejects with; Angular's
+  interceptor builds an `ApiError` the handler maps to copy. Server `message`
   is never shown.
 - In Next, a public cached loader lets the `ActionError` propagate and the data section renders
   the package's error-state component; in an SPA a failing loader or refetch
   reaches the route's error state. An unexpected error reaches the nearest boundary.
 - In Next, an action returns the `ActionError` message as `serverError`; in an SPA the
-  awaiting handler catches the error (React: `mutateAsync`, `reportFailure`). Either
+  awaiting handler catches the error (React: `.unwrap()`, `reportFailure`). Either
   way field errors appear on their fields, the outcome in a toast specific to the action that
   failed, with a recovery hint (retry, fix the field, sign in again). A toast never fires
   from an interceptor or an effect. See the package's `AGENTS.md › Errors`.

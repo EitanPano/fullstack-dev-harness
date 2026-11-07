@@ -21,10 +21,10 @@ props are in the package's `frontend/AGENTS.md › Styling`; read it, do not res
 - One primary action per view: one filled button, the rest outline or ghost.
 - Hierarchy from the type scale: one `h1` per page, always through `PageHeader`; `Section`
   titles are `h2`.
-- Spacing rhythm: `gap-2` inside a control group, `gap-4` between fields, `gap-6` or `gap-8`
-  between sections. `Page` already sets `gap-6`.
-- Container width by pattern: form at the width the package's styling sets, list `max-w-3xl`,
-  dashboard full width.
+- Spacing rhythm on the 4 px scale: 8 px inside a control group, 16 px between fields, 24 or
+  32 px between sections (`Page` already sets 24 px).
+- Container width by pattern: form at the width the package's styling sets, list a 48 rem
+  column, dashboard full width.
 - Status by `Badge` tone, always with its text label; never colour alone.
 - Density from the brief: a dense brief tightens rows, never the touch targets.
 
@@ -32,29 +32,28 @@ props are in the package's `frontend/AGENTS.md › Styling`; read it, do not res
 
 Pattern components: `Page`, `PageHeader`, `Section`, `EmptyState`, `ErrorState`,
 `ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog`. Use one before
-writing a layout by hand. These names are the React and Next ones; a package's
-`AGENTS.md › Styling` lists its equivalents (Angular, in `shared/components/`:
-`page-header`, `empty-state`, `error-state`, `skeleton`, `form-field`, `form-actions`, `auth-card`).
+writing a layout by hand. These names are the React and Next ones (React keeps them in
+`shared/components/`); Angular's equivalents are listed in its `AGENTS.md › Styling`.
 
 - **list**: `Page` > `PageHeader` (title, the create action) > `Section` with the rows in a
-  `max-w-3xl` column. Row: name, a status `Badge`, secondary text muted, row actions at the
+  48 rem column. Row: name, a status `Badge`, secondary text muted, row actions at the
   end. Empty: `EmptyState` with the next step. Loading: `ListSkeleton` of the row count.
   Error: `ErrorState` with retry.
 - **detail**: `Page` > `PageHeader` (the entity's name, edit as the primary action, delete as
   a ghost or outline button that opens a `ConfirmDialog`) > `Section`s titled by meaning
   (facts, history). Loading: `CardSkeleton` per section.
 - **form**: `Page` > `PageHeader` > one form of the package's form bindings, at the form
-  width its styling sets, `gap-4` between fields, fields grouped in `Section`s when over six,
+  width its styling sets, 16 px between fields, fields grouped in `Section`s when over six,
   `FormActions` last (submit primary, cancel outline). Field errors sit under the field; a
   submit failure is an `ErrorState` or an alert above `FormActions`, in the user's words.
 - **auth**: `AuthCard` alone in the page, no `PageHeader`; its title is the `h1`. One primary
   action; the switch to the other auth route is a link beneath.
 - **dashboard** (a dashboard or a table view): `Page` > `PageHeader` > `Section`s at full
-  width; summary cards in a responsive grid (`grid gap-4 sm:grid-cols-2 lg:grid-cols-4`), a
-  table under them. The table scrolls inside its own container on phones; the page never does.
+  width; summary cards in a responsive grid (two columns from `sm`, four from `lg`, 16 px gaps),
+  a table under them. The table scrolls inside its own container on phones; the page never does.
   Loading: `CardSkeleton` per card, `ListSkeleton` for the table.
 - **landing** (a home or content page): `Page` > `PageHeader` (the product's name, the one
-  primary action) > `Section`s of content, each titled by meaning, in a `max-w-3xl` column. No
+  primary action) > `Section`s of content, each titled by meaning, in a 48 rem column. No
   form beside the primary action; a signed-out home links to `auth`. Empty and loading follow
   the section's own pattern.
 - **confirm** (a destructive confirm): `ConfirmDialog` only. The title names the thing, the
