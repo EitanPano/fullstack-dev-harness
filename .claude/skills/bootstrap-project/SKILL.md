@@ -126,10 +126,11 @@ Search and sharing answer, deciding by the `static` declaration and never by a s
 - "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular).
 - A stack with no frontend skips this question.
 
-Ask only the remaining choice (the server today). Show the chosen stack with its reason (for
-example "single-page app: no public page needs search or sharing") and accept an override. Ask
-every flag the templates declare (show its
-`summary` and `default`) and every capability that lists providers. Map the answers to
+Ask each remaining choice in turn: the frontend framework when the kept stacks differ in it (name
+the options by template id: `frontend/react`, `frontend/angular`), then the server.
+Show the chosen stack with its reason (for example "single-page app: no public page needs search
+or sharing") and accept an override. Ask every flag the templates declare (show its `summary` and
+`default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
 
 Ask the deploy mode only when the chosen stack has a server and its frontend's

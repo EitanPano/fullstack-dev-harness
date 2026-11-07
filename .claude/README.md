@@ -80,9 +80,9 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 
 ## Frontend choice
 
-React (the single-page app) is the default frontend. The dev loop has exercised it less than the
-Next.js frontend, so report any gap you meet. Next is for products whose public pages must be
-found by search engines or show a rich preview when shared.
+React and Angular are the single-page frontends. Next is for products whose public pages must be
+found by search engines or show a rich preview when shared. The dev loop has exercised React and
+Next; Angular is new in catalog v1.6.0, so report any gap you meet.
 
 ## Updating the harness
 
