@@ -50,12 +50,11 @@ importers, and list the old path there. The driver removes it.
    backend stage, in the "backend ready" continuation; without one, in the same dispatch, after
    the partial `verify` with e2e. It runs only when the plan's `UX` names a route; otherwise
    report `UI pass: n/a (no route in UX)`. The screens are the three files per route that
-   `ui-design › Rubric` names. A route is captured only when it is in the
-   package's nav table or in the screens list its `AGENTS.md › Tests` names (React:
-   `ROUTES` and `SIGNED_IN_ROUTES` `{ route, setup }` in `screens.spec.ts`; Angular:
-   `AUTH_ROUTES` and `SIGNED_IN_ROUTES` in `tests/e2e/screen-routes.ts`): add a signed-in
-   route and a public route outside the nav there, or the files do not exist. A role-gated
-   route needs the setup that promotes the account, per that section.
+   `ui-design › Rubric` names. A route is captured only when it is in the package's nav table
+   or in the screens list its `AGENTS.md › Tests` names (`SIGNED_IN_ROUTES` `{ route, setup }`,
+   and Angular's `AUTH_ROUTES`, in `tests/e2e/screen-routes.ts`): add a signed-in route and a
+   public route outside the nav there, or the files do not exist. A role-gated route needs the
+   setup that promotes the account, per that section.
    - Per route, Read the three screenshots (about 1.5k tokens each), apply the rubric's judged
      checks and fix what fails. One fix pass per route, then the partial `verify` with e2e.
    - A route that cannot be captured (a dynamic `/x/[id]` on the fresh e2e database) is
