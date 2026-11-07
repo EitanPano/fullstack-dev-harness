@@ -82,7 +82,8 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 
 React and Angular are the single-page frontends. Next is for products whose public pages must be
 found by search engines or show a rich preview when shared. The dev loop has exercised React and
-Next; Angular is new in catalog v1.6.0, so report any gap you meet.
+Next; Angular is new in catalog v1.6.0 and React's structure (Redux Toolkit, RTK Query and the
+global SCSS tree) in v1.7.0, so report any gap you meet.
 
 ## Updating the harness
 
