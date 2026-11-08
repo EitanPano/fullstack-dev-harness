@@ -33,7 +33,7 @@ props are in the package's `frontend/AGENTS.md › Styling`; read it, do not res
 Pattern components: `Page`, `PageHeader`, `Section`, `EmptyState`, `ErrorState`,
 `ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog`. Use one before
 writing a layout by hand. These names are the React and Next ones (React keeps them in
-`shared/components/`); Angular's equivalents are listed in its `AGENTS.md › Styling`.
+`shared/components/`); Angular's and Vue's equivalents are listed in their `AGENTS.md › Styling`.
 
 - **list**: `Page` > `PageHeader` (title, the create action) > `Section` with the rows in a
   48 rem column. Row: name, a status `Badge`, secondary text muted, row actions at the

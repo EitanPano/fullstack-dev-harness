@@ -89,7 +89,7 @@ provider payloads in a response.
   user-safe.
 - The one reader of a generated-client result, the place `AGENTS.md › Errors` names, turns a
   failure into a typed error. Next's `call` throws an `ActionError` with the `code`'s copy;
-  React's `call` returns an `ApiError` the hook exposes and `.unwrap()` rejects with; Angular's
+  React's `call` returns an `ApiError` the hook exposes and `.unwrap()` rejects with; Angular's and Vue's
   interceptor builds an `ApiError` the handler maps to copy. Server `message`
   is never shown.
 - In Next, a public cached loader lets the `ActionError` propagate and the data section renders
