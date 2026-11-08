@@ -52,7 +52,7 @@ importers, and list the old path there. The driver removes it.
    report `UI pass: n/a (no route in UX)`. The screens are the three files per route that
    `ui-design › Rubric` names. A route is captured only when it is in the package's nav table
    or in the screens list its `AGENTS.md › Tests` names (`SIGNED_IN_ROUTES` `{ route, setup }`,
-   and Angular's `AUTH_ROUTES`, in `tests/e2e/screen-routes.ts`): add a signed-in route and a
+   and Angular's and Vue's `AUTH_ROUTES`, in `tests/e2e/screen-routes.ts`): add a signed-in route and a
    public route outside the nav there, or the files do not exist. A role-gated route needs the
    setup that promotes the account, per that section.
    - Per route, Read the three screenshots (about 1.5k tokens each), apply the rubric's judged
