@@ -103,7 +103,7 @@ marker in the Auth section with the line for the chosen frontend:
   address. The opt-in `CLIENT_IP_HEADER` makes the frontend forward the visitor's address
   (the `deployment` skill, section 6); without it all visitors share one rate-limit bucket,
   about 30 active signed-in visitors per 15 minutes.
-- Single-page app (React, Angular): the browser calls `/api` on the page's own origin (the
+- Single-page app (React, Angular, Vue): the browser calls `/api` on the page's own origin (the
   server in `single`, the frontend image's proxy in `split`), so there is no CORS and no
   API URL in the bundle. Rate limits key on the client address, so `TRUST_PROXY` is the
   hop count in front of the server (`false` in `single` locally, `1` in `split`).
@@ -123,18 +123,18 @@ and a `dir` each) and each package's `<catalog>/<template path>/template.yaml`. 
 Search and sharing answer, deciding by the `static` declaration and never by a stack id:
 
 - "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today).
-- "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular).
+- "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular, Vue).
 - A stack with no frontend skips this question.
 
 Ask each remaining choice in turn: the frontend framework when the kept stacks differ in it (name
-the options by template id: `frontend/react`, `frontend/angular`), then the server.
+the options by template id: `frontend/react`, `frontend/angular`, `frontend/vue`), then the server.
 Show the chosen stack with its reason (for example "single-page app: no public page needs search
 or sharing") and accept an override. Ask every flag the templates declare (show its `summary` and
 `default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
 
 Ask the deploy mode only when the chosen stack has a server and its frontend's
-`template.yaml` declares `static` (a single-page app: React, Angular). Put the tradeoff in
+`template.yaml` declares `static` (a single-page app: React, Angular, Vue). Put the tradeoff in
 two lines and map the answer to `--deploy <single|split>`:
 
 - `single` (the default): one container and one port; the server serves the built

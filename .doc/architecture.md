@@ -11,7 +11,7 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 
 | Component | Responsibility | Runs as |
 | --- | --- | --- |
-| `frontend/` | Pages and routes. Server-rendered (Next): its server calls the API. Single-page app (React): static files, the browser calls `/api` on its own origin | Server-rendered: the frontend's container. SPA: the server's container (`single`) or the frontend's static-server container (`split`). Ports: `.fullstack/catalog.yaml` |
+| `frontend/` | Pages and routes. Server-rendered (Next): its server calls the API. Single-page app (React, Angular, Vue): static files, the browser calls `/api` on its own origin | Server-rendered: the frontend's container. SPA: the server's container (`single`) or the frontend's static-server container (`split`). Ports: `.fullstack/catalog.yaml` |
 | `backend/` | HTTP API, validation, business rules, persistence; serves the SPA's files in `single` | The server's container; port in `.fullstack/catalog.yaml` |
 | Stack | The packages and their templates | <!-- FILL: written by the bootstrap from .fullstack/catalog.yaml: stack id; per package its directory, template and version --> |
 | Data store | System of record | <!-- FILL: the compose service and port of the engine chosen under Data Store --> |
