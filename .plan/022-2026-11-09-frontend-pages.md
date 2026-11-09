@@ -3,12 +3,15 @@
 Status: active
 Owner: Eitan
 Last updated: 2026-11-09
-Approval: G1 granted 2026-11-09 by Eitan ("active the plan"). Eitan asked on 2026-11-09 for the four changes (rename `features/` to
-`pages/`; prefix the layout components with `app`, move them into a `components/` folder and delete
-`layout/`; each page's and component's `.scss` beside its `.ts`, global styles staying in `styles/`;
-each frontend using its primary features, React having no hooks), approved the session's recap
-("yes do that") and ADR 0009 after its builder check ("approved"). This plan is sized from the ADR.
-Approval: delegated (2026-11-09, "start. the only thing i want is a PR from dev to main which i will merge manually on both repos."): commits, pushes, PRs into `dev` and their merges are the session's; the dev → main merges and the tag are Eitan's.
+Approval: G1 granted 2026-11-09 by Eitan ("active the plan"). Eitan asked on 2026-11-09 for the
+four changes (rename `features/` to `pages/`; prefix the layout components with `app`, move them
+into a `components/` folder and delete `layout/`; each page's and component's `.scss` beside its
+`.ts`, global styles staying in `styles/`; each frontend using its primary features, React having
+no hooks), approved the session's recap ("yes do that") and ADR 0009 after its builder check
+("approved"). This plan is sized from the ADR.
+Approval: delegated (2026-11-09, "start. the only thing i want is a PR from dev to main which i
+will merge manually on both repos."): read by the session as: commits, pushes, PRs into `dev` and
+their merges; the dev → main merges and the tag are Eitan's.
 Input: ADR 0009 at the catalog's `docs/adr/0009-pages-components-colocated-styles.md` on
 `feat/frontend-pages` (accepted 2026-11-09; the ledger keeps a copy): C1 the tree, C1.1 the import
 table, C1.2 names, C2 styles with C2.1 Angular encapsulation and C2.2 the scans, C3 primary
@@ -100,7 +103,8 @@ the release, as its own pull request through `dev`.
 - A run starts from the on-disk path spelling (`C:\Dev`, never `C:\dev`), the Bun path-case trap.
 - Eitan's rules: Sonnet implementers and per-task reviews, one Opus final review; Conventional
   Commits; two repositories only; every pull request targets `dev` and `main` moves only by a
-  `dev` → `main` merge; no commit, push, PR, merge or tag without a yes at the time.
+  `dev` → `main` merge; no commit, push, PR, merge or tag without a yes at the time (superseded
+  for `dev` by the delegation in Approval).
 
 ## Open Questions
 
@@ -117,11 +121,12 @@ three React hooks instead of five, no `useTransition`.
 - **G0 (session), done 2026-11-09:** both branches cut (`feat/frontend-pages` on a62bf90 and on
   5282620); ADR 0009 written, builder-checked and accepted, placed at the catalog's
   `docs/adr/0009-pages-components-colocated-styles.md` (uncommitted until G3); this plan written.
-- **G1 (Eitan):** `Status: active` on this plan.
-- **G2 (session):** spikes S1–S3 recorded in the ledger with the versions tried; a failed spike
-  stops here and returns to Eitan with its evidence (ADR Spikes).
-- **G3 (Eitan):** yes to the catalog commits and the PR into `dev`, after the Opus review and the
-  local proofs; yes to the harness commits and the H1 PR into `dev`.
+- **G1 (Eitan), done 2026-11-09:** `Status: active` on this plan.
+- **G2 (session), done (S1 failed; R6 below):** spikes S1–S3 recorded in the ledger with the
+  versions tried; a failed spike stops here and returns to Eitan with its evidence (ADR Spikes).
+- **G3 (taken by the session under the delegation):** yes to the catalog commits and the PR
+  into `dev`, after the Opus review and the local proofs; yes to the harness commits and the H1
+  PR into `dev`.
 - **G4 (Eitan):** yes to the release: catalog `dev` → `main`, the tag `v1.9.0` and its notes.
 - **G5 (Eitan):** yes to the lock bump PR (H3, into `dev`, then the `dev` → `main` pull request)
   and the proof run P1.
@@ -329,80 +334,165 @@ P1 follow G4.
 
 ## Changes during the task
 
-- 2026-11-09 — G2: S2 and S3 passed; S1 failed its "styles.scss first" criterion (Vite links a shared
-  component chunk's CSS before the entry CSS; no behavioural break). Driver's ruling R6 (ledger): the
-  global tree is wrapped in cascade layers (`@layer setup, themes, basics;`), sibling sheets stay
-  unlayered and win regardless of chunk order; spike S1b proves it before C1a. Recorded in the ADR's
-  "Decisions made while building" by C4. Eitan can reverse it before the dev → main merge.
-- 2026-11-09 — Ruling R4 (ledger): Angular ships no `@defer` block; the toast is a CDK overlay portal, so
-  `app-main-layout` has no toast outlet to wrap and every other shell element is a landmark or flag-gated.
-- 2026-11-09 — Ruling R7 (ledger): Vue's toast list gets no `<TransitionGroup>` (Reka teleports each toast
-  root into its viewport, so the wrapper has no element to animate); the header's offline badge
-  `<Transition>` is the Vue transition example. V08's Vue clause reads accordingly.
-- 2026-11-09 — Ruling R8 (ledger): the CDK overlay's pane and backdrop (`.modal__panel*`,
+- 2026-11-09 — Driver's rulings R1–R3 (pre-flight scan, ledger): R1, a spec file follows its owner's
+  stem when the owner is renamed, its describe/it titles unchanged (this amends V09's "moved specs
+  keep their names"); R2, C2 and C3 ran in parallel in two catalog git worktrees on the branches
+  `feat/frontend-pages-vue` and `feat/frontend-pages-angular`, merged back by the driver; R3, C1 was
+  split into C1a (moves, styles, scans, lint, manifest) and C1b (hooks, callers, documents,
+  changelog, `index.yaml`) from the start.
+- 2026-11-09 — Driver's ruling R4 (ledger): Angular ships no `@defer` block; the toast is a CDK
+  overlay portal, so `app-main-layout` has no toast outlet to wrap and every other shell element is
+  a landmark or flag-gated. This amends V08's Angular `@defer` clause: the absence is the recorded
+  outcome.
+- 2026-11-09 — G2: S2 and S3 passed; S1 failed its "styles.scss first" criterion (Vite links a
+  shared component chunk's CSS before the entry CSS; no behavioural break). Driver's ruling R6
+  (ledger): the global tree is wrapped in cascade layers (`@layer setup, themes, basics;`), sibling
+  sheets stay unlayered and win regardless of chunk order; spike S1b proves it before C1a. Recorded
+  in the ADR's "Decisions made while building" by C4. R6 set aside the stop rule of this plan and
+  the ADR, which Eitan approved (a failed spike stops the plan): the ledger's reasons are that
+  layering is none of the rejected alternatives, is additive and reversible, and the failure is a
+  bundler link-order technicality with no selector depending on it. Eitan can reverse it before the
+  dev → main merge; it awaits his ratification.
+- 2026-11-09 — Driver's ruling R7 (ledger): Vue's toast list gets no `<TransitionGroup>` (Reka
+  teleports each toast root into its viewport, so the wrapper has no element to animate); the
+  header's offline badge `<Transition>` is the Vue transition example. V08's Vue clause reads
+  accordingly.
+- 2026-11-09 — Driver's ruling R8 (ledger): the CDK overlay's pane and backdrop (`.modal__panel*`,
   `.modal__backdrop`) have no owning view, so their rules stay in the global tree
-  (`styles/basics/_layout.scss`, layered), applied through the service's `panelClass`/`backdropClass`;
-  no inline style from a service. Angular also records: no `linkedSignal` (no local state resets on an
-  input), `no-unknown-files` turned on, the page lint element is `src/app/pages/*/*`.
+  (`styles/basics/_layout.scss`, layered), applied through the service's
+  `panelClass`/`backdropClass`; no inline style from a service. Angular also records: no
+  `linkedSignal` (no local state resets on an input), `no-unknown-files` turned on, the page lint
+  element is `src/app/pages/*/*`.
+- 2026-11-09 — Angular has no compile-based density test (C3 report; the e2e `shell.spec` asserts
+  sizing), so step C3's `density.spec.ts` compile set does not exist and V06's Angular proof is
+  `shell.spec` in CI.
+- 2026-11-09 — The session took G3 (the catalog commits, PR #27 and its merge into `dev`) under
+  Eitan's delegation; G4's merge and tag and G5 stay Eitan's. Driver's ruling R9 (ledger): the
+  harness `dev` → `main` pull request is opened now, as Eitan asked, marked "merge after the lock
+  bump H3 lands in `dev`".
+- 2026-11-09 — Addition to C6, found by the Opus harness review: `.claude/rules/ui-and-styling.md`
+  and `.claude/skills/code-review/SKILL.md` said "no stylesheet outside the styling tree", false
+  once every SPA page and component owns a sibling sheet. Both now say a stylesheet lives only where
+  the frontend's `AGENTS.md › Styling` places it. The plan template's React step order now follows
+  the React recipe (the page's stylesheet, then the nav entry).
 
 ## As built
 
-Built 2026-11-09 by subagent-driven development with Sonnet implementers and task reviewers, one Opus
-whole-branch review per repository and the session as driver, under Eitan's delegated approval ("start.
-the only thing i want is a PR from dev to main which i will merge manually on both repos"). The record is
-the ledger `.superpowers/sdd/022-2026-11-09-frontend-pages/progress.md` (git-ignored) with every brief,
-report, review package, the spike record, the screenshot baselines and the release-notes draft beside it.
-Catalog branch `feat/frontend-pages` against `main` a62bf90 (33 commits, 405 files; `frontend/react`
-4.0.0, `frontend/vue` 2.0.0, `frontend/angular` 2.0.0, ADR 0009 and the amendment lines, CONTRIBUTING,
-the README matrix; `frontend/next`, the servers, tools, stacks and schemas untouched), pull request #27
-into `dev`. Harness branch `feat/frontend-pages` against 5282620 (this plan and the three C6 wording
-files). Docker was down on the build machine, so every `--with-app`, `--with-services` and e2e leg is the
-pull request's CI run. Rulings R1–R8 are in the ledger and in "Changes during the task"; the ADR's
-"Decisions made while building" carries each.
+Built 2026-11-09 by subagent-driven development with Sonnet implementers and task reviewers, one
+Opus whole-branch review per repository and the session as driver, under Eitan's delegated approval
+("start. the only thing i want is a PR from dev to main which i will merge manually on both
+repos"). The record is the ledger `.superpowers/sdd/022-2026-11-09-frontend-pages/progress.md`
+(git-ignored) with every brief, report, review package, the spike record, the screenshot baselines
+and the release-notes draft beside it.
+Catalog branch `feat/frontend-pages` against `main` a62bf90 (33 commits, 408 files at 1cdab31;
+`frontend/react` 4.0.0, `frontend/vue` 2.0.0, `frontend/angular` 2.0.0, ADR 0009 and the amendment
+lines, CONTRIBUTING, the README matrix; `frontend/next`, the servers, tools, stacks and schemas
+untouched), pull request #27 into `dev`: 52 of 52 checks pass (every case with `--e2e
+--with-services --with-app`), merged into `dev` as 6dbd3f4 under the delegation; the release pull
+request #28, `dev` → `main`, is open for Eitan. Harness branch `feat/frontend-pages` against
+5282620: this plan, the C6 wording in three files, and the review's fix wave (two instruction
+texts, one template line). Docker was down on the build machine, so every `--with-app`,
+`--with-services` and e2e leg is the pull request's CI run.
+Rulings R1–R4 and R6–R8 (the ledger skipped the number R5) are in the ledger; R1, R4, R6, R7 and R8
+are in the ADR's "Decisions made while building"; R2 and R3 are process rulings (worktrees; the C1
+split) recorded in the ledger only. R6 overrode the stop rule of this plan and the ADR that Eitan
+approved: the decision Eitan most needs to ratify before merging the release PR (reasons in
+"Changes during the task").
 
-- V01 — `bun tools/validate.ts` ok after the matrix regeneration; `--readme` leaves no diff; `--lockfiles`
-  ok; `cd tools && bun run check` ok.
-- V02 — Local (check only): React `default`, `alone`, `auth-off`, `split`, `bun`, `auth-off-postgres`,
-  `brand`; Vue `default`, `auth-off`, `i18n-off`, `split`, `python`, `alone`, `pwa-off`, `brand`,
-  `flags-off`, `postgres`; Angular `default`, `auth-off`, `i18n-off`, `split`, `python`, `alone`, `pwa-off`, `brand`, `flags-off`, `postgres`: 20 of 20 proof steps green
-  (tools `check`, `--lockfiles`, 18 cases; scratchpad proofs/summary.log). One `vue/default` run failed once in its test step while the proofs ran in parallel and passed
-  on the rerun (816 tests); cause unproven; CI is the independent check. `git diff --stat a62bf90 --
-  frontend/next` is empty. e2e: CI on #27.
+- V01 — `bun tools/validate.ts` ok after the matrix regeneration; `--readme` leaves no diff;
+  `--lockfiles` ok; `cd tools && bun run check` ok.
+- V02 — Local proofs, `check` only (no Docker, no e2e), from three sources:
+  (a) the implementers' generated cases at their task heads (React 7eb07ff and cfe67f1, Vue
+  f892fb1, Angular at C3's head before its R8 correction 2064f84): React `default`, `alone`,
+  `auth-off`; Vue `default`, `auth-off`, `i18n-off`; Angular `default`, `auth-off`, `i18n-off`.
+  One `vue/default` run failed once in its test step while proofs ran in parallel and passed on the
+  rerun (816 tests); cause unproven.
+  (b) 18 background cases, tools `check` and `--lockfiles`: 20 of 20 proof steps green
+  (scratchpad proofs/summary.log, 14:46-15:34). They ran on the shared working tree while the C4
+  docs and the fix wave were editing it, so their tree states varied. Cases: React `split`, `bun`,
+  `auth-off-postgres`, `brand`; Vue and Angular `split`, `python`, `alone`, `pwa-off`, `brand`,
+  `flags-off`, `postgres`.
+  (c) No React generated case ran locally at the final tree 1cdab31. CI on #27 at 1cdab31 is the
+  proof of the shipped tree: 52/52 checks, every case with `--e2e --with-services --with-app`.
+  `git diff --stat a62bf90 -- frontend/next` is empty.
 - V03 — In each base: no `src/features`, `src/layout`, `src/styles/components`, `src/styles/views`;
-  `src/styles` is `basics setup styles.scss themes`; every `components/` entry is `app-*` (Angular:
-  the folder and the `App*Component` class); Vue's `shared/components/` has no `app-*`; the three scans
-  assert it on the real tree.
-- V04 — The scans: React `tests/unit/styles-tree.test.ts` (six rules as pure functions, the last-import
-  and layer-completeness checks, seeded temp-tree cases), Vue `styles-tree.spec.ts` (plus no `scoped`,
-  no style body, the empty `src` block as the last block), Angular `component-styles.spec.ts` (plus no
-  `ViewEncapsulation.None`, no `::ng-deep`, `styleUrls` for the shared `controls.scss`); the layered
-  partials are globbed, not listed. Final review: React 169, Vue 216, Angular 115 scan/density/boundaries
-  tests; the compiled old global tree against the new compile set differs only by the added rules.
-- V05 — The three boundaries tests keep one violation and one allowed case per row of the C1.1 table
-  with the new paths and messages; `src/hooks/` stays refused; the Vue page row covers every module file
-  that is not a routes, form or `components/` file (the final review's fix).
-- V06 — Density tests compile `styles.scss` plus every sibling sheet: 36 / 32 compact / 44 coarse hold;
-  no BEM class removed; the e2e `screens.spec` in both themes with axe is CI's.
-- V07 — S2 (header and button) and the C3 selector table: own-host selectors → `:host`, the two interior
-  reaches removed (`block` input on the button; flex stretch in form-actions), the form-field's checkbox
-  rule moved under `:host-context`, the overlay pane and backdrop in the global tree (R8); the Angular
-  shell's 8 views and the modal screenshot-identical to the 1.0.0 baseline outside the live uptime digits.
+  `src/styles` is `basics setup styles.scss themes`; every component file in `components/` is
+  `app-*` (Vue's `slots.ts`, the specs and the sheets are exempt by the scan; Angular: the folder
+  and the `App*Component` class); Vue's `shared/components/` has no `app-*`; the three scans assert
+  it on the real tree. The Opus harness review re-ran the checks at 1cdab31; the `find`/`ls`
+  lines themselves are not recorded.
+- V04 — The scans: React `tests/unit/styles-tree.test.ts` (six rules as pure functions, the
+  last-import and layer-completeness checks, seeded temp-tree cases), Vue `styles-tree.spec.ts`
+  (plus no `scoped`, no style body, the empty `src` block as the last block), Angular
+  `component-styles.spec.ts` (plus no `ViewEncapsulation.None`, no `::ng-deep`, `styleUrls` for the
+  shared `controls.scss`); the layered partials are globbed, not listed. The Opus catalog review
+  at 165328c counted React 169, Vue 216, Angular 115 scan/density/boundaries tests; after the fix
+  wave the scan suites are React 267 (`tests/unit` and `shared/components`), Vue unit 260, Angular
+  `component-styles` 28 (task-C5-fix-report.md; different scopes, not a recount). That review
+  compiled the old global tree against the new compile set: React and Vue differ only by the added
+  rules (`.header__status`; the six badge-transition rules); Angular only by the expected
+  encapsulation changes (`app-*` host rules → `:host`, the two interior reaches removed,
+  `.button--block` added, `cdk.overlay()` dropped).
+- V05 — The three boundaries tests keep one violation and one allowed case per row of the C1.1
+  table with the new paths and messages; `src/hooks/` stays refused; the Vue page row covers every
+  module file that is not a routes, form or `components/` file (the final review's fix).
+- V06 — React and Vue density tests compile `styles.scss` plus every sibling sheet: 36 / 32 compact
+  / 44 coarse hold; Angular has no density test, its sizing is CI's e2e `shell.spec`; no BEM class
+  removed; the e2e `screens.spec` in both themes with axe is CI's.
+- V07 — S2 (header and button) and the C3 selector table: own-host selectors → `:host`
+  (app-checkbox's display rule became `:host { display: block }` in `checkbox.component.scss`),
+  the two interior reaches removed (`block` input on the button; flex stretch in form-actions),
+  the overlay pane and backdrop in the global tree (R8); the Angular shell's 8 views
+  screenshot-identical to the 1.0.0 baseline outside the live uptime digits, the modal checked in
+  a browser at R8 (pane rect identical, backdrop colours). Not screenshotted at the final build:
+  the open account menu with the new `block` buttons, the checkbox field and the toast (S2 covered
+  the menu at spike time); the e2e in CI (52/52 on #27) is their proof.
 - V08 — React: `useMediaQuery` (sheet closes at `md`), `useOnlineStatus` (offline badge),
-  `useDebouncedValue` (no caller, named in AGENTS.md), each with happy-path and unsubscribe/empty tests;
-  Angular `model()` on the drawer with `[(open)]`; Vue `<Transition>` on the badge. Recorded absences:
-  Angular `@defer` (R4) and `linkedSignal`; Vue `<TransitionGroup>` (R7).
-- V09 — No test deleted, skipped or focused: the one deleted test file (`no-component-styles.spec.ts`) is
-  replaced by `component-styles.spec.ts` with a successor per assertion; describe/it titles unchanged
-  (ten Vue `base-*.spec.ts` keep `describe('App…')` titles — a backlog rename).
+  `useDebouncedValue` (no caller, named in AGENTS.md), each with happy-path and unsubscribe/empty
+  tests; Angular `model()` on the drawer with `[(open)]`; Vue `<Transition>` on the badge. Recorded
+  absences: Angular `@defer` (R4) and `linkedSignal`; Vue `<TransitionGroup>` (R7).
+- V09 — No test deleted, skipped or focused: the one deleted test file
+  (`no-component-styles.spec.ts`) is replaced by `component-styles.spec.ts` with a successor per
+  assertion; moved specs follow their owner's stem (R1), describe/it titles unchanged (ten Vue
+  `base-*.spec.ts` keep `describe('App…')` titles; see the backlog lines below).
 - V10 — ADR 0009 (with "Decisions made while building" and the versions re-verified against
-  node_modules), the three agents files (five headings each), the READMEs, the changelogs' move tables,
-  CONTRIBUTING, `index.yaml` and the README matrix name the same layers, files and versions; `validate` ok.
+  node_modules), the three agents files (five headings each), the READMEs, the changelogs' move
+  tables, CONTRIBUTING, `index.yaml` and the README matrix name the same layers, files and
+  versions; `validate` ok.
 - V11 — The harness: `.doc/glossary.md` says `pages/<noun>`, the plan template says "the page's
-  stylesheet", `.claude/README.md › Frontend choice` names v1.9.0; the one remaining "global SCSS tree"
-  hit is the v1.7.0 history clause; `node --test scripts/*.test.mjs` 240/240.
-- V12 — Reviews: Sonnet task reviews for C1a, C1b (1 fix round), C2, C3, C4 (1 fix round) and H1; the
-  Opus catalog review (ready with fixes → one fix wave → scoped re-review clean); the Opus harness review
-  (below). No open P0/P1. CI: the PR checks.
-- V13 — P1 not run in this session: the proof clone needs Eitan to open Claude Code in it once (the
-  trust dialog), and the bumped lock needs the `v1.9.0` tag, which follows Eitan's `dev` → `main` merge.
-  Pending with H3 (the lock bump) as its own pull request.
+  stylesheet", `.claude/README.md › Frontend choice` names v1.9.0; the one remaining "global SCSS
+  tree" hit is the v1.7.0 history clause; the fix wave reworded the two "styling tree" texts;
+  `node --test scripts/*.test.mjs` 240/240.
+- V12 — Reviews: Sonnet task reviews for C1a, C1b (1 fix round), C2, C3, C4 (1 fix round) and H1;
+  C0 (a record, no code) and H2 (this plan, reviewed by the Opus harness review) had no Sonnet task
+  review. The Opus catalog review: ready with fixes, one fix wave, scoped re-review clean. The Opus
+  harness review found three false As built claims and a missed C6 text, fixed in one wave (this
+  commit) with a scoped re-review to follow (its result is not recorded here). The harness has no
+  CI; its gate is `node --test scripts/*.test.mjs` (240/240). Catalog #27 CI: 52/52. Open P0/P1:
+  none known on the catalog; the harness review's Critical and Important items are addressed in
+  this wave, pending that re-review.
+- V13 — P1 not run, and the proof clone `../fullstack-dev-harness-proof-022` does not exist yet.
+  Its blockers: the trust dialog (Eitan opens Claude Code once in the clone), Docker down, and port
+  4000 held by the spike's API (PID 35672; the session's stop was denied, and the Playwright
+  configs set `reuseExistingServer: false`). The `v1.9.0` tag is not a hard blocker: P1 may run
+  with `--templates` against the catalog branch. Housekeeping for Eitan: delete the catalog
+  branches `feat/frontend-pages-vue` and `feat/frontend-pages-angular`. The harness `dev` → `main`
+  merge must wait for the lock bump H3 (else `main`'s glossary says `pages/` while its lock pins
+  v1.8.0); its pull request is opened with that note. H3 follows Eitan's catalog merge and tag as
+  its own pull request.
+
+### Backlog lines carried out of this plan
+
+Proposed, not yet in `.plan/000-backlog.md`:
+
+- [ ] next: co-located SCSS (its own ADR; was "the global SCSS tree")
+- [ ] frontend: a move script for 3.x/1.x projects from each changelog's table
+- [ ] frontend: close the scan escape forms (`ViewEncapsulation.ShadowDom`, Vue `<style module>`,
+  the two-importer early return, the own-block check)
+- [ ] angular: `OverlayConfig.maxHeight` for the modal's dead 90dvh cap
+- [ ] react: the `role="status"` nested inside `aria-live` in the header
+- [ ] vue: rename the ten `base-*.spec.ts` `describe('App…')` titles
+- [ ] frontend: `@defer` / `<TransitionGroup>` / `linkedSignal` examples, if Eitan wants them
+  regardless of R4 and R7
+- [ ] catalog: raise `minCatalog` (still v1.5.0) with the lock bump so `harness-update` does not
+  ship v1.9.0 wording to projects on older catalogs
