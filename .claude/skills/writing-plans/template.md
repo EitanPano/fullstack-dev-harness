@@ -58,7 +58,7 @@ One line per module or feature; no copy strings, no code.
 
 1. One line per step of the package's `frontend/AGENTS.md › Adding a feature`, in its order,
    each naming its path. React: model, service endpoints, feature (routes, page, components),
-   nav entry, the page's stylesheet. Angular and Vue: models, service, store, feature, route and nav,
+   the page's stylesheet, nav entry. Angular and Vue: models, service, store, feature, route and nav,
    the page's stylesheet, copy keys. A top-level screen gets its nav entry; a route needs its own
    loading and error copy only when its group's do not fit.
 2. `frontend/tests/` — the unit test and the e2e test.
