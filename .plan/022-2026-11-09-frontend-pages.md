@@ -375,6 +375,17 @@ P1 follow G4.
   once every SPA page and component owns a sibling sheet. Both now say a stylesheet lives only where
   the frontend's `AGENTS.md › Styling` places it. The plan template's React step order now follows
   the React recipe (the page's stylesheet, then the nav entry).
+- 2026-11-09 — G4 and H3: Eitan merged the release PR #28 (`dev` → `main`, ecf7466); on Eitan's
+  word the session created the annotated tag `v1.9.0` on ecf7466 from the ledger's
+  `release-notes.md` (release run 42661085079; `release.yml` publishes from the tag's notes) and
+  fast-forwarded the catalog's `dev` to `main`. H3 (this `catalog.lock` bump to v1.9.0 / ecf7466)
+  was cut from harness `dev` dfff8ae on `chore/catalog-v1.9.0`; its smoke
+  `node scripts/bootstrap.mjs --fetch` cloned the catalog at v1.9.0 into the cache, the commit
+  matched the lock, the tools installed, the index printed, exit 0; the harness suite 240/240.
+  `minCatalog` stays v1.5.0 (Eitan's choice, asked with the tag): raising it would refuse a harness
+  update to every project on an older catalog, and the fix wave made the styling rule and the
+  review skill catalog-neutral, leaving the plan template's recipe line the one v1.9.0-specific
+  text; the backlog line stays proposed.
 
 ## As built
 
@@ -466,20 +477,19 @@ approved: the decision Eitan most needs to ratify before merging the release PR 
 - V12 — Reviews: Sonnet task reviews for C1a, C1b (1 fix round), C2, C3, C4 (1 fix round) and H1;
   C0 (a record, no code) and H2 (this plan, reviewed by the Opus harness review) had no Sonnet task
   review. The Opus catalog review: ready with fixes, one fix wave, scoped re-review clean. The Opus
-  harness review found three false As built claims and a missed C6 text, fixed in one wave (this
-  commit) whose scoped re-review found every finding addressed and no new breakage. The harness has no
-  CI; its gate is `node --test scripts/*.test.mjs` (240/240). Catalog #27 CI: 52/52. Open P0/P1:
-  none known on the catalog; the harness review's Critical and Important items are addressed in
-  this wave, pending that re-review.
-- V13 — P1 not run, and the proof clone `../fullstack-dev-harness-proof-022` does not exist yet.
-  Its blockers: the trust dialog (Eitan opens Claude Code once in the clone), Docker down, and port
+  harness review found three false As built claims and a missed C6 text, fixed in one wave
+  (f6edcaa) whose scoped re-review found every finding addressed and no new breakage. The harness
+  has no CI; its gate is `node --test scripts/*.test.mjs` (240/240). Catalog #27 CI: 52/52. Open
+  P0/P1: none known on the catalog; the harness review's Critical and Important items are
+  addressed and its re-review found nothing open.
+- V13 — P1 not run yet; the proof clone `../fullstack-dev-harness-proof-022` does not exist. Its
+  blockers: the trust dialog (Eitan opens Claude Code once in the clone), Docker down, and port
   4000 held by the spike's API (PID 35672; the session's stop was denied, and the Playwright
-  configs set `reuseExistingServer: false`). The `v1.9.0` tag is not a hard blocker: P1 may run
-  with `--templates` against the catalog branch. Housekeeping for Eitan: delete the catalog
-  branches `feat/frontend-pages-vue` and `feat/frontend-pages-angular`. The harness `dev` → `main`
-  merge must wait for the lock bump H3 (else `main`'s glossary says `pages/` while its lock pins
-  v1.8.0); its pull request is opened with that note. H3 follows Eitan's catalog merge and tag as
-  its own pull request.
+  configs set `reuseExistingServer: false`). With `v1.9.0` tagged and this lock bump, the clone
+  runs at the bumped lock. Housekeeping for Eitan: delete the catalog branches
+  `feat/frontend-pages-vue` and `feat/frontend-pages-angular`. The harness `dev` → `main` pull
+  request #49 merges after this bump lands in `dev` (else `main`'s glossary says `pages/`
+  while its lock pins v1.8.0).
 
 ### Backlog lines carried out of this plan
 
