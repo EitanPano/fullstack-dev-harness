@@ -51,10 +51,10 @@ failure-path test, an error state, a change-log line).
    `infra/subscribers/`)? A file in two defensible homes is a finding.
    Frontend: layer direction as the frontend's `AGENTS.md` states it (no sibling
    slice); no raw `button`, `input`, `select` or `textarea` outside the package's control
-   components; no hex colour or palette literal outside its token files and styling tree
-   (`AGENTS.md › Styling`); no stylesheet outside that tree; status never by colour alone; no
-   `revalidatePath`; no limit copied from the backend into a form schema; every new file in
-   the slice the frontend's `AGENTS.md` table names for it.
+   components; no hex colour or palette literal outside its token files
+   (`AGENTS.md › Styling`); no stylesheet outside the homes that section names; status never by
+   colour alone; no `revalidatePath`; no limit copied from the backend into a form schema;
+   every new file in the slice the frontend's `AGENTS.md` table names for it.
 4. **Error handling and validation**: validation at the edge with the envelope, correct
    status codes, no swallowed errors, user-safe failure UX, logs with request id.
 5. **Unnecessary complexity**: abstraction without a second caller (a controller function
