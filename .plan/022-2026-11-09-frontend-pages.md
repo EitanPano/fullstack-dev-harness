@@ -1,6 +1,6 @@
 # Pages, app-wide components and co-located styles in the SPA templates
 
-Status: active
+Status: done
 Owner: Eitan
 Last updated: 2026-11-09
 Approval: G1 granted 2026-11-09 by Eitan ("active the plan"). Eitan asked on 2026-11-09 for the
@@ -127,9 +127,10 @@ three React hooks instead of five, no `useTransition`.
 - **G3 (taken by the session under the delegation):** yes to the catalog commits and the PR
   into `dev`, after the Opus review and the local proofs; yes to the harness commits and the H1
   PR into `dev`.
-- **G4 (Eitan):** yes to the release: catalog `dev` → `main`, the tag `v1.9.0` and its notes.
-- **G5 (Eitan):** yes to the lock bump PR (H3, into `dev`, then the `dev` → `main` pull request)
-  and the proof run P1.
+- **G4 (Eitan), done 2026-11-09:** the catalog `dev` → `main` merge (#28); the tag `v1.9.0` and
+  its notes by the session on Eitan's yes.
+- **G5 (Eitan), done 2026-11-09:** the lock bump PR #50 into `dev` (merged by the session under
+  the delegation), the `dev` → `main` pull request #49 (merged by Eitan); P1 dropped by Eitan.
 
 ### Spikes (throwaway, in the session's scratch folder, never in a repository)
 
@@ -386,6 +387,12 @@ P1 follow G4.
   update to every project on an older catalog, and the fix wave made the styling rule and the
   review skill catalog-neutral, leaving the plan template's recipe line the one v1.9.0-specific
   text; the backlog line stays proposed.
+- 2026-11-09 — G5 and close: harness PR #49 (`dev` → `main`) merged by Eitan as 9d8be36; `main`
+  pins v1.9.0; `dev` fast-forwarded to it, so `dev` == `main` in both repos. P1 dropped by Eitan
+  ("drop P1"): the plan closes on the release, the lock bump and the CI and release-run proofs in
+  place of the proof clone; the loop-side check moves to the next real project on v1.9.0. R6 (the
+  cascade layers) shipped in v1.9.0 as flagged, without a word from Eitan either way; a reversal
+  is now a patch release, not a revert on the branch. `Status: done`.
 
 ## As built
 
@@ -482,14 +489,14 @@ approved: the decision Eitan most needs to ratify before merging the release PR 
   has no CI; its gate is `node --test scripts/*.test.mjs` (240/240). Catalog #27 CI: 52/52. Open
   P0/P1: none known on the catalog; the harness review's Critical and Important items are
   addressed and its re-review found nothing open.
-- V13 — P1 not run yet; the proof clone `../fullstack-dev-harness-proof-022` does not exist. Its
-  blockers: the trust dialog (Eitan opens Claude Code once in the clone), Docker down, and port
-  4000 held by the spike's API (PID 35672; the session's stop was denied, and the Playwright
-  configs set `reuseExistingServer: false`). With `v1.9.0` tagged and this lock bump, the clone
-  runs at the bumped lock. Housekeeping for Eitan: delete the catalog branches
-  `feat/frontend-pages-vue` and `feat/frontend-pages-angular`. The harness `dev` → `main` pull
-  request #49 merges after this bump lands in `dev` (else `main`'s glossary says `pages/`
-  while its lock pins v1.8.0).
+- V13 — P1 dropped by Eitan on 2026-11-09 ("drop P1") after the release and the lock bump: no
+  proof clone was made (`../fullstack-dev-harness-proof-022` does not exist). The shipped tree's
+  proofs are CI on #27 and the release run 42661085079 (every case with
+  `--e2e --with-services --with-app`), the local proofs (20/20) and the bootstrap fetch smoke at
+  the bumped lock. The loop-side check the proof would have given (the frontend agent landing a
+  page in `pages/<noun>/` with a sibling `.scss`, unaided) is unproven; it runs with the next real
+  project on v1.9.0. Housekeeping for Eitan: delete the catalog branches `feat/frontend-pages-vue`
+  and `feat/frontend-pages-angular`.
 
 ### Backlog lines carried out of this plan
 
