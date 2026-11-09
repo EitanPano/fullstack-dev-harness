@@ -467,7 +467,7 @@ approved: the decision Eitan most needs to ratify before merging the release PR 
   C0 (a record, no code) and H2 (this plan, reviewed by the Opus harness review) had no Sonnet task
   review. The Opus catalog review: ready with fixes, one fix wave, scoped re-review clean. The Opus
   harness review found three false As built claims and a missed C6 text, fixed in one wave (this
-  commit) with a scoped re-review to follow (its result is not recorded here). The harness has no
+  commit) whose scoped re-review found every finding addressed and no new breakage. The harness has no
   CI; its gate is `node --test scripts/*.test.mjs` (240/240). Catalog #27 CI: 52/52. Open P0/P1:
   none known on the catalog; the harness review's Critical and Important items are addressed in
   this wave, pending that re-review.
