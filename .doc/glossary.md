@@ -18,7 +18,7 @@ docs use these words and no synonyms. Add a term here before using it anywhere e
 
 A frontend slice is named as its package's `AGENTS.md` says: Next features are actions
 (`feature/<action>`); React, Angular and Vue features mirror the server's modules or a screen group
-(`features/<noun>`), so a frontend module shares the server module's noun. The glossary still
+(`pages/<noun>`), so a frontend module shares the server module's noun. The glossary still
 lists each action beside the nouns, in the same table (for example `refresh`: re-read an
 entity's data, `feature/refresh-health` in Next).
 

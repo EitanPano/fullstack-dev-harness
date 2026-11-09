@@ -12,8 +12,8 @@ Applies to every frontend package.
   those utilities only, never a literal colour or size.
 - One toast library and one icon set per package, concise action-oriented toasts, the same
   icon for the same concept everywhere.
-- No inline styles and no stylesheet outside the styling tree the package's `AGENTS.md ›
-  Styling` names.
+- No inline styles, and no stylesheet where the package's `AGENTS.md › Styling` puts none (its
+  global tree; in an SPA also a sibling of its owner).
 - Semantic HTML, labelled controls, keyboard reachability. Every route has a loading and an
   error state, its own or its group's; every data section has a skeleton that matches its
   layout.
