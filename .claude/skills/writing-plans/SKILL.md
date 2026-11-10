@@ -75,7 +75,8 @@ In this order, with these exact headings:
   view), `workspace` (a board, canvas or editor), `confirm` (a destructive confirm), `landing`
   (a home or content page). Empty, loading and error are states, not patterns.
 
-  The first task with a frontend stage starts `UX` with `- shell — <regions, each with its contents> — theme toggle: <place> — account: <place | none> — from: <Reference app | brief>`.
+  A plan whose `UX` names a route opens it with the template's `shell` line
+  (`ui-design › Shell`).
 - `Steps`: per package, one line per module or feature.
 - `Changes during the task` is empty at the start; the driver writes it.
 
