@@ -34,8 +34,7 @@ importers, and list the old path there. The driver removes it.
    goes in the report as `Tests first:`.
 4. **Implement** per `frontend/AGENTS.md › Adding a feature`, with a loading and an error
    state on every route (its own or its group's), a skeleton per new data
-   section, and the plan's `UX` section as the brief for each route; its `shell` line names
-   all the chrome the app is to have.
+   section, and the plan's `UX` section as the brief for each route; its `shell` line is all the chrome you build.
 5. **Gates**: `node scripts/verify.mjs --plan <plan> --package frontend --no-e2e --reuse`
    until it exits 0, then stop with `E2E: pending backend` when the plan has a backend stage.
    Without one, run `node scripts/verify.mjs --plan <plan> --package frontend --reuse` (it

@@ -41,8 +41,7 @@ Contract and `Retired:` strings had landed.
    a recommended answer. Size it per `writing-plans › Sizing a product task`; other hardening
    goes under `Out` as a proposed backlog line.
 5. Fill `Retired:` with the exact names and paths the task renames or removes, or `none`. For
-   each UX route choose a pattern and a tone, and copy or write the `shell` line, per the
-   `ui-design` skill.
+   each UX route choose a pattern and a tone, and write the `shell` line when it is due, per the `ui-design` skill.
 6. Save as `.orchestrate/<slug>/plan.md` with `Status: draft` and `Base:` left as the
    placeholder (the driver promotes the draft to `.plan/` and writes the Base), and print the
    path on the last line of your response.

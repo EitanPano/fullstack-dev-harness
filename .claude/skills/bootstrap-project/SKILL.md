@@ -175,8 +175,7 @@ Take the brand flags from the `Design` form; pass only the fields that hold a va
   unattended run does not stall.
 - When the generator rejects a brand value (an invalid hex, enum or name, or a colour pair it
   cannot make pass contrast) it names the flag: report it, ask for another value, re-run.
-- `Tone`, `Reference apps` and `Primary viewport` have no flag; the plans' `UX` lines read
-  them.
+- `Tone`, `Reference apps` and `Primary viewport` have no flag; the first frontend task's `shell` line reads them.
 - `node scripts/bootstrap.mjs --help` prints the usage and every flag.
 
 The run:
