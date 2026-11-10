@@ -38,9 +38,10 @@ acceptance criteria (AC numbers) it satisfies.>
 ## UX
 
 <Only when there is a frontend stage. Per route: its pattern (`list`, `detail`, `form`, `auth`,
-`dashboard`, `confirm`, `landing`), primary action, loading, empty and error states, tone and phone layout
-(`ui-design` skill). No copy strings.>
+`dashboard`, `workspace`, `confirm`, `landing`), primary action, loading, empty and error states, tone and phone layout
+(`ui-design` skill). No copy strings. The first task with a frontend stage starts with the `shell` line.>
 
+- shell — <regions, each with its contents> — theme toggle: <place> — account: <place | none> — from: <Reference app | brief>
 - /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>
 
 ## Steps

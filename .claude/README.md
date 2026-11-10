@@ -9,7 +9,7 @@ replaced on an update.
 
 1. A task is one line in `.plan/000-backlog.md`.
 2. The orchestrator drafts the plan into `.orchestrate/<slug>/plan.md`, with a `UX` line per
-   route (pattern, primary action, states, tone). You approve the draft; the driver then cuts the
+   route (pattern, primary action, states, tone) and, in the first frontend task, a `shell` line. You approve the draft; the driver then cuts the
    task's branch and promotes it to `.plan/NNN-YYYY-MM-DD-<slug>.md`. Once a task's implementers
    are running, the orchestrator plans the next backlog line in the background.
 3. The backend agent implements the plan's Contract and regenerates the server's contract (the
@@ -84,7 +84,8 @@ React, Angular and Vue are the single-page frontends. Next is for products whose
 must be found by search engines or show a rich preview when shared. The dev loop has exercised
 React and Next; Angular arrived in catalog v1.6.0, React's structure (Redux Toolkit, RTK Query and
 the global SCSS tree) in v1.7.0, Vue in v1.8.0, and v1.9.0 moved the three SPA trees to `pages/` and
-`components/` with co-located styles, so report any gap you meet.
+`components/` with co-located styles, and v1.10.0 removed the template header, navigation, footer and example
+screen; report any gap you meet.
 
 ## Updating the harness
 

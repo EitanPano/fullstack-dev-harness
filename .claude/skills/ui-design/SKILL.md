@@ -11,10 +11,17 @@ props are in the package's `frontend/AGENTS.md › Styling`; read it, do not res
 
 ## Inputs
 
-- `.doc/product-definition.md › Design`: Tone, Reference apps, Primary viewport, Density.
+- `.doc/product-definition.md › Design`: Tone, Reference apps (they decide the shell), Primary viewport, Density.
 - The plan's `UX` section, one line per route:
   `- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>`
 - `.doc/glossary.md` for every noun and action on screen.
+
+## Shell
+
+The first task with a frontend stage writes the plan's `shell` line; later tasks keep to it.
+Take the regions a Reference app shows for the same job (top bar, side nav, footer, each with
+its contents, and where the theme toggle and account menu sit); with "none", the least the
+scope needs. Build nothing the line does not name; a new screen adds a nav entry, not a region.
 
 ## Page decisions
 
@@ -24,16 +31,15 @@ props are in the package's `frontend/AGENTS.md › Styling`; read it, do not res
 - Spacing rhythm on the 4 px scale: 8 px inside a control group, 16 px between fields, 24 or
   32 px between sections (`Page` already sets 24 px).
 - Container width by pattern: form at the width the package's styling sets, list a 48 rem
-  column, dashboard full width.
+  column, dashboard and workspace full width; `auth` brings its own `h1`.
 - Status by `Badge` tone, always with its text label; never colour alone.
 - Density from the brief: a dense brief tightens rows, never the touch targets.
 
 ## Page patterns
 
 Pattern components: `Page`, `PageHeader`, `Section`, `EmptyState`, `ErrorState`,
-`ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog`. Use one before
-writing a layout by hand. These names are the React and Next ones (React keeps them in
-`shared/components/`); Angular's and Vue's equivalents are listed in their `AGENTS.md › Styling`.
+`ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog`: use one before
+a hand-written layout. These are the React and Next names; Angular's and Vue's are in their `AGENTS.md › Styling`.
 
 - **list**: `Page` > `PageHeader` (title, the create action) > `Section` with the rows in a
   48 rem column. Row: name, a status `Badge`, secondary text muted, row actions at the
@@ -56,6 +62,10 @@ writing a layout by hand. These names are the React and Next ones (React keeps t
   primary action) > `Section`s of content, each titled by meaning, in a 48 rem column. No
   form beside the primary action; a signed-out home links to `auth`. Empty and loading follow
   the section's own pattern.
+- **workspace** (a board, canvas or editor): a toolbar row with the `h1` (the open thing's
+  name) and the primary action; the surface fills the rest at full width and scrolls inside
+  itself, never the page. Loading: a skeleton of its columns or panes. Empty: `EmptyState`
+  inside the surface with the first create action.
 - **confirm** (a destructive confirm): `ConfirmDialog` only. The title names the thing, the
   body states the consequence, the confirm button is destructive and says the verb ("Delete
   plant"), the cancel is the default focus.
@@ -85,8 +95,9 @@ and `verify`; the passes judge only the judged ones.
 4. The brand accent used only for action and emphasis: one accent on calm neutrals. Judged.
 5. Status readable without colour. Judged.
 6. Empty, loading and error states designed, not left as defaults. Judged.
-7. A phone header that neither wraps nor cramps. Machine-checked: no horizontal overflow.
-   Judged: the header's wrap and crowding.
+7. The shell matches the plan's `shell` line: its regions and no others, laid out as the
+   Reference app does for the same job; a phone header that neither wraps nor cramps.
+   Machine-checked: no horizontal overflow. Judged: the rest.
 8. Dark mode legible. Machine-checked: the WCAG AA contrast scan in both themes. Judged:
    surfaces, borders and images still read.
 9. Copy concise and action-oriented. Judged.
