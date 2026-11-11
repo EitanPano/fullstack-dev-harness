@@ -43,9 +43,8 @@ legitimate use of it should survive. Retire a role value in literal form (`'admi
 `UserRole.admin`), never as a bare word an entity or a path also uses (`user`). Harness plans omit
 the line.
 
-The orchestrator writes the plan as a draft to `.orchestrate/<slug>/plan.md` (git-ignored). The
-driver promotes it to `.plan/NNN-YYYY-MM-DD-<slug>.md`, with the next free number, and writes
-`Base:` when it cuts the task's branch. Use the `Base:` placeholder until then.
+The driver promotes the draft to `.plan/NNN-YYYY-MM-DD-<slug>.md`, with the next free number,
+and writes `Base:` when it cuts the task's branch.
 
 New plans start as `Status: draft`. Only the human flips a plan to `active`, by editing
 the file. The review and QA stages run in parallel after the implementation stages and are not
@@ -73,7 +72,11 @@ In this order, with these exact headings:
   `- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>`
 
   The pattern is one of `list`, `detail`, `form`, `auth`, `dashboard` (a dashboard or a table
-  view), `confirm` (a destructive confirm), `landing` (a home or content page). Empty, loading and error are states, not patterns.
+  view), `workspace` (a board, canvas or editor), `confirm` (a destructive confirm), `landing`
+  (a home or content page). Empty, loading and error are states, not patterns.
+
+  A plan whose `UX` names a route opens it with the template's `shell` line
+  (`ui-design › Shell`).
 - `Steps`: per package, one line per module or feature.
 - `Changes during the task` is empty at the start; the driver writes it.
 

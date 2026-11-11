@@ -50,8 +50,8 @@ backlog marker overrides it for one task. The bootstrap passes the display name,
 radius, type, density and default theme to the frontend generator as flags.
 
 - Tone: <!-- FILL: two or three adjectives, e.g. calm, dense, playful -->
-- Reference apps: <!-- FILL: one to three products whose look is the target, or "none" -->
-- Display name: <!-- FILL: the product name shown in the header and the page title -->
+- Reference apps: <!-- FILL: one to three products whose layout and look are the target (the shell follows them), or "none" -->
+- Display name: <!-- FILL: the product name shown in the page title and where the design puts it -->
 - Primary colour: <!-- FILL: one hex value, e.g. #1d4ed8 -->
 - Neutral colour: <!-- FILL: one hex value, e.g. #64748b -->
 - Radius: <!-- FILL: sm | md | lg -->
