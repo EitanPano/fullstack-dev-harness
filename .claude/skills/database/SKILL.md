@@ -16,8 +16,8 @@ below. `docker compose up -d --wait <service>` starts the database service for l
 `migrate` and `e2eDb` arrive with the database. Commands are always resolved from
 `.fullstack/catalog.yaml`: when the bootstrap wired no database, the data-layer task's
 `Scaffold: --capability database=<engine>` brings the engine's files and records those three
-commands there, so the task adds none by hand. The production `migrate` run in the stack is in the `deployment` skill
-(section 4).
+commands there; an engine without a provider is built by hand (`data-layer-task.md`). The
+production `migrate` run in the stack is in the `deployment` skill (section 4).
 
 ## Choosing (bootstrap)
 
@@ -27,27 +27,25 @@ Ask the user one question: Postgres, MongoDB, or decide later.
   transactions span several writes, or reporting queries are expected.
 - MongoDB when records are document-shaped (nested, varying fields) and read mostly by
   id or owner.
-- Decide later when the first tasks need no persistence; the orchestrator refuses to plan
-  a task that stores data until the section is filled. The in-memory store keeps serving
-  and the first backlog task adds the engine.
+- Decide later when the first tasks need no persistence; the orchestrator refuses to plan a
+  task that stores data until the section is filled. The in-memory store serves meanwhile.
 
 The Data store answer in `.doc/architecture.md` records the engine the user names (or "decide
-later") and the client library (for example "Postgres 17 with an ORM" or "MongoDB 8 with the
-official driver"). Whether the server template lists a provider is a separate fact. When it lists
-one for the engine, the bootstrap generates it wired (`--capability database=<id>`): that is the
-data-layer task already done, and no such task is written. The package's `AGENTS.md › Adding the
-data layer` then describes what exists and how to change the model, and the rules under "Every
-engine" and "What the shipped code assumes of the store" still bind every later change. When it
-lists none, the first backlog line is `- [ ] add the <engine> data layer | stack:backend`; for
-"decide later" it is the same line with the engine left for the task to fill (`add the data layer`).
+later") and the client library (for example "Postgres 17 with an ORM"). Whether the server
+template lists a provider is a separate fact. When it lists one for the engine, the bootstrap
+generates it wired (`--capability database=<id>`): that is the data-layer task already done, and
+no such task is written. The package's `AGENTS.md › Adding the data layer` describes what exists,
+and the rules under "Every engine" and "What the shipped code assumes of the store" still bind
+every later change. When it lists none, the first backlog line is
+`- [ ] add the <engine> data layer | stack:backend`; for "decide later" the engine is left for
+the task (`add the data layer`).
 
 ## The data-layer task
 
-Only when the bootstrap wired no provider: `.fullstack/catalog.yaml` has `providers: {}` and the
-task is the backlog line `add the <engine> data layer` or `add the data layer`; its plan carries
-`Scaffold: --capability database=<engine>` (with `--stack <id>` when there is no server), and
-the task builds the product's models on what the
-scaffold brought. Its deliverables, the e2e database chain included, are in
+Only when the bootstrap wired no provider (`providers: {}` in `.fullstack/catalog.yaml`): the
+backlog line `add the <engine> data layer` or `add the data layer`. Its plan carries
+`Scaffold: --capability database=<engine>` (with `--stack <id>` without a server) for an engine
+with a provider, else the hand-built branch. Its deliverables, the e2e chain included, are in
 `.claude/skills/database/data-layer-task.md`. Read that file before planning or starting the
 task; no other task needs it.
 

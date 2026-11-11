@@ -72,7 +72,8 @@ Never run a scaffolder inside an existing package, except one the package's `AGE
 
 ## Architecture
 
-Each package exists when the product needs it, added only by `scripts/scaffold.mjs`; layer maps: each package's `AGENTS.md`.
+A package exists when the product needs it: the bootstrap creates the first, `scripts/scaffold.mjs`
+adds later ones; layer maps: its `AGENTS.md`.
 
 - Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
   `middleware/`, `services/`, `infra/`. Modules meet only through controllers; never import

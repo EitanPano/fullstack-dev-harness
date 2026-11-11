@@ -53,8 +53,7 @@ names, roles or password rule is a gap:
   that needs it (e.g. "roles `member` and `staff` replace `user` and `admin`; decided in the task
   that adds the first gate"). Change no template code.
 - That task's plan carries `Retired:` with the template's old terms (`writing-plans`), role
-  values in literal form (`'admin'`, `UserRole.admin`), never a bare word the entity or a path
-  shares (`user`). Without it the rename arrives unannounced in a later task's plan.
+  values in literal form (`'admin'`, `UserRole.admin`), never a bare word like `user`.
 - After section 3, confirm the defaults in the generated package: entity and gates in its
   `AGENTS.md › Authentication`, password bounds in `models/user/constants`
   (`USER_LIMITS.password`). Add any gap they show.
@@ -83,12 +82,10 @@ fact, settled in section 2; when it does, the generator wires it and section 5 f
 section from what was generated.
 
 **Auth.** Scaffold a product with no accounts (Auth: none) with `--flag auth=false`; any other
-answer keeps the server template's authentication (its `auth` flag on, the default). The scaffold
-resolves the `auth` markers in the Auth section of `.doc/architecture.md` (section 3): under
-`none` it keeps the "Auth: none" text and drops the shipped default and the roles marker. So for
-`none`, leave the marked text alone and answer no FILL marker inside an `<!-- auth-start -->`
-block. Never edit the glossary's marked auth rows (`session`, `caller`, `OTP`, `target`): the
-scaffold removes them under `none` and keeps them otherwise.
+answer keeps the server template's authentication (`auth` on, the default). The scaffold resolves
+the `auth` markers in `.doc/architecture.md › Auth` (section 3): under `none` it keeps "Auth:
+none", so answer no FILL marker inside an `<!-- auth-start -->` block. Never edit the glossary's marked auth rows (`session`, `caller`,
+`OTP`, `target`): the scaffold removes them under `none` and keeps them otherwise.
 
 Stop when the product definition's "Ready to plan" checklist is satisfied. Do not scaffold while
 a marker remains in a section the checklist names.
@@ -119,8 +116,8 @@ store "decide later".
 
 Ask each remaining choice in turn: the frontend framework when the kept stacks differ in it (name
 the options by template id: `frontend/react`, `frontend/angular`, `frontend/vue`), then the
-server. Show the chosen stack with its reason (e.g. "single-page app: no public page needs search
-or sharing") and accept an override. Ask every flag the templates declare (show its `summary` and
+server. Show the chosen stack with its reason (e.g. "single-page app: no public page needs search")
+and accept an override. Ask every flag the templates declare (show its `summary` and
 `default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
 
@@ -128,10 +125,9 @@ or sharing") and accept an override. Ask every flag the templates declare (show 
 `static`. Put the tradeoff in two lines and map the answer to `--deploy <single|split>`:
 
 - `single` (the default): one container and one port; the server serves the built frontend and
-  the API, so no CORS and no frontend container. It needs the Docker Compose floor stated in the
-  `deployment` skill (section 1): name it to the user and run `docker compose version` against
-  it before accepting `single`. On an older client, say so and offer `split` or an
-  upgrade; do not scaffold `single`.
+  the API, so no CORS and no frontend container. It needs the Compose floor in the `deployment`
+  skill (section 1): name it and run `docker compose version` before accepting `single`. On an
+  older client, offer `split` or an upgrade; do not scaffold `single`.
 - `split`: a static-server image per frontend that proxies `/api` to the server, for separate
   scaling or hosting of the frontend.
 
@@ -140,10 +136,9 @@ A frontend without `static` (Next) is always `split`: do not ask, pass no `--dep
 
 **Database provider.** Ask it here when the template lists one
 (`capabilities.database.providers`). When the template lists the engine the user named in
-section 1, the provider fixes the client library (the package's
-`AGENTS.md › Adding the data layer` names it): tell the user and confirm. On a yes, pass
-`--capability database=<id>` and write no data-layer backlog line, because the generator wired
-the engine. On a no, pass no capability and write that line.
+section 1, the provider fixes the client library (the package's `AGENTS.md › Adding the data
+layer` names it): tell the user and confirm. On a yes, pass `--capability database=<id>` and write
+no data-layer line. On a no, pass no capability and write that line.
 
 **Tools.** Before scaffolding, check each chosen template's `tools` (name and minimum version, in
 its `template.yaml`) against the machine, e.g. `uv --version` for a Python backend. Name any
@@ -277,12 +272,11 @@ Do each item; the dev loop refuses to start until the last one holds.
    data-layer line. With a server and no database provider passed at generation, the first line
    is `- [ ] add the <engine> data layer | stack:backend` for a named engine, or
    `- [ ] add the data layer | stack:backend` for "decide later" (the `database` skill says what
-   that task delivers). The first in-scope capability from the product definition is the first
-   line with a provider, the next line without one. Set `tracker:` in the backlog header to
+   that task delivers). The first in-scope capability is the first line with a provider, the next line without one. Set `tracker:` in the backlog header to
    `linear` or `none` as the user prefers.
 2. **Architecture rows.** Fill `.doc/architecture.md` per the table in
-   `.claude/skills/dev-loop/scaffold-step.md`: all rows; for a lone frontend only `Stack`, and
-   `n/a: no server yet` in the Client model, Deployment, Data store and Data migrations places.
+   `.claude/skills/dev-loop/scaffold-step.md`: all rows; a lone frontend only `Stack`, and
+   `n/a: no server yet` in the table's other places.
 3. **README.** In `README.md`, replace `<!-- readme:about -->` with About, written from Purpose
    and Problem Statement, and `<!-- readme:features -->` with Features: the in-scope capabilities
    from Product Scope, one line each, written `- <capability> (planned)` (nothing is built yet);

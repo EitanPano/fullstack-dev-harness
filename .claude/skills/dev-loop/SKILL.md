@@ -251,7 +251,7 @@ again. Task N+1's branch is cut from task N's branch.
 
 - One agent per stage, named exactly `orchestrator`, `backend`, `frontend`, `reviewer`,
   `qa`; the hooks key write lanes on those names.
-- Pass paths, not file contents.
+- Pass paths, not file contents; the plan's `Base:` line gives the diff base.
 - Never dispatch an implementer against a `draft` plan, or before the draft is promoted to `.plan/`.
 - Sonnet for implementers and QA, Opus for orchestrator and reviewer: set in each agent's
   frontmatter and passed explicitly as `model`.

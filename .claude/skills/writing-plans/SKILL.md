@@ -45,7 +45,9 @@ legitimate use of it should survive. Retire a role value in literal form (`'admi
 the line.
 
 `Scaffold:` names a part `.fullstack/catalog.yaml` lacks that the task needs (a server:
-`--stack <id>`; a flag: `--flag <name>=true`; a capability: `--capability <kind>=<id>`); else `none`.
+`--stack <id> --flag auth=<true|false>`, the flag from the product definition's Auth answer, plus
+`--deploy <single|split>` with a frontend; a flag: `--flag <name>=true`; a capability:
+`--capability <kind>=<id>`); else `none`. Stack ids: `stacks:` in the catalog's `index.yaml`.
 
 The driver promotes the draft to `.plan/NNN-YYYY-MM-DD-<slug>.md`, with the next free number,
 and writes `Base:` when it cuts the task's branch.
