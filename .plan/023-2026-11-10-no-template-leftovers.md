@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Eitan
-Last updated: 2026-11-10
+Last updated: 2026-11-11
 Input: ADR 0010 at the catalog's `docs/adr/0010-no-chrome-no-example-screen.md` on `feat/no-chrome`
 (accepted by Eitan on 2026-11-10: "accept the ADR"): D1 the skeleton, D2 the components the product places, D3 no example
 screen, D4 sign out, D5 tests, D6 documents, D7 release, D8 the harness, spike S0.
@@ -309,3 +309,14 @@ Waves: C0 → C1 → (C2 ∥ C3 ∥ C4) → C5 → C6. H1 runs from G1 in parall
   load two git calls of the harness suite hung at zero CPU. The suites ran green with the
   monitor off for the test process (scripts 275 of 275, hooks 1702 of 1702). Proposed backlog
   line: `- [ ] tests: make the temp-repository fixtures immune to the system git config`.
+- 2026-11-11 — R29: Angular's restored service-worker guards pass vacuously while no data group
+  exists; a seeded example for `matches()` is a proposed backlog line. R30: while an orphaned API
+  held port 4000, the five cases on the Python server ran first on the final tree (6b3e7ae), all
+  green, Angular's post-fix e2e among them; on Eitan's word the orphan was stopped. The Vue and
+  Angular captures match the baselines on phone (6 of 6) and move only in x on desktop (R12).
+- 2026-11-11 — G3 and G4, on Eitan's word ("merge the PRs", "merge all to dev, we will do it
+  optimistic", "merge dev to main and tag v1.10.0"): harness #54 → `dev` 61e5f3b; catalog #29 →
+  `dev` 90ff925 (52 of 52 CI checks, the local `frontend/` run still going); #30 dates the four
+  changelog entries 2026-11-11; #31 → `main` 28d557c, tagged `v1.10.0` from the ledger's release
+  notes (release run 42958874812). R18 to R28 reached `main` on that word, not on a separate
+  ratification. H3: this `catalog.lock` bump to v1.10.0 / 28d557c; `minCatalog` stays v1.5.0.
