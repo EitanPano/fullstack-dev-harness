@@ -41,6 +41,7 @@ holds a marker. Delete a marker only by replacing it with a decision.
 - Performance: <!-- FILL: e.g. first page under 2 s on a 4G connection -->
 - Locale: <!-- FILL: single language (which) | multiple (which) -->
 - Search and sharing: <!-- FILL: yes | no. Do any public pages need to be found by search engines or show a rich preview when shared? -->
+- Server: <!-- FILL: now | later. "now" when v1 has accounts, data that must outlive this browser or reach another person, a secret, or a schedule -->
 - Data retention and privacy: <!-- FILL: anything the product must or must not keep -->
 
 ## Design

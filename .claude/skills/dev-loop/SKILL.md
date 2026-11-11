@@ -103,8 +103,10 @@ When the draft is active, cut the branch and promote the draft:
 
 1. Create `feat/<slug>` (or `fix/`, `chore/`) from the current branch; after a committed task,
    that is the task's branch.
-2. Copy the draft to `.plan/NNN-YYYY-MM-DD-<slug>.md` with the next free number, and write
-   `Branch:` and `Base:` (`git rev-parse HEAD`) in it. `verify --plan` reads this file.
+2. A `Scaffold:` other than `none`: run `.claude/skills/dev-loop/scaffold-step.md` now.
+3. Copy the draft to `.plan/NNN-YYYY-MM-DD-<slug>.md` with the next free number, and write
+   `Branch:` and `Base:` (`git rev-parse HEAD`, the scaffold commit if any) in it. `verify --plan`
+   reads this file.
 
 If `tracker: linear` and the Linear tool is available, dispatch the orchestrator once more to
 create one ticket per stage (Todo, medium priority, plan path in the description) and write
@@ -123,13 +125,10 @@ id and (frontend) the figma URL if any.
    `contract` command, its report, then stop. The contract is final after this stage.
 2. Then, in one message, SendMessage to that backend agent ("continue: implement the rest of
    the plan") and dispatch `frontend`. With no backend stage, or no Contract section, backend
-   and frontend start together in one message. A backend report's `Commands:` line (the
-   data-layer task adds `testDb`, `migrate` and `e2eDb`; only names from the `AGENTS.md` command
-   table count, any other command stays in the report's `Handoff:`) is written into
-   `.fullstack/catalog.yaml` under `packages.<dir>.commands` as soon as it arrives, before any
-   later frontend dispatch and before the next `verify`. A full-stack data-layer task therefore
-   runs its backend stage first; read `.claude/skills/database/data-layer-task.md` before you
-   dispatch its frontend stage, which needs three template files from you (item 7).
+   and frontend start together in one message. A backend report's `Commands:` line (only
+   names from the `AGENTS.md` command table count, any other command stays in the report's
+   `Handoff:`) is written into `.fullstack/catalog.yaml` under `packages.<dir>.commands` as soon
+   as it arrives, before the next `verify`.
 3. The frontend stops after `check` with `E2E: pending backend` in its report when a backend
    stage exists. Its e2e runs the production build and starts the API itself. Once the backend
    reports, SendMessage it "backend ready: run `verify --package frontend --reuse` (with

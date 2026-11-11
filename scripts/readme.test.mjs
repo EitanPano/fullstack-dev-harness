@@ -6,10 +6,13 @@ import path from 'node:path'
 import { after, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
+  PACKAGE_BLOCKS,
   extractConfiguration,
   parseEnvExample,
   renderConfiguration,
+  renderPackageBlocks,
   replaceConfiguration,
+  replacePackageBlocks,
 } from './readme.mjs'
 
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'readme.mjs')
@@ -172,6 +175,119 @@ test('the CLI fails with one line on a missing README or markers, usage on bad a
   assert.equal(bad.status, 2)
   assert.match(bad.stderr, /usage/)
   assert.equal(cli(root).status, 2)
+})
+
+// A catalog checkout holds only the template.yaml files the tool lists are read from.
+const CATALOG_YAML = (pkgs) =>
+  `deploy: split\npackages:\n${pkgs
+    .map(
+      ([dir, template, port]) =>
+        `  ${dir}:\n    template: ${template}\n    commands:\n      install: bun install\n` +
+        `      dev: bun run dev\n      check: bun run check\n    http:\n      port: ${port}\n`,
+    )
+    .join('')}`
+const TEMPLATES = {
+  'frontend/react/template.yaml': "tools:\n  - { name: bun, min: '1.4' }\n",
+  'server/bun-express/template.yaml': "tools:\n  - { name: uv, min: '0.12' }\n",
+}
+const LOCK = JSON.stringify({
+  repository: 'https://example.test/c',
+  version: 'v1.0.0',
+  commit: 'a'.repeat(40),
+})
+const pair = (name, body) => `<!-- ${name}:start -->\n${body}\n<!-- ${name}:end -->`
+const blocksReadme = (extra = '') =>
+  `# T\n\n${PACKAGE_BLOCKS.map((n) => pair(n, `old ${n}`)).join('\n\n')}\n\n` +
+  `${START}\nstale\n${END}\n${extra}`
+
+function project(pkgs, readme) {
+  const catalog = mkdtempSync(path.join(tmpdir(), 'readme-cat-'))
+  bases.push(catalog)
+  for (const [file, text] of Object.entries({ 'index.yaml': 'schemaVersion: 1\n', ...TEMPLATES })) {
+    mkdirSync(path.dirname(path.join(catalog, file)), { recursive: true })
+    writeFileSync(path.join(catalog, file), text)
+  }
+  const root = repo({
+    '.fullstack/catalog.yaml': CATALOG_YAML(pkgs),
+    'catalog.lock': LOCK,
+    'README.md': readme,
+  })
+  return { root, catalog }
+}
+
+test('renderPackageBlocks wraps every block in its own marker pair', () => {
+  const { root, catalog } = project([['frontend', 'frontend/react', 3000]], '# T\n')
+  const blocks = renderPackageBlocks(root, catalog, { name: 'demo' })
+  assert.deepEqual(Object.keys(blocks), PACKAGE_BLOCKS)
+  for (const name of PACKAGE_BLOCKS) {
+    assert.ok(blocks[name].startsWith(`<!-- ${name}:start -->\n`), name)
+    assert.ok(blocks[name].endsWith(`\n<!-- ${name}:end -->`), name)
+  }
+  assert.match(blocks.prerequisites, /- bun 1\.4\+/)
+  assert.match(blocks.installation, /git clone <repository-url>\ncd demo\n# frontend\ncd frontend\nbun install/)
+  assert.match(blocks['usage-notes'], /http:\/\/localhost:3000/)
+  assert.doesNotMatch(blocks['usage-notes'], /[Cc]ompose/)
+})
+
+test('replacePackageBlocks swaps the text between the markers and nothing else', () => {
+  const text = blocksReadme('Tail\n')
+  const out = replacePackageBlocks(text, { usage: pair('usage', 'NEW') })
+  assert.ok(out.includes(pair('usage', 'NEW')))
+  assert.ok(!out.includes('old usage\n'))
+  assert.ok(out.includes('old tests') && out.endsWith('Tail\n'))
+  assert.equal(replacePackageBlocks(text.replace(/\n/g, '\r\n'), {}).includes('\r\n'), true)
+})
+
+test('replacePackageBlocks names the block whose markers are missing or doubled', () => {
+  assert.throws(() => replacePackageBlocks('# T\n', { tests: 'x' }), /<!-- tests:start -->/)
+  const twice = `${pair('tests', '')}\n${pair('tests', '')}`
+  assert.throws(() => replacePackageBlocks(twice, { tests: 'x' }), /exactly one/)
+})
+
+test('--packages re-renders the blocks after a part is added, keeping the clone lines', () => {
+  const { root, catalog } = project([['frontend', 'frontend/react', 3000]], '')
+  const first = renderPackageBlocks(root, catalog, { name: 'demo' })
+  writeFileSync(path.join(root, 'README.md'), `# T\n\n${Object.values(first).join('\n\n')}\n\nTail\n`)
+  writeFileSync(
+    path.join(root, '.fullstack', 'catalog.yaml'),
+    CATALOG_YAML([
+      ['frontend', 'frontend/react', 3000],
+      ['backend', 'server/bun-express', 4000],
+    ]),
+  )
+  const run = cli(root, '--packages', '--templates', catalog)
+  assert.equal(run.status, 0, run.stderr)
+  const text = readFileSync(path.join(root, 'README.md'), 'utf8')
+  assert.match(text, /- uv 0\.12\+/)
+  assert.match(text, /cd demo\n# frontend\ncd frontend\nbun install\ncd \.\.\n# backend\ncd backend/)
+  assert.ok(text.endsWith('\n\nTail\n'))
+  assert.equal(cli(root, '--packages', '--templates', catalog).status, 0)
+  assert.equal(readFileSync(path.join(root, 'README.md'), 'utf8'), text)
+})
+
+test('--packages with --configuration does both', () => {
+  const { root, catalog } = project([['frontend', 'frontend/react', 3000]], blocksReadme())
+  const run = cli(root, '--packages', '--configuration', '--templates', catalog)
+  assert.equal(run.status, 0, run.stderr)
+  const text = readFileSync(path.join(root, 'README.md'), 'utf8')
+  assert.ok(!text.includes('old prerequisites') && !text.includes('stale'))
+  assert.match(text, /This project reads no environment variables/)
+})
+
+test('--packages on a README without the markers fails clearly and writes nothing', () => {
+  const { root, catalog } = project([['frontend', 'frontend/react', 3000]], '# T\n')
+  const run = cli(root, '--packages', '--templates', catalog)
+  assert.equal(run.status, 1)
+  assert.match(run.stderr, /<!-- prerequisites:start -->/)
+  assert.equal(readFileSync(path.join(root, 'README.md'), 'utf8'), '# T\n')
+})
+
+test('--packages reports an unusable catalog lock as one line', () => {
+  const { root, catalog } = project([['frontend', 'frontend/react', 3000]], blocksReadme())
+  writeFileSync(path.join(root, 'catalog.lock'), '{}')
+  const run = cli(root, '--packages', '--templates', catalog)
+  assert.equal(run.status, 1)
+  assert.match(run.stderr, /catalog\.lock/)
 })
 
 describe('readme', { concurrency: 6 }, () => {

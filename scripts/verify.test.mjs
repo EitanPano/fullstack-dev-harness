@@ -87,7 +87,7 @@ async function freePort() {
 
 // A repository with a server package (`backend`) and a frontend, committed, with a plan whose
 // Base is that commit. `commands` overrides one command of one package.
-async function fixture({ commands = {}, ports, noDb = false, plan = true } = {}) {
+async function fixture({ commands = {}, ports, noDb = false, plan = true, compose = false } = {}) {
   const base = mkdtempSync(path.join(tmpdir(), 'verify-'))
   bases.push(base)
   const root = path.join(base, 'repo')
@@ -136,6 +136,7 @@ async function fixture({ commands = {}, ports, noDb = false, plan = true } = {})
   writeFileSync(path.join(root, 'backend', 'app.ts'), 'export const a = 1\n')
   writeFileSync(path.join(root, 'frontend', 'app.ts'), 'export const b = 1\n')
   if (noDb) writeFileSync(path.join(base, 'no-db'), '')
+  if (compose) writeFileSync(path.join(root, 'docker-compose.yml'), 'services: {}\n')
   git(root, 'init', '-q')
   git(root, 'config', 'user.email', 't@example.com')
   git(root, 'config', 'user.name', 't')
@@ -470,7 +471,7 @@ test('a package without a contract command is skipped, not failed', async () => 
 })
 
 test('a full run fails when the database service exists and no package has testDb', async () => {
-  const fx = await fixture({ commands: { backend: { testDb: null } } })
+  const fx = await fixture({ commands: { backend: { testDb: null } }, compose: true })
   const { exit } = await runVerify(opts(fx).options)
   const check = read(fx).checks.find((entry) => entry.name === 'testdb-defined')
   assert.equal(exit, 1)
@@ -629,6 +630,32 @@ test('a frontend-only e2e run still starts the database and migrates the server'
   assert.ok(runs(fx).includes('marker'))
   assert.match(docker, /up -d --wait database/)
   assert.equal(read(fx, 'verify-partial.json').packages.backend.migrate.ok, true)
+})
+
+// No server, so no testDb, migrate or Compose file: a lone frontend package.
+const NO_DB = { backend: { testDb: null, migrate: null } }
+
+test('without a Compose file or a testDb command a full run never needs docker', async () => {
+  const fx = await fixture({ commands: NO_DB })
+  const { exit, result } = await runVerify(opts(fx, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(exit, 0)
+  assert.notEqual(result.reason, 'docker unavailable')
+  assert.equal(read(fx).ok, true)
+  assert.equal(existsSync(path.join(fx.base, 'docker.log')), false)
+})
+
+test('with a Compose file a full run still reports a missing docker', async () => {
+  const fx = await fixture({ commands: NO_DB, compose: true })
+  const { exit, result } = await runVerify(opts(fx, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(exit, 2)
+  assert.equal(result.reason, 'docker unavailable')
+})
+
+test('a testDb command alone still needs docker', async () => {
+  const fx = await fixture()
+  const { exit, result } = await runVerify(opts(fx, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(exit, 2)
+  assert.equal(result.reason, 'docker unavailable')
 })
 
 test('a missing docker is an environment error, exit 2', async () => {
