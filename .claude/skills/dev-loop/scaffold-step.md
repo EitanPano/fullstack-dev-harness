@@ -5,9 +5,10 @@ draft is copied to `.plan/`. The arguments are in the draft, `.orchestrate/<slug
 
 1. Run `node scripts/scaffold.mjs <the line's arguments> --slug <slug>`. The driver does every
    step; no role agent runs before the draft is promoted.
-2. Exit 0: fill the table below and the README blocks, run `node scripts/verify.mjs --out .orchestrate/<slug>/scaffold`, then ask for the
-   commit (under delegated approval, make it) with the line the script printed. The plan's
-   `Base:` is that commit.
+2. Exit 0: fill the table below and the README blocks, run
+   `node scripts/verify.mjs --out .orchestrate/<slug>/scaffold`, then ask for the commit (under
+   delegated approval, make it) with the line the script printed. The plan's `Base:` is that
+   commit.
 3. Exit 1: `.orchestrate/<slug>/scaffold/conflicts.md` lists the conflicts. With markers, keep the
    product's change and take the part's. A line without markers (deleted here and changed by the
    part, binary, add/add) is a keep-or-delete decision; the part's copy is at

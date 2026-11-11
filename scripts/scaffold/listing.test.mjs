@@ -28,6 +28,22 @@ describe('listFiles', () => {
       else process.env.GIT_CONFIG_GLOBAL = saved
     }
   })
+  it("lists every file, whatever git's default XDG ignore file ignores", () => {
+    const dir = path.join(top, 'xdg-tree')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(path.join(dir, 'server.txt'), 'x\n')
+    const xdg = path.join(top, 'xdg')
+    mkdirSync(path.join(xdg, 'git'), { recursive: true })
+    writeFileSync(path.join(xdg, 'git', 'ignore'), 'server.txt\n')
+    const saved = process.env.XDG_CONFIG_HOME
+    process.env.XDG_CONFIG_HOME = xdg
+    try {
+      assert.deepEqual(listFiles(dir), ['server.txt'])
+    } finally {
+      if (saved === undefined) delete process.env.XDG_CONFIG_HOME
+      else process.env.XDG_CONFIG_HOME = saved
+    }
+  })
   it('fails with exit 3 naming git when a git call fails', () => {
     assert.throws(
       () => listFiles(path.join(top, 'missing')),

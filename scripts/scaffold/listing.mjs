@@ -1,6 +1,6 @@
 // The files a generated tree holds, as git tracks them. Git runs apart from the user's and the
-// system's configuration: a global excludesFile would hide generated files, and autocrlf or
-// safecrlf could change or refuse them.
+// system's configuration: an excludes file (set, or XDG's default `git/ignore`) would hide
+// generated files, and autocrlf or safecrlf could change or refuse them.
 import { spawnSync } from 'node:child_process'
 import os from 'node:os'
 import process from 'node:process'
@@ -9,6 +9,8 @@ import { ScaffoldError } from './request.mjs'
 // os.devNull is `\\.\nul` on Windows, a path git cannot open.
 const NO_CONFIG = process.platform === 'win32' ? 'NUL' : os.devNull
 const ISOLATED = [
+  '-c',
+  `core.excludesFile=${NO_CONFIG}`,
   '-c',
   'core.fsmonitor=false',
   '-c',
