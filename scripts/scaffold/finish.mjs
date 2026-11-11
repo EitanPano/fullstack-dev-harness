@@ -25,20 +25,35 @@ function packageOf(provenance, rel) {
   return dirs.find((dir) => rel === dir || rel.startsWith(`${dir}/`))
 }
 
-// conflicts.md is a checklist: the resolving agent writes `- [x]` after deciding. A conflict
-// without markers (a file kept, a file deleted) is otherwise invisible to `--complete`.
-export function writeConflicts(root, slug, conflicts, next, parts) {
+// The command that finishes a scaffold, with the run's slug and templates override.
+export function completeCommand({ slug, templates }) {
+  const override = templates === undefined ? '' : ` --templates ${templates}`
+  return `node scripts/scaffold.mjs --complete --slug ${slug}${override}`
+}
+
+// conflicts.md is a checklist: the driver writes `- [x]` after deciding. A conflict without
+// markers (a file kept, a file deleted) is otherwise invisible to `--complete`; where the part
+// has a copy the resolver cannot see in the tree, it is saved under `next/` and named on the line.
+export function writeConflicts(root, options, conflicts, next, parts) {
+  const slug = options.slug
   const dir = scaffoldDir(root, slug)
   mkdirSync(dir, { recursive: true })
-  const rows = conflicts.map(({ path: rel, conflict }) => {
+  const rows = conflicts.map(({ path: rel, conflict, markers, nextCopy }) => {
     const pkg = packageOf(next, rel)
     const owner = pkg === undefined ? 'driver' : ownerOf(next, pkg)
-    return `- [ ] ${rel} ${DASH} ${pkg ?? '.'} ${DASH} ${owner} ${DASH} ${conflict}`
+    let row = `- [ ] ${rel} ${DASH} ${pkg ?? '.'} ${DASH} ${owner} ${DASH} ${conflict}`
+    if (!markers && nextCopy !== undefined) {
+      const copy = path.join(dir, 'next', rel)
+      mkdirSync(path.dirname(copy), { recursive: true })
+      writeFileSync(copy, nextCopy)
+      row += ` ${DASH} next: .orchestrate/${slug}/scaffold/next/${rel}`
+    }
+    return row
   })
   const list = [
     '# Scaffold conflicts',
     '',
-    'Resolve each file, check it off (`- [x]`), then run `node scripts/scaffold.mjs --complete`.',
+    `Resolve each file, check it off (\`- [x]\`), then run \`${completeCommand(options)}\`.`,
     'A file with merge markers must lose them; one without markers must be checked off.',
     '',
     ...rows,
@@ -83,7 +98,8 @@ export function removeState(root, slug) {
 export function openConflicts(root, slug, conflicts) {
   const file = path.join(scaffoldDir(root, slug), 'conflicts.md')
   const lines = existsSync(file) ? readFileSync(file, 'utf8').split(/\r?\n/) : []
-  const checked = (rel) => lines.some((line) => line.startsWith(`- [x] ${rel} ${DASH} `))
+  const checked = (rel) =>
+    ['x', 'X'].some((mark) => lines.some((l) => l.startsWith(`- [${mark}] ${rel} ${DASH} `)))
   return conflicts
     .filter(({ path: rel, markers }) => {
       if (!markers) return !checked(rel)
@@ -94,14 +110,14 @@ export function openConflicts(root, slug, conflicts) {
 }
 
 // Same shell form as `verify`; a multi-line command runs line by line.
-function run(root, dir, name, command) {
+function run(root, dir, name, command, again) {
   for (const line of command.split('\n').filter((l) => l.trim() !== '')) {
     console.log(`  ${dir}: ${line}`)
     const result = spawnSync(line, { cwd: path.join(root, dir), shell: true, stdio: 'inherit' })
     if (result.status !== 0) {
       throw new ScaffoldError(
         `${dir} ${name} failed (${result.error?.message ?? `exit ${result.status}`}); fix it, ` +
-          'then run `node scripts/scaffold.mjs --complete` again',
+          `then run \`${again}\` again`,
         3,
       )
     }
@@ -109,11 +125,11 @@ function run(root, dir, name, command) {
 }
 
 // install for every package, then contract, then format; NEXT's order puts producers first.
-export function finish(root, next, catalog) {
+export function finish(root, next, catalog, again) {
   assertConfined(root, Object.keys(next.packages), 'package directory')
   for (const name of ['install', 'contract', 'format']) {
     for (const [dir, pkg] of Object.entries(next.packages)) {
-      if (pkg.commands?.[name] !== undefined) run(root, dir, name, pkg.commands[name])
+      if (pkg.commands?.[name] !== undefined) run(root, dir, name, pkg.commands[name], again)
     }
   }
   const file = path.join(root, 'README.md')

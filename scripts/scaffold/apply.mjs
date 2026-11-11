@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
-import { assertConfined } from './confine.mjs'
+import { assertConfined, assertRealConfined } from './confine.mjs'
 import { ScaffoldError } from './request.mjs'
 
 const LOCKFILES = new Set([
@@ -154,8 +154,8 @@ function performAll(root, ops) {
     const written = done.length === 0 ? 'none' : done.join(', ')
     throw new ScaffoldError(
       `applying the scaffold failed (${error.message}); already written: ${written}. ` +
-        'The tree was clean before: run `git checkout -- .` and remove the untracked files ' +
-        '(`git clean -fd`, mind your own untracked files) to restore it, then run again',
+        'The tree was clean before: ask the user to restore the tree (changed files back to the ' +
+        'last commit, new files removed), then run again',
       3,
     )
   }
@@ -190,7 +190,10 @@ export function applyTrees({ root, baseDir, nextDir, baseFiles, nextFiles, tmp, 
     entries.push(entry)
 
     if (LOCKFILES.has(name)) {
-      if (base === undefined && next !== undefined && project === undefined) {
+      // A lock the project never touched takes the catalog's tested one, not a fresh resolve.
+      const untouched = base !== undefined && project?.equals(base) === true
+      const free = base === undefined && project === undefined
+      if (next !== undefined && (free || untouched) && !sameContent(base, next)) {
         entry.action = 'write'
         write(rel, next)
       } else entry.action = sameContent(base, next) ? 'nothing' : 'lockfile-left'
@@ -219,6 +222,7 @@ export function applyTrees({ root, baseDir, nextDir, baseFiles, nextFiles, tmp, 
         // git cannot merge a binary file: the project's copy stays, with no markers.
         entry.conflict = action === 'merge' ? 'binary file differs, cannot merge' : CASES[action]
         entry.markers = false
+        entry.nextCopy = next
       } else {
         if (merged.conflicts > 0) {
           entry.conflict = action === 'merge' ? 'merge conflict' : CASES[action]
@@ -229,8 +233,11 @@ export function applyTrees({ root, baseDir, nextDir, baseFiles, nextFiles, tmp, 
     } else if (CASES[action] !== undefined) {
       entry.conflict = CASES[action]
       entry.markers = false
+      entry.nextCopy = next
     }
   }
+  // Before any write: a directory link in the project must not lead outside it.
+  assertRealConfined(root, [...new Set(ops.map(([, rel]) => rel))])
   if (!dryRun) performAll(root, ops)
   return entries
 }

@@ -5,7 +5,10 @@ import { assertConfined, safeRelative } from './confine.mjs'
 import { ScaffoldError } from './request.mjs'
 
 const refuses = (fn) =>
-  assert.throws(fn, (e) => e instanceof ScaffoldError && e.exit === 2 && /outside|unsafe/.test(e.message))
+  assert.throws(
+    fn,
+    (e) => e instanceof ScaffoldError && e.exit === 2 && /outside|unsafe/.test(e.message),
+  )
 
 describe('safeRelative', () => {
   it('accepts plain relative POSIX paths', () => {

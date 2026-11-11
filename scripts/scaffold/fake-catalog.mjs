@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { resolveCommand } from '../catalog.mjs'
 
 const GENERATOR = `
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -52,24 +53,40 @@ const put = (rel: string, text: string) => {
   mkdirSync(path.dirname(file), { recursive: true })
   writeFileSync(file, text)
 }
-const gi = Object.values(pkgs).map((p: any) => '# --- fullstack-templates: ' + p.dir + ' ---\\n' + p.dir + '/dist/\\n')
+const gi = Object.values(pkgs).map(
+  (p: any) => '# --- fullstack-templates: ' + p.dir + ' ---\\n' + p.dir + '/dist/\\n',
+)
 put('.gitignore', gi.join('\\n'))
-put('run-step.cjs', "if (process.env.SCAFFOLD_TEST_FAIL && process.argv[2] === 'frontend' && process.argv[3] === 'install') process.exit(1)\\nrequire('node:fs').appendFileSync(process.env.SCAFFOLD_TEST_LOG || 'run.log', process.argv.slice(2).join(' ') + '\\\\n')\\n")
+const failing =
+  "process.env.SCAFFOLD_TEST_FAIL && process.argv[2] === 'frontend' && " +
+  "process.argv[3] === 'install'"
+const logging =
+  "require('node:fs').appendFileSync(process.env.SCAFFOLD_TEST_LOG || 'run.log', " +
+  "process.argv.slice(2).join(' ') + '\\\\n')"
+put('run-step.cjs', 'if (' + failing + ') process.exit(1)\\n' + logging + '\\n')
 for (const p of Object.values(pkgs) as any[]) {
   put(p.dir + '/package.json', '{"name":"' + p.dir + '"}\\n')
   put(p.dir + '/bun.lock', 'lock\\n')
   if (p.kind === 'frontend') {
-    put(p.dir + '/src/app.txt', 'title: app\\n1\\n2\\n3\\n4\\n5\\napi: ' + (hasServer ? 'yes' : 'none') + '\\npwa: ' + p.flags.pwa + '\\n')
+    const api = hasServer ? 'yes' : 'none'
+    const title = 'title: app\\n1\\n2\\n3\\n4\\n5\\napi: '
+    put(p.dir + '/src/app.txt', title + api + '\\npwa: ' + p.flags.pwa + '\\n')
     if (!hasServer) put(p.dir + '/src/standalone.txt', 'standalone\\n')
   } else {
-    put(p.dir + '/src/server.txt', 'auth: ' + p.flags.auth + '\\ndatabase: ' + (p.caps.database ?? 'none') + '\\n')
-    put(p.dir + '/.env.example', '# Port the server listens on.\\nPORT=3000\\n' + (p.caps.database ? '# Database URL.\\nDATABASE_URL=\\n' : ''))
+    const database = p.caps.database ?? 'none'
+    put(p.dir + '/src/server.txt', 'auth: ' + p.flags.auth + '\\ndatabase: ' + database + '\\n')
+    const url = p.caps.database ? '# Database URL.\\nDATABASE_URL=\\n' : ''
+    put(p.dir + '/.env.example', '# Port the server listens on.\\nPORT=3000\\n' + url)
   }
 }
 if (hasServer) put('docker-compose.yml', 'deploy: ' + deploy + '\\n')
 const commit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim()
-const step = (dir: string, name: string) => '      ' + name + ': node ../run-step.cjs ' + dir + ' ' + name + '\\n'
-let y = 'schemaVersion: 1\\ncatalog:\\n  repository: https://example.invalid/t\\n  version: ' + (o['catalog-version'] ?? 'local') + '\\n  commit: ' + commit + '\\n'
+const step = (dir: string, name: string) =>
+  '      ' + name + ': node ../run-step.cjs ' + dir + ' ' + name + '\\n'
+const version = o['catalog-version'] ?? 'local'
+let y = 'schemaVersion: 1\\ncatalog:\\n  repository: https://example.invalid/t\\n'
+y += '  version: ' + version
+y += '\\n  commit: ' + commit + '\\n'
 y += 'generatedAt: ' + new Date().toISOString() + '\\n'
 y += 'stack: ' + (o.stack ?? 'null') + '\\n'
 if (deploy) y += 'deploy: ' + deploy + '\\n'
@@ -77,10 +94,14 @@ y += 'packages:\\n'
 for (const p of Object.values(pkgs) as any[]) {
   y += '  ' + p.dir + ':\\n    template: ' + p.template + '\\n    version: 1.0.0\\n'
   const f = Object.entries(p.flags)
-  y += f.length ? '    flags:\\n' + f.map(([k, v]) => '      ' + k + ': ' + v + '\\n').join('') : '    flags: {}\\n'
+  const row = ([k, v]: any) => '      ' + k + ': ' + v + '\\n'
+  const lines = (key: string, entries: any[]) =>
+    entries.length ? '    ' + key + ':\\n' + entries.map(row).join('') : '    ' + key + ': {}\\n'
+  y += lines('flags', f)
   const c = Object.entries(p.caps)
-  y += c.length ? '    capabilities:\\n' + c.map(([k, v]) => '      ' + k + ': ' + v + '\\n').join('') : '    capabilities: {}\\n'
-  y += '    commands:\\n' + ['install', 'contract', 'format', 'check'].map((n) => step(p.dir, n)).join('')
+  y += lines('capabilities', c)
+  const names = ['install', 'contract', 'format', 'check']
+  y += '    commands:\\n' + names.map((n) => step(p.dir, n)).join('')
   y += '    http:\\n      port: ' + (p.kind === 'server' ? 3000 : 5173) + '\\n'
 }
 y += 'answers:\\n  projectName: ' + o.name + '\\n'
@@ -133,16 +154,22 @@ const README = [
 // with a lock file and a README, committed.
 export function makeProject(catalog, parent, args = ['--template', 'frontend/fake']) {
   const dir = mkdtempSync(path.join(parent ?? os.tmpdir(), 'fake-project-'))
-  const run = spawnSync('bun', ['tools/generate.ts', ...args, '--out', dir, '--name', 'demo'], {
-    cwd: catalog,
-    encoding: 'utf8',
-  })
+  const bun = resolveCommand('bun')
+  const run = spawnSync(
+    bun.file,
+    [...bun.prefix, 'tools/generate.ts', ...args, '--out', dir, '--name', 'demo'],
+    { cwd: catalog, encoding: 'utf8', shell: false },
+  )
   if (run.status !== 0) throw new Error(`fake generator failed: ${run.stderr}`)
   write(dir, 'README.md', README)
   write(
     dir,
     'catalog.lock',
-    JSON.stringify({ repository: 'https://example.invalid/t', version: 'v1.10.0', commit: 'a'.repeat(40) }),
+    JSON.stringify({
+      repository: 'https://example.invalid/t',
+      version: 'v1.10.0',
+      commit: 'a'.repeat(40),
+    }),
   )
   git(dir, ['init', '-q'])
   git(dir, ['add', '-A'])

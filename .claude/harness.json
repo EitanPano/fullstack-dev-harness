@@ -60,7 +60,8 @@
       "names": [
         "CONTRIBUTING.md",
         "scripts/bootstrap.mjs",
-        "scripts/history.mjs"
+        "scripts/history.mjs",
+        "scripts/scaffold/fake-catalog.mjs"
       ]
     },
     {

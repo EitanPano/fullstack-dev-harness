@@ -8,7 +8,7 @@
 //   node scripts/scaffold.mjs [--stack <id>] [--flag <name>=<bool>]…
 //     [--capability <kind>=<id>]… [--deploy single|split] [--slug <slug>] [--templates <path>]
 //     [--root <dir>] [--dry-run]
-//   node scripts/scaffold.mjs --complete [--slug <slug>] [--root <dir>]
+//   node scripts/scaffold.mjs --complete [--slug <slug>] [--templates <path>] [--root <dir>]
 //
 // Exit: 0 done · 1 conflicts to resolve · 2 refused, nothing written · 3 a command or an
 // unexpected failure.
@@ -29,6 +29,7 @@ import {
 } from './catalog.mjs'
 import { applyTrees } from './scaffold/apply.mjs'
 import {
+  completeCommand,
   finish,
   openConflicts,
   readState,
@@ -36,6 +37,7 @@ import {
   writeConflicts,
   writeState,
 } from './scaffold/finish.mjs'
+import { listFiles } from './scaffold/listing.mjs'
 import {
   ScaffoldError,
   USAGE,
@@ -85,6 +87,13 @@ function locate(root, recorded, override) {
       throw new ScaffoldError('.fullstack/catalog.yaml records no catalog commit (null)')
     }
     const head = git(catalog, ['rev-parse', 'HEAD']).stdout.trim()
+    const dirty = git(catalog, ['status', '--porcelain'])
+    if (dirty.status === 0 && dirty.stdout.trim() !== '') {
+      throw new ScaffoldError(
+        `the catalog checkout ${catalog} has uncommitted changes; BASE would not match the ` +
+          'project generation',
+      )
+    }
     if (head !== recorded.commit) {
       throw new ScaffoldError(
         `the catalog checkout ${catalog} is at HEAD ${head || 'unknown'}, not the recorded ` +
@@ -109,14 +118,6 @@ function generate(catalog, args, label) {
   if (result.status !== 0) {
     throw new ScaffoldError(`the generator failed for ${label}${result.reason}`, 3)
   }
-}
-
-function listFiles(dir) {
-  git(dir, ['init', '-q'])
-  git(dir, ['add', '-A'])
-  const listed = git(dir, ['ls-files', '-z'])
-  if (listed.status !== 0) throw new ScaffoldError(`git could not list ${dir}`, 3)
-  return listed.stdout.split('\0').filter(Boolean)
 }
 
 function add(root, options, override) {
@@ -174,25 +175,36 @@ function add(root, options, override) {
     }
     if (options.dryRun) return conflicts.length > 0 ? 1 : 0
     if (conflicts.length > 0) {
-      const list = writeConflicts(root, options.slug, conflicts, next, parts)
+      const list = writeConflicts(root, options, conflicts, next, parts)
       console.log(`\n${conflicts.length} conflict(s): ${list}`)
-      console.log('Resolve the markers, then run: node scripts/scaffold.mjs --complete')
+      console.log(`Resolve them, then run: ${completeCommand(options)}`)
       return 1
     }
     writeState(root, options.slug, { parts, conflicts: [] })
-    return conclude(root, options.slug, next, catalog, parts)
+    return conclude(root, options, catalog, parts)
   } catch (error) {
     keep = !(error instanceof ScaffoldError)
     if (keep) console.error(`scaffold: temp folders kept at ${tmp}`)
     throw error
   } finally {
-    if (!keep) rmSync(tmp, { recursive: true, force: true })
+    if (!keep) removeTemp(tmp)
   }
 }
 
-function conclude(root, slug, next, catalog, parts) {
-  finish(root, next, catalog)
-  removeState(root, slug)
+// The project is already written by now: a stuck temp folder (antivirus, a lingering bun) warns.
+function removeTemp(tmp) {
+  try {
+    rmSync(tmp, { recursive: true, force: true, maxRetries: 5 })
+  } catch (error) {
+    console.warn(`scaffold: could not remove ${tmp} (${error.message}); remove it by hand`)
+  }
+}
+
+// The commands come from the project's own merged provenance, never from state.json.
+function conclude(root, options, catalog, parts) {
+  const provenance = readYaml(path.join(root, '.fullstack', 'catalog.yaml'))
+  finish(root, provenance, catalog, completeCommand(options))
+  removeState(root, options.slug)
   console.log(`\nchore(scaffold): add ${parts.join(', ')}`)
   return 0
 }
@@ -203,10 +215,9 @@ function complete(root, options, override) {
   if (open.length > 0) {
     throw new ScaffoldError(`unresolved conflicts (markers or unchecked): ${open.join(', ')}`)
   }
-  // The commands come from the project's own provenance, never from state.json.
   const provenance = readYaml(path.join(root, '.fullstack', 'catalog.yaml'))
   const { catalog } = locate(root, provenance.catalog, override)
-  return conclude(root, options.slug, provenance, catalog, state.parts)
+  return conclude(root, options, catalog, state.parts)
 }
 
 // exitCode, not exit(): a piped stdout may still hold unwritten output.

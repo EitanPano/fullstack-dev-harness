@@ -120,6 +120,18 @@ describe('checkRequest', () => {
     refuses(() => ok(p, ['--capability', 'database=mongodb']), /already has database/)
     ok(lone(), ['--stack', 'vue-bun-express', '--capability', 'database=postgres'])
   })
+  it('refuses a capability when no server exists or comes with the request', () => {
+    refuses(() => ok(lone(), ['--capability', 'database=postgres'], null), /no server/)
+    ok(stacked(), ['--capability', 'database=postgres'], null)
+    ok(lone(), ['--stack', 'x', '--capability', 'database=postgres'])
+    refuses(
+      () =>
+        ok(lone(), ['--stack', 'x', '--capability', 'database=postgres'], [
+          { template: 'frontend/vue', dir: 'frontend' },
+        ]),
+      /no server/,
+    )
+  })
   it('refuses --deploy without --stack, and an empty request', () => {
     refuses(() => ok(stacked(), ['--deploy', 'single']), /--deploy/)
     refuses(() => ok(lone(), []), /nothing to add/)

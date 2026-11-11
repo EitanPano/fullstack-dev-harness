@@ -1,6 +1,7 @@
 // Reads a scaffold request, checks it only adds, and turns provenance into generator requests.
 // Pure functions plus one Bun child process for YAML; the harness stays dependency-free.
 import { spawnSync } from 'node:child_process'
+import { resolveCommand } from '../catalog.mjs'
 
 export class ScaffoldError extends Error {
   constructor(message, exit = 2) {
@@ -15,7 +16,8 @@ export const USAGE =
   '[--capability <kind>=<id>]…\n' +
   '         [--deploy single|split] [--slug <slug>] [--templates <path>] [--root <dir>] ' +
   '[--dry-run]\n' +
-  '       node scripts/scaffold.mjs --complete [--slug <slug>] [--root <dir>]\n' +
+  '       node scripts/scaffold.mjs --complete [--slug <slug>] [--templates <path>] ' +
+  '[--root <dir>]\n' +
   '       node scripts/scaffold.mjs --help'
 
 const DEFAULT_DIR = { frontend: 'frontend', server: 'backend' }
@@ -26,7 +28,8 @@ const kindOf = (template) => template.split('/')[0]
 export function readYaml(file) {
   const code =
     'const t=await Bun.file(process.argv[1]).text();console.log(JSON.stringify(Bun.YAML.parse(t)))'
-  const run = spawnSync('bun', ['-e', code, file], {
+  const bun = resolveCommand('bun')
+  const run = spawnSync(bun.file, [...bun.prefix, '-e', code, file], {
     shell: false,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
@@ -114,6 +117,14 @@ export function checkRequest(provenance, options, stackPackages) {
     if (owner !== undefined && value === false) {
       throw new ScaffoldError(`--flag ${name}=false removes what ${owner[0]} has on`)
     }
+  }
+  // A capability belongs to a server, which the project has or the stack brings. An unknown flag
+  // or capability id is left to the generator, which owns the template manifests.
+  const hasServer =
+    existing.some(([, pkg]) => kindOf(pkg.template) === 'server') ||
+    (stackPackages ?? []).some((s) => kindOf(s.template) === 'server')
+  if (options.capabilities.length > 0 && !hasServer) {
+    throw new ScaffoldError('--capability needs a server: the project has no server; add --stack')
   }
   for (const { kind } of options.capabilities) {
     const owner = existing.find(([, pkg]) => pkg.capabilities?.[kind] != null)

@@ -124,7 +124,8 @@ export function authFlagFrom(provenancePath) {
     else if (line.trim() !== '' && flagsIndent !== undefined && indent <= flagsIndent) {
       flagsIndent = undefined
     }
-    if (flagsIndent !== undefined && indent > flagsIndent && /^\s+auth:\s*true\s*$/.test(line)) {
+    const authLine = /^\s+auth:\s*true\s*(#.*)?$/.test(line)
+    if (flagsIndent !== undefined && indent > flagsIndent && authLine) {
       return true
     }
   }

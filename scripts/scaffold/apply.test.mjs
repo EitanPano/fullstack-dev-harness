@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { after, beforeEach, describe, it } from 'node:test'
@@ -26,7 +34,7 @@ describe('decide (the table)', () => {
     assert.equal(d('a', undefined, undefined).action, 'nothing')
     assert.equal(d('a', undefined, 'changed').action, 'removed-conflict')
   })
-  it('modified: writes NEXT over an untouched file, conflicts over a deleted one, else merges', () => {
+  it('modified: writes NEXT over an untouched file, conflicts over a deleted one', () => {
     assert.equal(d('a', 'n', 'a').action, 'write')
     assert.equal(d('a', 'n', undefined).action, 'deleted-conflict')
     assert.equal(d('a', 'n', 'x').action, 'merge')
@@ -100,7 +108,7 @@ describe('applyTrees', () => {
     assert.match(read('n.txt'), /<<<<<<< project\nmine\n=======\nnext\n>>>>>>> next/)
     assert.equal(entries[0].conflict, 'added by the part, different here')
   })
-  it('keeps a file the part removed but the project changed, and writes nothing for a deleted one', () => {
+  it('keeps a file the part removed but the project changed, deleted ones stay out', () => {
     put(baseDir, 'r.txt', 'base\n')
     put(root, 'r.txt', 'mine\n')
     put(baseDir, 'm.txt', 'base\n')
@@ -126,13 +134,76 @@ describe('applyTrees', () => {
     assert.equal(action(entries, 'bun.lock'), 'lockfile-left')
     assert.equal(entries.some((e) => e.conflict), false)
   })
+  it('takes the NEXT lockfile when the project lockfile equals BASE', () => {
+    put(baseDir, 'bun.lock', 'a\n')
+    put(nextDir, 'bun.lock', 'b\n')
+    put(root, 'bun.lock', 'a\n')
+    const entries = run(['bun.lock'], ['bun.lock'])
+    assert.equal(read('bun.lock'), 'b\n')
+    assert.equal(action(entries, 'bun.lock'), 'write')
+  })
+  it('hands back the NEXT copy of a conflict without markers', () => {
+    const bin = (...bytes) => Buffer.from(bytes).toString('latin1')
+    put(baseDir, 'd.txt', 'base\n')
+    put(nextDir, 'd.txt', 'next\n')
+    put(baseDir, 'bin.dat', bin(0, 1, 2))
+    put(nextDir, 'bin.dat', bin(0, 1, 3))
+    put(root, 'bin.dat', bin(0, 9, 9))
+    put(nextDir, 'n.txt', 'next\n')
+    put(root, 'n.txt', 'mine\n')
+    put(baseDir, 'r.txt', 'base\n')
+    put(root, 'r.txt', 'mine\n')
+    const entries = run(['d.txt', 'bin.dat', 'r.txt'], ['d.txt', 'bin.dat', 'n.txt'])
+    const copies = Object.fromEntries(entries.map((e) => [e.path, e.nextCopy?.toString('latin1')]))
+    assert.equal(copies['d.txt'], 'next\n')
+    assert.equal(copies['bin.dat'], bin(0, 1, 3))
+    assert.equal(copies['r.txt'], undefined, 'removed by the part: no NEXT copy')
+    assert.equal(copies['n.txt'], undefined, 'markers hold it')
+  })
+  it('refuses a directory link that leads outside, writing nothing', (t) => {
+    const outside = path.join(path.dirname(root), 'outside')
+    mkdirSync(outside)
+    try {
+      symlinkSync(outside, path.join(root, 'link'), 'junction')
+    } catch (error) {
+      return t.skip(`the OS refuses to create a directory link: ${error.code}`)
+    }
+    put(nextDir, 'ok.txt', 'ok\n')
+    put(nextDir, 'link/x.txt', 'x\n')
+    assert.throws(
+      () => run([], ['link/x.txt', 'ok.txt']),
+      (e) => e instanceof ScaffoldError && e.exit === 2 && /outside the project/.test(e.message),
+    )
+    assert.equal(existsSync(path.join(outside, 'x.txt')), false)
+    assert.equal(existsSync(path.join(root, 'ok.txt')), false)
+  })
+  it('refuses a symbolic link in BASE or NEXT', (t) => {
+    put(nextDir, 'real.txt', 'real\n')
+    // A file link needs a privilege on Windows; a junction is a link lstat reports the same way.
+    const target = path.join(nextDir, 'real.txt')
+    try {
+      symlinkSync(target, path.join(nextDir, 'ln.txt'), 'file')
+    } catch {
+      try {
+        symlinkSync(path.dirname(target), path.join(nextDir, 'ln.txt'), 'junction')
+      } catch (error) {
+        return t.skip(`the OS refuses to create a link: ${error.code}`)
+      }
+    }
+    assert.throws(
+      () => run([], ['real.txt', 'ln.txt']),
+      (e) => e instanceof ScaffoldError && e.exit === 2 && /symbolic link/.test(e.message),
+    )
+    assert.equal(existsSync(path.join(root, 'real.txt')), false)
+  })
   it('appends only the missing fullstack-templates sections to the root .gitignore', () => {
     const h = (n) => `# --- fullstack-templates: ${n} ---`
     put(baseDir, '.gitignore', `${h('frontend')}\ndist/\n`)
     put(nextDir, '.gitignore', `${h('frontend')}\ndist/\n\n${h('backend')}\n.venv/\n__pycache__/\n`)
     put(root, '.gitignore', `mine\n${h('frontend')}\ndist/\n`)
     run(['.gitignore'], ['.gitignore'])
-    assert.equal(read('.gitignore'), `mine\n${h('frontend')}\ndist/\n\n${h('backend')}\n.venv/\n__pycache__/\n`)
+    const sections = `${h('frontend')}\ndist/\n\n${h('backend')}\n.venv/\n__pycache__/\n`
+    assert.equal(read('.gitignore'), `mine\n${sections}`)
     const again = run(['.gitignore'], ['.gitignore'])
     assert.equal(action(again, '.gitignore'), 'nothing')
   })
@@ -178,8 +249,8 @@ describe('applyTrees', () => {
         e instanceof ScaffoldError &&
         e.exit === 3 &&
         /already written: a\.txt/.test(e.message) &&
-        /git checkout -- \./.test(e.message) &&
-        /untracked/.test(e.message),
+        /ask the user to restore the tree/.test(e.message) &&
+        !/git checkout|git clean/.test(e.message),
     )
   })
   it('marks which conflicts hold markers', () => {
