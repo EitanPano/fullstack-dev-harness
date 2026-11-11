@@ -27,10 +27,10 @@ Applies to every frontend package.
   minimum of 24 px holds. The shell spec asserts it on the `@phone` tests.
 - The package's control components (the directory its `AGENTS.md › Styling` names) are the one
   place for a control; a raw `button`, `input`, `select` or `textarea` elsewhere fails the gates.
-- The shell is the package's shell component (named in its `AGENTS.md`): `<header>`,
-  `<nav aria-label>`, the one `<main>` with a skip link, `<footer>`, and the theme toggle
-  where its `AGENTS.md › Styling` puts it (user menu or header). A feature adds its nav entry
-  and renders inside `main`, never a second landmark set.
+- The template's shell is a skip link and the one `<main id="main">`. Header, navigation,
+  footer and the place of each ready-to-place control are product code, built only as the
+  plan's `shell` line says (`ui-design › Shell`). A page renders inside `main`; a top-level
+  one adds a nav-table entry, never a landmark set.
 - The brief is `.doc/product-definition.md › Design`; a `figma:<url>` backlog marker overrides
   it for that task. The generator applies the brand values at the bootstrap; changing them
   later edits the tokens, by plan only.

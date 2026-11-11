@@ -175,7 +175,8 @@ Take the brand flags from the `Design` form; pass only the fields that hold a va
   unattended run does not stall.
 - When the generator rejects a brand value (an invalid hex, enum or name, or a colour pair it
   cannot make pass contrast) it names the flag: report it, ask for another value, re-run.
-- `Tone`, `Reference apps` and `Primary viewport` stay in the form and have no flag.
+- `Tone`, `Reference apps` and `Primary viewport` have no flag; the plans' `UX` lines read
+  them.
 - `node scripts/bootstrap.mjs --help` prints the usage and every flag.
 
 The run:
@@ -225,9 +226,8 @@ node scripts/verify.mjs --out .orchestrate/bootstrap
   the final message.
 
 **Dev check.** Start each package's `dev` command (an SPA's server first, as the frontend's
-`AGENTS.md` says) and open the frontend's `http.health` path on its `http.port` (an SPA's dev
-server proxies `/api` to the server). The page must reach the server: the health screen proves
-the typed client does.
+`AGENTS.md` says) and open the frontend's `http.port`: the home page renders. With a server,
+`/api/health` answers on that port for an SPA (its dev proxy) and on the server's port for Next.
 
 Stop the dev servers by port. On Windows a `--reload` server leaves its child holding the port
 after the parent is stopped, and the port's owner is then the dead reloader, so stop the owner
