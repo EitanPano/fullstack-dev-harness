@@ -6,9 +6,10 @@
 // writes. Run once, from anywhere:
 //
 //   node scripts/bootstrap.mjs --fetch [--templates <path>]
-//   node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… [--capability k=v]…
-//     [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]
-//     [--deploy single|split] [--display-name <text>] [--brand-primary <hex>]
+//   node scripts/bootstrap.mjs (--stack <id> | --template <kind>/<id>) --name <name>
+//     [--flag k=v]… [--capability k=v]… [--answers <file>] [--templates <path>]
+//     [--root <dir>] [--skip-install] [--deploy single|split (with --stack only)]
+//     [--display-name <text>] [--brand-primary <hex>]
 //     [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]
 //     [--theme system|light|dark] [--density comfortable|compact]
 //   node scripts/bootstrap.mjs --finish [--root <dir>]
@@ -19,15 +20,26 @@
 // refuse a second run → generate → verify `.fullstack/catalog.yaml` → clear the harness's own
 // history → write the project README. `--finish` is the last step before the commit: it records
 // the harness version and removes the harness-development files.
+// `--template <kind>/<id>` generates one package alone, where a stack is several.
 // `--skip-install` maps to the generator's `--skip-post-generate`. Environment:
 // FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE
 // (cache root, default ~/.cache/fullstack-templates).
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import {
+  CatalogError,
+  checkSchemaVersion,
+  defaultCacheRoot,
+  isDirectory,
+  locateCachedCatalog,
+  locateLocalCatalog,
+  readLock,
+  resolveCommand,
+  runSpawn,
+} from './catalog.mjs'
 import {
   MIN_BUN,
   MIN_NODE,
@@ -38,7 +50,6 @@ import {
 } from './history.mjs'
 import { readProvenance } from './provenance.mjs'
 
-const SUPPORTED_SCHEMA_VERSION = 1
 const README_TEMPLATE = ['.claude', 'skills', 'bootstrap-project', 'readme-template.md']
 
 // Brand options: forwarded unchanged and only when given. The generator validates them.
@@ -54,10 +65,10 @@ const BRAND_FLAGS = [
 
 const USAGE =
   'usage: node scripts/bootstrap.mjs --fetch [--templates <path>]\n' +
-  '       node scripts/bootstrap.mjs --stack <id> --name <name> [--flag k=v]… ' +
-  '[--capability k=v]…\n' +
-  '         [--answers <file>] [--templates <path>] [--root <dir>] [--skip-install]\n' +
-  '         [--deploy single|split] [--display-name <text>] [--brand-primary <hex>]\n' +
+  '       node scripts/bootstrap.mjs (--stack <id> | --template <kind>/<id>) --name <name>\n' +
+  '         [--flag k=v]… [--capability k=v]… [--answers <file>] [--templates <path>]\n' +
+  '         [--root <dir>] [--skip-install] [--deploy single|split (with --stack only)]\n' +
+  '         [--display-name <text>] [--brand-primary <hex>]\n' +
   '         [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]\n' +
   '         [--theme system|light|dark] [--density comfortable|compact]\n' +
   '       node scripts/bootstrap.mjs --finish [--root <dir>]\n' +
@@ -67,8 +78,7 @@ const args = parseArgs(process.argv.slice(2))
 const harnessRoot = fileURLToPath(new URL('..', import.meta.url))
 const root = path.resolve(args.root ?? harnessRoot)
 const override = args.templates ?? process.env.FULLSTACK_TEMPLATES_DIR
-const cacheRoot =
-  process.env.FULLSTACK_TEMPLATES_CACHE ?? path.join(os.homedir(), '.cache', 'fullstack-templates')
+const cacheRoot = defaultCacheRoot()
 
 main()
 
@@ -79,14 +89,16 @@ function main() {
   if (!args.fetch) checkGitWorkTree()
 
   step('Reading catalog.lock')
-  const lock = readLock()
+  const lock = catalogStep(() => readLock(harnessRoot))
 
   step('Locating the template catalog')
   const fromCache = override === undefined || override === ''
-  const catalog = fromCache ? locateCachedCatalog(lock) : locateLocalCatalog()
+  const catalog = catalogStep(() =>
+    fromCache ? locateCachedCatalog(lock, cacheRoot) : locateLocalCatalog(override),
+  )
 
   step('Checking the catalog schema version')
-  checkSchemaVersion(catalog)
+  catalogStep(() => checkSchemaVersion(catalog))
 
   const tools = path.join(catalog, 'tools')
   if (!fromCache && !isDirectory(tools)) fail(`${catalog} is not a catalog checkout (no tools/)`)
@@ -113,7 +125,8 @@ function main() {
     )
   }
 
-  step(`Generating the "${args.stack}" stack as "${args.name}"`)
+  const what = args.stack === undefined ? `"${args.template}" template` : `"${args.stack}" stack`
+  step(`Generating the ${what} as "${args.name}"`)
   const generated = runSpawn(
     'bun',
     generatorArguments(fromCache ? lock.version : undefined),
@@ -154,6 +167,16 @@ function main() {
   console.log('  wrote README.md (replace the readme: markers, then run --finish)')
 
   printNextSteps()
+}
+
+// The catalog module throws; the bootstrap turns that into its one failure path.
+function catalogStep(run) {
+  try {
+    return run()
+  } catch (error) {
+    if (error instanceof CatalogError) return fail(error.message)
+    throw error
+  }
 }
 
 function finish() {
@@ -211,101 +234,13 @@ function checkGitWorkTree() {
   }
 }
 
-function readLock() {
-  const file = path.join(harnessRoot, 'catalog.lock')
-  let lock
-  try {
-    // A BOM (Windows editors add one) makes JSON.parse throw on an otherwise valid file.
-    lock = JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''))
-  } catch (error) {
-    return fail(`cannot read ${file}: ${error.message}`)
-  }
-  for (const field of ['repository', 'version', 'commit']) {
-    if (typeof lock?.[field] !== 'string' || lock[field] === '') {
-      fail(`catalog.lock: "${field}" must be a non-empty string`)
-    }
-  }
-  if (!/^[0-9a-f]{40}$/.test(lock.commit)) {
-    fail('catalog.lock: "commit" must be 40 lowercase hex characters')
-  }
-  // The version becomes a path segment and a git ref, so it must be a plain tag.
-  if (!/^v\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/.test(lock.version)) {
-    fail('catalog.lock: "version" must be a tag such as v0.1.0')
-  }
-  return lock
-}
-
-// The lock pins a tag, but a tag can move; the commit check is what makes the pin real.
-function locateCachedCatalog(lock) {
-  const dir = path.join(cacheRoot, lock.version)
-  if (!existsSync(dir)) {
-    console.log(`  cloning ${lock.repository} at ${lock.version} into ${dir}`)
-    const cloned = runSpawn(
-      'git',
-      [
-        'clone',
-        '--depth',
-        '1',
-        '--branch',
-        lock.version,
-        '--quiet',
-        '-c',
-        'advice.detachedHead=false',
-        '--',
-        lock.repository,
-        dir,
-      ],
-      process.cwd(),
-    )
-    if (cloned.status !== 0) {
-      const what = `git clone of ${lock.repository} into ${dir} failed${cloned.reason}`
-      fail(`${what}; it needs the network`)
-    }
-  }
-  const head = spawnSync('git', ['-C', dir, 'rev-parse', 'HEAD'], { encoding: 'utf8' })
-  const actual = head.status === 0 ? head.stdout.trim() : ''
-  if (actual !== lock.commit) {
-    const found = actual === '' ? 'an unknown commit' : actual
-    fail(
-      `catalog.lock expects commit ${lock.commit} but ${dir} is at ${found}; ` +
-        'the tag moved or the cache is stale: delete that directory by hand and run again',
-    )
-  }
-  return dir
-}
-
-function locateLocalCatalog() {
-  const dir = path.resolve(override)
-  if (!isDirectory(dir)) fail(`template catalog ${dir} does not exist`)
-  console.warn(`  warning: using the local catalog ${dir}; catalog.lock is bypassed`)
-  return dir
-}
-
-// One regex on one line instead of a YAML parser: the harness stays dependency-free.
-function checkSchemaVersion(catalog) {
-  const file = path.join(catalog, 'index.yaml')
-  if (!existsSync(file)) fail(`${file} is missing; ${catalog} is not a template catalog`)
-  let version
-  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const match = /^schemaVersion:\s*(\d+)\s*$/.exec(line)
-    if (match !== null) {
-      version = Number(match[1])
-      break
-    }
-  }
-  if (version === undefined) fail(`${file} has no schemaVersion`)
-  if (version > SUPPORTED_SCHEMA_VERSION) {
-    fail(
-      `catalog schemaVersion ${version} is newer than this harness supports ` +
-        `(${SUPPORTED_SCHEMA_VERSION}); update the harness`,
-    )
-  }
-}
-
 // The generator resolves --out against its own cwd (the catalog), so every path is absolute.
 // A local override records its own identity, so only the cache path passes the version.
 function generatorArguments(catalogVersion) {
-  const list = ['tools/generate.ts', '--stack', args.stack, '--out', root, '--name', args.name]
+  const list = ['tools/generate.ts']
+  if (args.stack !== undefined) list.push('--stack', args.stack)
+  else list.push('--template', args.template)
+  list.push('--out', root, '--name', args.name)
   for (const flag of args.flags) list.push('--flag', flag)
   for (const capability of args.capabilities) list.push('--capability', capability)
   if (args.answers !== undefined) list.push('--answers', path.resolve(args.answers))
@@ -318,11 +253,9 @@ function generatorArguments(catalogVersion) {
   return list
 }
 
-function isDirectory(dir) {
-  return existsSync(dir) && statSync(dir).isDirectory()
-}
-
 function printNextSteps() {
+  // A single package has no Compose file, and nothing below may send the reader to Docker.
+  const hasCompose = existsSync(path.join(root, 'docker-compose.yml'))
   console.log('\nThen:')
   if (args.skipInstall) {
     console.log(
@@ -335,7 +268,7 @@ function printNextSteps() {
       'and testE2e, migrate and testDb where the package declares them) and ports.',
   )
   console.log("  Run every package's check command.")
-  if (args.capabilities.length > 0 || args.answers !== undefined) {
+  if (hasCompose && (args.capabilities.length > 0 || args.answers !== undefined)) {
     const when =
       args.capabilities.length > 0
         ? 'With a provider (a capability was passed)'
@@ -347,7 +280,11 @@ function printNextSteps() {
     console.log("    then the server package's migrate and testDb (see .fullstack/catalog.yaml).")
   }
   const withProvider = args.capabilities.length > 0 || args.answers !== undefined
-  printDeploySteps(readProvenance(path.join(root, '.fullstack', 'catalog.yaml')), withProvider)
+  printDeploySteps(
+    readProvenance(path.join(root, '.fullstack', 'catalog.yaml')),
+    withProvider,
+    hasCompose,
+  )
   console.log('  Where a package declares testE2e, install its browser')
   console.log('    (its AGENTS.md › Tests says how) and run it.')
   console.log(
@@ -356,12 +293,13 @@ function printNextSteps() {
   console.log('  Commit on chore/bootstrap once the gates are green.')
 }
 
-function printDeploySteps({ deploy, packages }, withProvider) {
+function printDeploySteps({ deploy, packages }, withProvider, hasCompose) {
   const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
   if (frontend?.port !== undefined) {
     console.log(`  Once started, the frontend dev server is at http://localhost:${frontend.port}.`)
   }
+  if (!hasCompose) return
   const compose = 'docker compose --profile app up --build'
   if (deploy === 'single') {
     const url = server?.port === undefined ? '' : ` (http://localhost:${server.port})`
@@ -391,31 +329,6 @@ function printDeploySteps({ deploy, packages }, withProvider) {
   console.log('    Stop it with: docker compose --profile app down')
 }
 
-// `reason` carries the spawn error (a missing executable, say) so the failure names its cause.
-function runSpawn(command, commandArgs, cwd) {
-  const resolved = resolveCommand(command)
-  const result = spawnSync(resolved.file, [...resolved.prefix, ...commandArgs], {
-    cwd,
-    stdio: 'inherit',
-  })
-  const reason = result.error === undefined ? '' : ` (${result.error.message})`
-  return { status: result.status ?? 1, reason }
-}
-
-// Windows: an npm-installed `bun` is a .cmd shim that spawn cannot execute directly. When
-// where.exe lists several hits, a real .exe wins: the official Bun installer ships bun.exe, and
-// the shim goes through cmd.exe, which mishandles quoted paths with spaces.
-function resolveCommand(command) {
-  if (process.platform !== 'win32') return { file: command, prefix: [] }
-  const where = spawnSync('where.exe', [command], { encoding: 'utf8' })
-  const hits = (where.stdout ?? '').split(/\r?\n/).filter((line) => line.trim() !== '')
-  const first = hits.find((line) => /\.exe$/i.test(line.trim())) ?? hits[0]
-  if (first === undefined) return { file: command, prefix: [] }
-  return /\.(cmd|bat)$/i.test(first)
-    ? { file: 'cmd.exe', prefix: ['/c', first] }
-    : { file: first, prefix: [] }
-}
-
 function parseArgs(argv) {
   const parsed = {
     fetch: false,
@@ -439,6 +352,7 @@ function parseArgs(argv) {
     else if (arg === '--finish') parsed.finish = true
     else if (arg === '--skip-install') parsed.skipInstall = true
     else if (arg === '--stack') parsed.stack = value(arg, ++i)
+    else if (arg === '--template') parsed.template = value(arg, ++i)
     else if (arg === '--name') parsed.name = value(arg, ++i)
     else if (arg === '--flag') parsed.flags.push(value(arg, ++i))
     else if (arg === '--capability') parsed.capabilities.push(value(arg, ++i))
@@ -473,8 +387,12 @@ function parseArgs(argv) {
     const extra =
       parsed.flags.length + parsed.capabilities.length + Object.keys(parsed.brand).length
     if (others.length > 0 || extra > 0) die('--finish accepts only --root')
-  } else if (parsed.stack === undefined || parsed.name === undefined) {
-    die(`--stack and --name are required\n${USAGE}`)
+  } else if ((parsed.stack === undefined) === (parsed.template === undefined)) {
+    die(`exactly one of --stack and --template is required\n${USAGE}`)
+  } else if (parsed.name === undefined) {
+    die(`--name is required\n${USAGE}`)
+  } else if (parsed.template !== undefined && parsed.deploy !== undefined) {
+    die('--deploy applies to a stack; a --template package has no deploy mode')
   }
   return parsed
 }

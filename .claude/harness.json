@@ -27,7 +27,9 @@
       "scripts/loop-stats.mjs",
       "scripts/manifest.mjs",
       "scripts/readme.mjs",
-      "scripts/harness-update.mjs"
+      "scripts/harness-update.mjs",
+      "scripts/catalog.mjs",
+      "scripts/scaffold.mjs"
     ],
     "project": [
       "README.md",

@@ -19,8 +19,7 @@ import {
   trackedFiles,
   writeRecord,
 } from './manifest.mjs'
-import { readProvenance } from './provenance.mjs'
-import { renderConfiguration } from './readme.mjs'
+import { renderConfiguration, renderPackageBlocks } from './readme.mjs'
 
 export const MIN_NODE = 24
 export const MIN_BUN = [1, 4]
@@ -114,99 +113,25 @@ export function clearHarnessHistory(root, { auth }) {
   return { removedPlans, keptPlans, docs }
 }
 
+// Auth is on only when a package's `flags` block says `auth: true`; a project without a server
+// (or an unreadable file) has no accounts, so its auth text is cleared.
 export function authFlagFrom(provenancePath) {
-  if (!existsSync(provenancePath)) return true
-  const lines = readFileSync(provenancePath, 'utf8').split(/\r?\n/)
-  return !lines.some((line) => /^\s+auth:\s*false\s*$/.test(line))
+  if (!existsSync(provenancePath)) return false
+  let flagsIndent
+  for (const line of readFileSync(provenancePath, 'utf8').split(/\r?\n/)) {
+    const indent = /^\s*/.exec(line)[0].length
+    if (/^\s+flags:\s*$/.test(line)) flagsIndent = indent
+    else if (line.trim() !== '' && flagsIndent !== undefined && indent <= flagsIndent) {
+      flagsIndent = undefined
+    }
+    if (flagsIndent !== undefined && indent > flagsIndent && /^\s+auth:\s*true\s*$/.test(line)) {
+      return true
+    }
+  }
+  return false
 }
 
 const gitIn = (root, args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' })
-
-// Every command comes resolved from the catalog and runs inside its package's folder. One
-// `cd` per package keeps the lines valid in bash and PowerShell alike (no `&&`, no subshell).
-function packageBlock(pkg, commands) {
-  const lines = commands.flatMap((name) => (pkg.commands[name] ?? '').split('\n')).filter(Boolean)
-  return lines.length === 0 ? [] : [`# ${pkg.dir}`, `cd ${pkg.dir}`, ...lines, 'cd ..']
-}
-
-const fenced = (lines) => (lines.length === 0 ? '' : `\`\`\`bash\n${lines.join('\n')}\n\`\`\``)
-
-// The tools a template declares in its `tools:` list (`- { name: uv, min: '0.12.23' }`), read
-// from the catalog checkout, so no stack or template name is spelled here.
-function templateTools(catalogRoot, template) {
-  const file = path.join(catalogRoot, template, 'template.yaml')
-  if (!existsSync(file)) return []
-  const tools = []
-  let inList = false
-  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
-    if (/^tools:\s*$/.test(line)) inList = true
-    else if (inList && /^\s+-\s/.test(line)) {
-      const name = /\bname:\s*['"]?([\w.-]+)/.exec(line)?.[1]
-      const min = /\bmin:\s*['"]?([\w.+-]+)/.exec(line)?.[1]
-      if (name !== undefined) tools.push({ name, min })
-    } else if (inList && /^\S/.test(line)) break
-  }
-  return tools
-}
-
-function prerequisites(root, packages, catalogRoot) {
-  const seen = new Map()
-  for (const pkg of packages) {
-    if (catalogRoot === undefined) break
-    for (const tool of templateTools(catalogRoot, pkg.template)) {
-      if (!seen.has(tool.name)) seen.set(tool.name, tool)
-    }
-  }
-  const lines = [...seen.values()].map(({ name, min }) => `- ${name}${min ? ` ${min}+` : ''}`)
-  lines.push('- git')
-  if (existsSync(path.join(root, 'docker-compose.yml'))) lines.push('- Docker with Compose v2')
-  return lines.join('\n')
-}
-
-const normalizedUrl = (url) =>
-  url
-    .trim()
-    .toLowerCase()
-    .replace(/\/+$/, '')
-    .replace(/\.git$/, '')
-
-// An origin that is a local path or the harness itself (a plain `git clone` of it) is not the
-// product's repository, so the README shows a placeholder instead of leaking it.
-function repositoryUrl(root) {
-  const remote = gitIn(root, ['remote', 'get-url', 'origin'])
-  const url = remote.status === 0 ? remote.stdout.trim() : ''
-  if (url === '' || /^([a-z]:|\/|\.\.?\/|file:)/i.test(url)) return undefined
-  try {
-    const manifest = readFileSync(path.join(root, '.claude', 'harness.json'), 'utf8')
-    const harness = JSON.parse(manifest).repository
-    if (typeof harness === 'string' && normalizedUrl(harness) === normalizedUrl(url)) {
-      return undefined
-    }
-  } catch {
-    // No readable manifest: nothing to compare with, so the origin stands.
-  }
-  return url
-}
-
-// In development the app is the frontend's dev server, which proxies /api; only the Compose
-// image of a `single` deploy serves the built frontend from the server's port.
-function usageNotes(root, { deploy, packages }) {
-  const server = packages.find((pkg) => pkg.template.startsWith('server/'))
-  const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
-  const port = (frontend ?? server)?.port
-  const notes = []
-  if (port !== undefined) notes.push(`Open http://localhost:${port} once the dev servers are up.`)
-  if (existsSync(path.join(root, 'docker-compose.yml'))) {
-    const composePort = (deploy === 'single' ? server : (frontend ?? server))?.port
-    const where =
-      composePort === undefined ? '' : ` (the app is then at http://localhost:${composePort})`
-    notes.push(
-      `To run the whole stack with Docker Compose${where}:\n\n` +
-        '```bash\ndocker compose --profile app up --build\n```',
-    )
-  }
-  return notes.join('\n\n')
-}
 
 // The brand display name the generator recorded under `answers.brand`, if any.
 function displayNameOf(catalogFile) {
@@ -220,29 +145,10 @@ function displayNameOf(catalogFile) {
 // Fills the template's `{{token}}`s from the catalog; a token left over is a bug, not output.
 export function writeProjectReadme(root, name, templateFile, catalogRoot) {
   const catalogFile = path.join(root, '.fullstack', 'catalog.yaml')
-  const catalog = readProvenance(catalogFile)
-  const { packages } = catalog
-  const url = repositoryUrl(root)
-  const dir =
-    (url ?? '')
-      .replace(/\/+$/, '')
-      .split(/[/:]/)
-      .pop()
-      ?.replace(/\.git$/, '') || name
-  const blocks = (commands) => packages.flatMap((pkg) => packageBlock(pkg, commands))
-  const dev = blocks(['dev'])
   const values = {
     name: displayNameOf(catalogFile) ?? name,
-    prerequisites: prerequisites(root, packages, catalogRoot),
-    installation: fenced([
-      `git clone ${url ?? '<repository-url>'}`,
-      `cd ${dir}`,
-      ...blocks(['install']),
-    ]),
-    usage: fenced(dev.length === 0 ? [] : ['# Run each of these in its own terminal.', ...dev]),
-    'usage-notes': usageNotes(root, catalog),
+    ...renderPackageBlocks(root, catalogRoot, { name }),
     configuration: renderConfiguration(root),
-    tests: fenced(blocks(['check', 'test', 'testE2e'])),
     license: existsSync(path.join(root, 'LICENSE'))
       ? 'See [LICENSE](LICENSE).'
       : 'No license has been chosen yet.',
