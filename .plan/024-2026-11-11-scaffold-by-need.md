@@ -155,6 +155,7 @@ tree and H2. H5 and P2 follow G4.
 ```
 node scripts/scaffold.mjs [--stack <id>] [--flag <name>=<bool>]… [--capability <kind>=<id>]…
   [--deploy single|split] [--slug <slug>] [--templates <path>] [--root <dir>] [--dry-run]
+node scripts/scaffold.mjs --complete [--slug <slug>] [--templates <path>] [--root <dir>]
 ```
 
 | Step | Behaviour |
@@ -231,4 +232,49 @@ node scripts/scaffold.mjs [--stack <id>] [--flag <name>=<bool>]… [--capability
 
 ## Changes during the task
 
-None yet.
+Rulings (the ledger holds each with its cost if wrong):
+
+- R6 `scaffold.mjs --complete` finishes a run after conflicts; it re-derives the package commands
+  from the merged provenance, never from `state.json`.
+- R7 a lone frontend's leftover `SERVER_*` placeholder fails generation (ADR 0011 built-decisions).
+- R8 the loop runs the scaffold after the branch is cut and before the draft is promoted; the
+  scaffold commit is the plan's `Base:`.
+- R9 the data-layer task is backend-only; the scaffold brings the frontend's `server:database` e2e
+  files.
+- R10, R11 `conflicts.md` is a checklist (`- [x]`); `--complete` refuses an unticked line and a
+  leftover `<<<<<<< project` / `>>>>>>> next` line.
+- R12, R13 template worktree branches squash-merged per task; the README matrix regenerated once.
+- R14 Angular's dev proxy is `proxy.conf.mjs` (was `.json`), the one change to a stack's output.
+- R15 JSON a template cannot mark stays as inert lines in a lone project.
+- R16 the driver resolves every scaffold conflict itself; no role agent runs before promotion.
+- R17 a `Scaffold:` with `--stack` names `--flag auth=<…>` from the product's Auth answer (and
+  `--deploy` with a frontend); with auth on, the step restores the Auth section and glossary rows.
+- R18 MongoDB stays a bootstrap answer; the data-layer task keeps a hand-built branch for an
+  engine without a provider.
+
+### As built (2026-11-11)
+
+- Catalog `feat/scaffold-by-need` 9bad712..8684dfd (12 commits), PR #32 into `dev`: ADR 0011;
+  tools (bare `server` key, object form, no `contract`/Compose/`SERVER_*` without a server, lone
+  e2e, the subset test, overlap checks); next 3.1.0, react 5.1.0, vue 3.1.0, angular 3.1.0
+  (`alone-lean` for Vue and Angular); docs. Opus final review: With fixes (0 Critical,
+  3 Important), one fix wave, re-review clean (Minor only, deferred in the ledger).
+- Harness `feat/scaffold-by-need` e46be84..this commit: H1 (`scripts/catalog.mjs`,
+  `bootstrap --template`, Docker-free `verify`, `readme --packages`), H2 (`scripts/scaffold.mjs`
+  and `scripts/scaffold/*`), H3 wording, the final fix wave (git isolation of the file lists,
+  `resolveCommand`, realpath confinement, NEXT's copy for conflicts without markers, the
+  driver-centred `scaffold-step.md`, R17, R18). Opus final review: With fixes (1 Critical, the
+  suite red on an unlisted manifest name; 5 Important), one fix wave, re-review: one Important
+  (git's XDG ignore file) fixed by the session.
+- Proofs: S1 and S3 PASS (G2). Catalog: tools check 708, `validate` with `--readme` and
+  `--lockfiles` ok, 36/36 frontend cases with `--e2e --with-services --with-app` (vue `split`
+  passed on a rerun after a port collision); stack output byte-identical to 28d557c on 10 plans
+  bar R14. Harness: scripts 380/380, hooks 1702/1702.
+- S2 PASS: a lone Vue frontend (i18n and pwa off) verified with `docker` off the `PATH`; product
+  work; `--stack vue-bun-express --flag auth=false` exit 0, 0 conflicts, the product's change kept,
+  `verify` green; `--capability database=postgres` exit 0, 0 conflicts, `verify` green with
+  `testDb` (295); refusals (adds nothing, a second `--stack`, a dirty tree) exit 2. S4 PASS:
+  `--stack vue-python-fastapi --flag auth=false` exit 0, 0 conflicts, `verify` green (one
+  instant crash 0xC0000409 on the first try, green on the rerun).
+- Not exercised against the real catalog: the conflict path and `--complete` (neither proof hit a
+  conflict; the unit tests cover both). V08 (P2) waits for G4 and H5.
