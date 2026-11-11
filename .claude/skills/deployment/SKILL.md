@@ -238,8 +238,8 @@ than the API needs all of:
 3. A CSRF defence, in both cases (sibling subdomains are same-site): a synchroniser token, or
    a double-submit cookie with a custom header the server requires. Add a test that a
    mutation without it is refused.
-4. An API base URL in the bundle, read only through `src/shared/config/env.ts`. This gives up
-   the "relative `/api`" rule on purpose; the `baseUrl` in `shared/api/client.ts` changes with it, and the
+4. An API base URL in the bundle, read only through the package's env module. This gives up
+   the "relative `/api`" rule on purpose; the client's `baseUrl` changes with it, and the
    client sends `credentials: 'include'`, because fetch's same-origin default withholds
    cookies on a cross-origin request.
 

@@ -21,8 +21,8 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 ## Data Flow
 
 1. A browser request reaches a route in the frontend's routing layer.
-2. The page calls its feature's data layer (`server/` in a server-rendered frontend, `api/`
-   in a single-page app), which calls the API through the typed API client.
+2. The page calls the package's data layer (`services/`), which calls the API through the typed
+   API client.
 3. The module's router declares the endpoint's gates and names the handler; validation is
    declared once, from the module's request schema (a `validate` middleware in Express, the
    handler's typed parameters in FastAPI; see `backend/AGENTS.md › Adding a module`). The
