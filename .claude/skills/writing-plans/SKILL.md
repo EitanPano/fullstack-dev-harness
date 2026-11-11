@@ -34,6 +34,7 @@ Branch: feat/<slug>   (the driver writes it at promotion)
 Base: <commit>   (the driver writes it at promotion: the commit the branch was cut from)
 Stages: backend, frontend, qa   (omit backend for a stack:frontend task, frontend for a stack:backend task)
 Retired: `<exact name or path>`, … | none   (product tasks; see below)
+Scaffold: <scaffold.mjs arguments> | none
 ```
 
 `Retired:` lists, in backticks and comma-separated, the exact names and paths the task renames or
@@ -43,6 +44,9 @@ legitimate use of it should survive. Retire a role value in literal form (`'admi
 `UserRole.admin`), never as a bare word an entity or a path also uses (`user`). Harness plans omit
 the line.
 
+`Scaffold:` names a part `.fullstack/catalog.yaml` lacks that the task needs (a server:
+`--stack <id>`; a flag: `--flag <name>=true`; a capability: `--capability <kind>=<id>`); else `none`.
+
 The driver promotes the draft to `.plan/NNN-YYYY-MM-DD-<slug>.md`, with the next free number,
 and writes `Base:` when it cuts the task's branch.
 
@@ -50,8 +54,7 @@ New plans start as `Status: draft`. Only the human flips a plan to `active`, by 
 the file. The review and QA stages run in parallel after the implementation stages and are not
 listed.
 Implementers and QA read the task's change as `git diff <Base>`, reviewers the review
-package (`dev-loop` section 4): on a branch that already carries
-earlier committed tasks, `git diff main` would show those too. When the user delegates
+package (`dev-loop` section 4). When the user delegates
 approval, the driver adds `Approval: delegated (<date>, <the user's words>)`.
 
 ## Required sections

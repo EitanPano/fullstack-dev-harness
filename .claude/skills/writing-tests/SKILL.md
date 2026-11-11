@@ -52,9 +52,9 @@ report says why (`Tests first: after the fact — <reason>`); QA judges the reas
 
 Each package's `AGENTS.md › Tests` names its runner, test directories, stubs and helpers
 (`backend/AGENTS.md`, `frontend/AGENTS.md`). The commands `test` and `testE2e` come from
-`.fullstack/catalog.yaml`, and `testDb` is there too when a provider was chosen at the
-bootstrap; otherwise the data-layer task adds `testDb` and names it in the package's
-`AGENTS.md › Adding the data layer`. `verify` runs `testDb` wherever the package has it.
+`.fullstack/catalog.yaml`, and `testDb` is there too when a provider was chosen at the bootstrap;
+otherwise the data-layer task's scaffold records it. `verify` runs `testDb` wherever the package has
+it.
 
 - Server: HTTP tests import the app builder and never start infrastructure or the
   entry file. A module's tests live in one file; gates, shared capabilities and

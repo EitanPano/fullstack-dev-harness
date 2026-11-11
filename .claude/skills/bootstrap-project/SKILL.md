@@ -7,7 +7,7 @@ description: Turn a fresh clone of this harness into a running project. Use when
 
 Run once per project, in the interactive session (no role agent). The harness owns no templates:
 `catalog.lock` pins a release of the template catalog, and the bootstrap runs that catalog's
-generator. Supply the product, the stack and the database decision, then prove the result works.
+generator.
 
 After a context compaction, Read this file again: a re-attached skill keeps only its first 5,000
 tokens, and the last sections are the commit gate.
@@ -32,18 +32,18 @@ model, glossary, stack, flags, deploy mode, tracker, backlog lines.
 
 1. Fill every form from it, in the user's words: `.doc/product-definition.md` (Design included),
    `.doc/architecture.md` and `.doc/glossary.md`. Fill the markers the walk below asks about;
-   leave the ones section 5 writes. Map each stack, flag, capability, deploy-mode and brand
-   answer to its scaffold flag (sections 2 and 3).
+   leave the ones section 5 writes. Map the `Server:` line and each stack, flag, capability,
+   deploy-mode and brand answer to its scaffold flag (sections 2 and 3).
 2. Collect every gap: a marker the brief does not answer, a value the catalog cannot take, a
    clash with the glossary. Ask them all in one message, each with the skill's default or
    recommendation; do not walk the sections. Infer the Search and sharing answer (must public
-   pages be found by search engines or show a rich preview when shared?) from the brief; ask it
-   in the gap message only when the brief is silent. Write it into the product definition; it
-   decides the frontend (section 2).
+   pages be found by search engines or show a rich preview when shared?) and the `Server:`
+   answer from the brief; ask either in the gap message only when the brief is silent. Write
+   both into the product definition; they decide the frontend and the server (section 2).
 3. Compare the brief with the template gaps below.
-4. Show one summary to confirm: the forms, the stack and its flags, the database capability, the
-   deploy mode, the brand (every flag with its value, display name included), the template gaps
-   and the first backlog lines. Scaffold only after a yes.
+4. Show one summary to confirm: the forms, the stack (or the lone frontend) and its flags, the
+   database capability, the deploy mode, the brand (every flag with its value, display name
+   included), the template gaps and the first backlog lines. Scaffold only after a yes.
 
 **Template gaps.** Every server template ships the same auth defaults: entity `user`, roles
 `user` and `admin`, a password of 8 to 128 characters. Each difference in the brief's entity
@@ -65,8 +65,8 @@ Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in orde
 at a time and replace the marker with the answer, in the user's words. Suggest a default only
 when they ask.
 
-- Ask the Search and sharing line (Non-functional Requirements) with the form; it decides the
-  frontend (section 2).
+- Ask the Search and sharing and `Server:` lines (Non-functional Requirements) with the form;
+  they decide the frontend and the server (section 2).
 - Walk the `Design` section too; its brand fields become scaffold flags (section 3). A product
   with no frontend answers it "n/a", and Search and sharing "n/a" too (which resolves that FILL
   marker).
@@ -76,11 +76,11 @@ when they ask.
   fills them once the stack is chosen: the Data store's `Local service` line, the `Deploy mode`
   and `TRUST_PROXY` lines, and the Auth section's Client model marker.
 
-**Data store.** Ask the `database` skill's question: engine, client library, or decide later.
-Record the answer as given (the named engine or "decide later", plus the client library).
-Whether the server template lists that engine as a provider is a separate fact, settled in
-section 2; when it does, the generator wires it and section 5 fills the Data store section from
-what was generated.
+**Data store.** Skip with `Server: later`. Otherwise ask the `database` skill's question: engine,
+client library, or decide later. Record the answer as given (the named engine or "decide later",
+plus the client library). Whether the server template lists that engine as a provider is a separate
+fact, settled in section 2; when it does, the generator wires it and section 5 fills the Data store
+section from what was generated.
 
 **Auth.** Scaffold a product with no accounts (Auth: none) with `--flag auth=false`; any other
 answer keeps the server template's authentication (its `auth` flag on, the default). The scaffold
@@ -111,6 +111,11 @@ id:
 - "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today).
 - "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular, Vue).
 - A stack with no frontend skips this question.
+
+With `Server: later`, keep the frontend template alone (`--template frontend/<id>` from a kept
+stack, chosen by the same rule), skip the server, capability and deploy-mode questions, and pass
+`--flag <name>=false` for each frontend flag the scope does not use. Auth is `none` and the Data
+store "decide later".
 
 Ask each remaining choice in turn: the frontend framework when the kept stacks differ in it (name
 the options by template id: `frontend/react`, `frontend/angular`, `frontend/vue`), then the
@@ -151,7 +156,8 @@ node scripts/bootstrap.mjs --stack <id> --name <project-name> \
   [--flag k=v]… [--capability k=v]… [--deploy single|split] [brand flags]…
 ```
 
-Take the brand flags from the `Design` form; pass only the fields that hold a value:
+A lone frontend passes `--template frontend/<id>` in place of `--stack <id>`. Take the brand
+flags from the `Design` form; pass only the fields that hold a value:
 
 | Design field | Flag |
 | --- | --- |
@@ -182,13 +188,13 @@ Take the brand flags from the `Design` form; pass only the fields that hold a va
 The run:
 
 - Creates the packages the stack lists, under the directories it names; a merged
-  `docker-compose.yml` and `.gitignore`; `.editorconfig` when absent; and
+  `docker-compose.yml` (none for a lone frontend) and `.gitignore`; `.editorconfig` when absent; and
   `.fullstack/catalog.yaml`, the provenance file (per package: template, version, flags,
   capabilities, commands and ports; plus the top-level `providers` map, empty when none was
   chosen).
 - With a provider, adds its service to `docker-compose.yml`, `db/` with the database init
   script, and the connection variable in the server's `.env.example`.
-- Installs each package and runs its `contract` and `format` commands.
+- Installs each package and runs its `contract` (if it has one) and `format` commands.
 - Writes the root `README.md` from a template (`bootstrap.mjs`, once the generator has run),
   leaving two placeholder lines for section 5: `<!-- readme:about -->` and
   `<!-- readme:features -->`.
@@ -241,7 +247,7 @@ On Linux and macOS: `lsof -ti :<port> | xargs -r kill`. Confirm the port is free
 check: `Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction SilentlyContinue`
 (Windows) or `lsof -i :<port> -sTCP:LISTEN` (Linux, macOS) prints nothing.
 
-**App check.**
+**App check.** A lone frontend has no Compose file: skip it.
 
 1. Export in the shell (never in a file) a throwaway value for every secret the server's
    `.env.example` lists, and with a provider its `DATABASE_URL`: the server refuses to start in
@@ -267,46 +273,25 @@ development runs with defaults and warns.
 
 Do each item; the dev loop refuses to start until the last one holds.
 
-1. **Backlog.** Follow the grammar at the top of `.plan/000-backlog.md`. With no database
-   provider passed at generation, the first line is `- [ ] add the <engine> data layer` for a
-   named engine, or `- [ ] add the data layer` for "decide later"; append ` | stack:backend` only
-   when the stack has no frontend (the `database` skill says what that task delivers, and why the
-   frontend takes part). The first in-scope capability from the product definition is the first
+1. **Backlog.** Follow the grammar at the top of `.plan/000-backlog.md`. With no server, no
+   data-layer line. With a server and no database provider passed at generation, the first line
+   is `- [ ] add the <engine> data layer | stack:backend` for a named engine, or
+   `- [ ] add the data layer | stack:backend` for "decide later" (the `database` skill says what
+   that task delivers). The first in-scope capability from the product definition is the first
    line with a provider, the next line without one. Set `tracker:` in the backlog header to
    `linear` or `none` as the user prefers.
-2. **Stack.** Fill the `Stack` row of the components table in `.doc/architecture.md` from
-   `.fullstack/catalog.yaml`: the stack id and, per package, its directory, template and
-   version, plus the reason for the frontend choice (the Search and sharing answer).
+2. **Architecture rows.** Fill `.doc/architecture.md` per the table in
+   `.claude/skills/dev-loop/scaffold-step.md`: all rows; for a lone frontend only `Stack`, and
+   `n/a: no server yet` in the Client model, Deployment, Data store and Data migrations places.
 3. **README.** In `README.md`, replace `<!-- readme:about -->` with About, written from Purpose
    and Problem Statement, and `<!-- readme:features -->` with Features: the in-scope capabilities
    from Product Scope, one line each, written `- <capability> (planned)` (nothing is built yet);
    the dev loop removes the ` (planned)` suffix when a task delivers the capability.
-4. **Client model.** Replace the Client model marker in the Auth section of
-   `.doc/architecture.md` with the line for the chosen frontend:
-   - Server-rendered (Next): the frontend's server is the backend's client (no browser
-     fetch). CORS is off unless `CORS_ORIGINS` is set. Rate limits key on the client
-     address. The opt-in `CLIENT_IP_HEADER` makes the frontend forward the visitor's address
-     (the `deployment` skill, section 6); without it all visitors share one rate-limit bucket,
-     about 30 active signed-in visitors per 15 minutes.
-   - Single-page app (React, Angular, Vue): the browser calls `/api` on the page's own origin
-     (the server in `single`, the frontend image's proxy in `split`), so there is no CORS and no
-     API URL in the bundle. Rate limits key on the client address, so `TRUST_PROXY` is the hop
-     count in front of the server (`false` in `single` locally, `1` in `split`).
-5. **Deployment.** Fill `.doc/architecture.md › Operational Concerns`, its Deployment list: the
-   deploy mode (the top-level `deploy:` of `.fullstack/catalog.yaml`; "n/a" when the file has no
-   `deploy:`, a stack with no frontend or no server) and the local `TRUST_PROXY` default
-   (`false` in `single`, 1 in `split`).
-6. **Data store.** With a provider, fill the Data store section and the components table's
-   `Data store` row from what was generated: engine and version from the provider service's
-   image in `docker-compose.yml` (or the package's `AGENTS.md › Adding the data layer`); the
-   client library and the local service (the provider's Compose service and its connection
-   variable) from that `AGENTS.md` section and `.fullstack/catalog.yaml`. With no provider, write
-   `none yet: the data-layer task writes it` in the `Local service` line and that row, so the
-   first task is not blocked by them.
-7. **Change Log.** Replace its FILL line in `.doc/architecture.md` with
-   `- <YYYY-MM-DD>: initial architecture accepted; <stack id>, deploy <mode>, <engine or in-memory store>.`
+4. **Change Log.** Replace its FILL line in `.doc/architecture.md` with
+   `- <YYYY-MM-DD>: initial architecture accepted; <stack id>, deploy <mode>, <engine or
+   in-memory store>.` (A lone frontend: its template id, no deploy, no store.)
    Later entries go above it (newest first).
-8. **Ready to plan.** Three markers may stay open, each until its own decision: the production
+5. **Ready to plan.** Three markers may stay open, each until its own decision: the production
    `TRUST_PROXY` (the user's to decide, the `deployment` skill), the production target, and Data
    migrations when no provider was chosen. Every other marker holds an answer. "Decide later" is
    an answer for the Data store engine alone: a marker the user cannot answer stays, is named in
