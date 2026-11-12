@@ -84,10 +84,10 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 
 React, Angular and Vue are the single-page frontends. Next is for products whose public pages
 must be found by search engines or show a rich preview when shared. The dev loop has exercised
-React and Next; Angular arrived in catalog v1.6.0, React's structure (Redux Toolkit, RTK Query and
-the global SCSS tree) in v1.7.0, Vue in v1.8.0, and v1.9.0 moved the three SPA trees to `pages/` and
-`components/` with co-located styles; v1.10.0 removed the template header, navigation, footer
-and example screen. Report any gap you meet.
+React and Next. Catalog history: Angular v1.6.0; React on Redux Toolkit, RTK Query and the global
+SCSS tree v1.7.0; Vue v1.8.0; `pages/` and co-located styles in the SPAs v1.9.0; no template chrome
+or example screen v1.10.0; Next on SCSS without Tailwind, one folder shape for the four frontends
+(`layout/`, `models/<entity>/`) and `/api/auth/signup` v1.12.0. Report any gap you meet.
 
 ## Updating the harness
 
