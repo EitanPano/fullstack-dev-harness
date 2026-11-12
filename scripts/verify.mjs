@@ -6,7 +6,7 @@
 // With --reuse a passing step whose key (package subtree, shared inputs, command, Base) is
 // unchanged is taken from an earlier result instead of re-run. A full run with a Base also
 // writes review.diff; --round <n> --round-base <tree> adds review-fix-<n>.diff.
-import { mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { readProvenance } from './provenance.mjs'
@@ -294,10 +294,12 @@ export async function runVerify(options) {
       return database
     }
 
+    // A lone frontend has no Compose file and no database: nothing there needs Docker.
+    const hasCompose = existsSync(path.join(root, 'docker-compose.yml'))
     const needsDocker =
-      !partial ||
       selected.some((p) => has(p, 'testDb')) ||
-      (!options.noE2e && selected.some((p) => has(p, 'testE2e')))
+      (hasCompose &&
+        (!partial || (!options.noE2e && selected.some((p) => has(p, 'testE2e')))))
     if (needsDocker) {
       await hasDatabase()
       if (dockerMissing(listed)) return fail2('docker unavailable')
@@ -337,7 +339,7 @@ export async function runVerify(options) {
       }
     }
     // A database in the Compose file with no testDb command would leave its suites unrun.
-    if (!partial && withDb.length === 0 && (await hasDatabase())) {
+    if (!partial && withDb.length === 0 && hasCompose && (await hasDatabase())) {
       addCheck('testdb-defined', false, 'the database service exists but no package has testDb')
     }
     const e2e = options.noE2e ? [] : selected.filter((pkg) => has(pkg, 'testE2e'))

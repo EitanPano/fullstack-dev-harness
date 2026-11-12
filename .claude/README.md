@@ -9,10 +9,12 @@ replaced on an update.
 
 1. A task is one line in `.plan/000-backlog.md`.
 2. The orchestrator drafts the plan into `.orchestrate/<slug>/plan.md`, with a `UX` line per
-   route (pattern, primary action, states, tone) and a `shell` line for the chrome. You approve
-   the draft; the driver then cuts the task's branch and promotes it to
-   `.plan/NNN-YYYY-MM-DD-<slug>.md`. Once a task's implementers are running, the orchestrator
-   plans the next backlog line in the background.
+   route (pattern, primary action, states, tone) and a `shell` line for the chrome. You approve the
+   draft; the driver then cuts the task's branch and promotes it to
+   `.plan/NNN-YYYY-MM-DD-<slug>.md`. A plan whose `Scaffold:` line is not `none` first runs
+   `scripts/scaffold.mjs` and commits its result as the task's `Base:`; from catalog v1.11.0 a
+   project may start as a frontend alone and gain a server later. Once a task's implementers are
+   running, the orchestrator plans the next backlog line in the background.
 3. The backend agent implements the plan's Contract and regenerates the server's contract (the
    contract stage); then the backend and frontend agents work in parallel, the frontend
    regenerating its types and implementing the feature. Both test first. After e2e has captured
@@ -20,8 +22,7 @@ replaced on an update.
    light, phone dark, desktop light) against the `ui-design` rubric and fixes what fails.
 4. `node scripts/verify.mjs --plan <plan> --reuse` runs the gates and writes
    `.orchestrate/<slug>/verify.json` (run in the background; it can outlive a foreground
-   timeout). When the data-layer task adds `testDb` and `migrate`, the driver records them in
-   `.fullstack/catalog.yaml` from the backend's `Commands:` line first.
+   timeout).
 5. One reviewer (plus a security reviewer when `verify.json` says `security.triggered`) and QA
    run in parallel. P0 and P1 findings go back to the implementer, at most two fix rounds, each
    re-reviewed on its own diff. QA adds adversarial tests, runs a UX pass over the same
@@ -83,10 +84,10 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 
 React, Angular and Vue are the single-page frontends. Next is for products whose public pages
 must be found by search engines or show a rich preview when shared. The dev loop has exercised
-React and Next; Angular arrived in catalog v1.6.0, React's structure (Redux Toolkit, RTK Query and
-the global SCSS tree) in v1.7.0, Vue in v1.8.0, and v1.9.0 moved the three SPA trees to `pages/` and
-`components/` with co-located styles; v1.10.0 removed the template header, navigation, footer
-and example screen. Report any gap you meet.
+React and Next. Catalog history: Angular v1.6.0; React on Redux Toolkit, RTK Query and the global
+SCSS tree v1.7.0; Vue v1.8.0; `pages/` and co-located styles in the SPAs v1.9.0; no template chrome
+or example screen v1.10.0; Next on SCSS without Tailwind, one folder shape for the four frontends
+(`layout/`, `models/<entity>/`) and `/api/auth/signup` v1.12.0. Report any gap you meet.
 
 ## Updating the harness
 

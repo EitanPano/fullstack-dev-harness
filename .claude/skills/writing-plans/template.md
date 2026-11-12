@@ -7,6 +7,7 @@ Branch: feat/<slug>
 Base: <commit the branch was created from>
 Stages: backend, frontend, qa
 Retired: `<exact name or path the task renames or removes>`, … | none
+Scaffold: <scaffold.mjs arguments> | none
 
 ## Goal
 

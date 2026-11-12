@@ -76,7 +76,7 @@ test('a --root that does not exist is reported as missing', () => {
 
 // A fake catalog whose generator records its argv and writes a provenance file, so the test
 // sees exactly what bootstrap forwards without a real scaffold or the network.
-function runWithFakeGenerator(extraArgs) {
+function runWithFakeGenerator(extraArgs, primary = ['--stack', 'x']) {
   const catalog = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-catalog-'))
   const root = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-root-'))
   try {
@@ -99,7 +99,7 @@ function runWithFakeGenerator(extraArgs) {
     spawnSync('git', ['init', '-q'], { cwd: root })
     const result = spawnSync(
       process.execPath,
-      [script, '--stack', 'x', '--name', 'y', '--root', root, '--templates', catalog, ...extraArgs],
+      [script, ...primary, '--name', 'y', '--root', root, '--templates', catalog, ...extraArgs],
       {
         encoding: 'utf8',
         env: { ...process.env, FULLSTACK_TEMPLATES_DIR: '' },
@@ -193,6 +193,48 @@ test('the main run replaces the README with the project one, no token left', () 
   assert.match(readme, /<!-- readme:about -->/)
   assert.match(readme, /<!-- configuration:start -->/)
   assert.doesNotMatch(readme, /{{/)
+})
+
+const TEMPLATE = ['--template', 'frontend/react']
+
+test('--template is forwarded to the generator instead of --stack', () => {
+  const { result, forwarded } = runWithFakeGenerator([], TEMPLATE)
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(forwarded[forwarded.indexOf('--template') + 1], 'frontend/react')
+  assert.equal(forwarded.includes('--stack'), false)
+})
+
+test('--stack is still forwarded as --stack', () => {
+  const { forwarded } = runWithFakeGenerator([])
+  assert.equal(forwarded[forwarded.indexOf('--stack') + 1], 'x')
+  assert.equal(forwarded.includes('--template'), false)
+})
+
+test('exactly one of --stack and --template is required', () => {
+  const both = runWithFakeGenerator(['--template', 'frontend/react'])
+  assert.equal(both.result.status, 1)
+  assert.match(both.result.stderr, /exactly one of --stack and --template/)
+  const neither = runWithFakeGenerator([], [])
+  assert.equal(neither.result.status, 1)
+  assert.match(neither.result.stderr, /exactly one of --stack and --template/)
+})
+
+test('--deploy with --template is refused before anything runs', () => {
+  const { result, forwarded } = runWithFakeGenerator(['--deploy', 'single'], TEMPLATE)
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /--deploy.*--template|--template.*--deploy/)
+  assert.equal(forwarded, undefined)
+})
+
+test('the next steps name Compose only when the project has a docker-compose.yml', () => {
+  const alone = runWithFakeGenerator([], TEMPLATE)
+  assert.doesNotMatch(alone.result.stdout, /[Cc]ompose/)
+  assert.match(alone.result.stdout, /Then:/)
+})
+
+test('--help lists --template', () => {
+  const help = spawnSync(process.execPath, [script, '--help'], { encoding: 'utf8' })
+  assert.match(help.stdout, /--template <kind>\/<id>/)
 })
 
 function finishIn(setup) {

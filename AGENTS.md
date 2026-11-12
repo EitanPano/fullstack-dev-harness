@@ -23,7 +23,7 @@ The single source of truth for how work is done here; a package's versions are i
   Edit/Write; shell write channels, deletions, inline interpreters and git commands changing
   the tree or history are refused. `orchestrator` and `reviewer` may run any
   runtime's inline code and stdin programs.
-- A file a role agent needs removed goes in its report under `Delete:`; the driver removes it
+- A role agent lists a file to remove under `Delete:` in its report; the driver removes it
   inside that agent's lane only.
 - Never route around a refusal; report it.
 - Lanes stop accidents; they are no sandbox (use Claude Code's or a container). Recovery:
@@ -42,7 +42,7 @@ The single source of truth for how work is done here; a package's versions are i
 | `.claude/` | `agents/`, `skills/`, `rules/`, `hooks/`; `harness.json`, the file manifest | Harness |
 | `catalog.lock` | The pinned catalog version; frozen in a project | Humans |
 | `.fullstack/` | `catalog.yaml` (stack, flags, commands, ports); `harness.json`, the harness version | The bootstrap |
-| `scripts/` | `verify.mjs`, `readme.mjs`, `harness-update.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
+| `scripts/` | `verify.mjs`, `readme.mjs`, `harness-update.mjs`, `scaffold.mjs`, `catalog.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
 | `frontend/`, `backend/` | Generated packages | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | Compose stack, database init | Backend agent |
 | `.orchestrate/<slug>/` | Loop output per task: draft `plan.md`, reports, `ticket.md`, verify results, review diffs | The loop |
@@ -67,13 +67,13 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 | `test`, `testDb`, `e2eDb`, `testE2e` | Unit; suite on the test database; prepare the e2e database; e2e with accessibility scan. |
 | `contract`, `migrate` | OpenAPI out, or types regenerated; apply the data model change. |
 
-`testDb`, `e2eDb` and `migrate` exist once a database does: the data-layer task names them in
-its backend report (`Commands:`); the driver records them.
+`testDb`, `e2eDb` and `migrate` arrive with the database part.
 Never run a scaffolder inside an existing package, except one the package's `AGENTS.md` names.
 
 ## Architecture
 
-Two packages, one generated contract; layer maps: each package's `AGENTS.md`.
+A package exists when the product needs it: the bootstrap creates the first, `scripts/scaffold.mjs`
+adds later ones; layer maps: its `AGENTS.md`.
 
 - Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
   `middleware/`, `services/`, `infra/`. Modules meet only through controllers; never import
@@ -113,8 +113,8 @@ Done means every item holds, with evidence.
 7. `.doc/architecture.md` logs changes to routes, auth boundaries or the data model; new
    domain terms are in `.doc/glossary.md`.
 8. The review stage reports no open P0 or P1 finding.
-9. The root `README.md`'s Features names each user-visible capability the change adds or changes; its
-   Configuration block is regenerated with `node scripts/readme.mjs --configuration`.
+9. The root `README.md`'s Features names each user-visible capability the change adds or changes;
+   `node scripts/readme.mjs --configuration` regenerates its Configuration block.
 
 ## Skills
 

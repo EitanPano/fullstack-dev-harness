@@ -158,14 +158,25 @@ test('clearHarnessHistory on an empty root returns empty lists and creates nothi
   assert.deepEqual(readdirSync(root), [])
 })
 
-test('authFlagFrom reads the resolved flag from the provenance', () => {
+test('authFlagFrom is true only for an explicit auth: true under a package flags', () => {
   const dir = tempRoot()
   const file = path.join(dir, 'catalog.yaml')
-  writeFileSync(file, 'packages:\n  backend:\n    flags:\n      auth: false\n')
-  assert.equal(authFlagFrom(file), false)
-  writeFileSync(file, 'packages:\n  backend:\n    flags:\n      auth: true\n')
+  const of = (flags) => `packages:\n  backend:\n    template: server/x\n    flags:\n${flags}`
+  writeFileSync(file, of('      auth: true\n'))
   assert.equal(authFlagFrom(file), true)
-  assert.equal(authFlagFrom(path.join(dir, 'missing.yaml')), true)
+  writeFileSync(file, of('      auth: false\n'))
+  assert.equal(authFlagFrom(file), false)
+  writeFileSync(file, of('      cache: true\n'))
+  assert.equal(authFlagFrom(file), false, 'no auth line')
+  writeFileSync(file, 'packages:\n  frontend:\n    template: frontend/react\n')
+  assert.equal(authFlagFrom(file), false, 'a frontend alone has no flags')
+  writeFileSync(file, 'packages:\n  a:\n    flags:\n      x: 1\n    notes:\n      auth: true\n')
+  assert.equal(authFlagFrom(file), false, 'auth outside flags does not count')
+  writeFileSync(file, of('      auth: true  # on\n'))
+  assert.equal(authFlagFrom(file), true, 'a trailing comment')
+  writeFileSync(file, of('      auth: false # off\n'))
+  assert.equal(authFlagFrom(file), false)
+  assert.equal(authFlagFrom(path.join(dir, 'missing.yaml')), false)
   assert.ok(!existsSync(path.join(dir, 'missing.yaml')))
 })
 
@@ -472,6 +483,22 @@ test('writeProjectReadme fills every mechanical part from the catalog', () => {
   assert.match(text, /<!-- readme:features -->/)
   assert.match(text, /No license has been chosen yet/)
   assert.doesNotMatch(text, /\{\{/)
+})
+
+test('writeProjectReadme wraps each generated block in a marker pair', () => {
+  const { root, template } = readmeFixture()
+  writeProjectReadme(root, 'plant-care', template, catalogRoot())
+  const text = readFileSync(path.join(root, 'README.md'), 'utf8')
+  const names = ['prerequisites', 'installation', 'usage', 'usage-notes', 'configuration', 'tests']
+  let at = 0
+  for (const name of names) {
+    const start = text.indexOf(`<!-- ${name}:start -->`, at)
+    const end = text.indexOf(`<!-- ${name}:end -->`, start)
+    assert.ok(start >= at && end > start, name)
+    at = end
+  }
+  assert.match(text, /<!-- installation:start -->\n```bash\ngit clone/)
+  assert.match(text, /<!-- usage-notes:start -->\nOpen http/)
 })
 
 test('writeProjectReadme falls back to a placeholder URL and names a LICENSE file', () => {

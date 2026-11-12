@@ -33,7 +33,8 @@ Contract and `Retired:` strings had landed.
 2. If a `.doc/` section you depend on still holds a `<!-- FILL: … -->` marker, write a plan
    with `Status: blocked` naming the marker, save it as `.orchestrate/<slug>/plan.md`, print its
    path, and stop.
-3. Copy `.claude/skills/writing-plans/template.md` and fill it. The `Contract` table is exact:
+3. Copy `.claude/skills/writing-plans/template.md` and fill it; fill `Scaffold:` from
+   `.fullstack/catalog.yaml` and what the task needs. The `Contract` table is exact:
    endpoints, request fields, response fields, error codes. `Stages:` lists `backend` only
    when the task touches the API or the database (never for a `stack:frontend` task), and
    `frontend` never for a `stack:backend` task.
