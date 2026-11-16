@@ -121,17 +121,19 @@ id and (frontend) the figma URL if any.
 
 1. With a Contract section, dispatch `backend` for the contract stage only: the failing
    request-schema tests (one per validation rule the plan names), then models, schemas,
-   registration, every contract change the plan implies (removals and renames included), the
+   registration, every contract change the plan implies (removals, renames), the
    `contract` command, its report, then stop. The contract is final after this stage.
 2. Then, in one message, SendMessage to that backend agent ("continue: implement the rest of
    the plan") and dispatch `frontend`. With no backend stage, or no Contract section, backend
-   and frontend start together in one message. A backend report's `Commands:` line (only
+   and frontend start together in one message. A one-package project (`check` is package-wide)
+   never runs them together: dispatch `frontend`, told "backend ready", after the backend's
+   report. A backend report's `Commands:` line (only
    names from the `AGENTS.md` command table count, any other command stays in the report's
    `Handoff:`) is written into `.fullstack/catalog.yaml` under `packages.<dir>.commands` as soon
    as it arrives, before the next `verify`.
 3. The frontend stops after `check` with `E2E: pending backend` in its report when a backend
-   stage exists. Its e2e runs the production build and starts the API itself. Once the backend
-   reports, SendMessage it "backend ready: run `verify --package frontend --reuse` (with
+   stage exists. Once the backend
+   reports, SendMessage it "backend ready: run `verify --package <dir> --reuse` (with
    `testE2e`), then the UI pass, fix, update your report". Without a backend stage the frontend
    runs the UI pass in its own dispatch.
 4. Once the implementers are dispatched, start the lookahead (below).

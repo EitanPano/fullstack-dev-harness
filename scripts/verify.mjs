@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { readProvenance } from './provenance.mjs'
+import { kindOf, readProvenance } from './provenance.mjs'
 import { check as hitCheck, diffChecks } from './verify/checks.mjs'
 import { addedLines, changedFiles, git, treeHash } from './verify/git.mjs'
 import { isMain } from './verify/main.mjs'
@@ -196,11 +196,13 @@ export async function runVerify(options) {
     }
 
     Object.assign(result, { startTree, packages: {}, checks: [] })
-    const isFrontend = (pkg) => pkg.template.startsWith('frontend/') || 'testE2e' in pkg.commands
+    // Named by template kind, not by which commands a package has: a `fullstack` package has
+    // testE2e and is no server, and it is the only package of its project.
+    const isServer = (pkg) => kindOf(pkg.template) === 'server'
     // The server goes first so its contract is regenerated before the frontend's types.
     const selected = catalog.packages
       .filter((pkg) => chosen.length === 0 || chosen.includes(pkg.dir))
-      .sort((a, b) => Number(isFrontend(a)) - Number(isFrontend(b)))
+      .sort((a, b) => Number(!isServer(a)) - Number(!isServer(b)))
     const has = (pkg, name) => name in pkg.commands
     // A partial run answers for its own packages; a sibling's concurrent edit is not its failure.
     const scope = partial ? selected.map((pkg) => pkg.dir) : undefined
@@ -219,7 +221,7 @@ export async function runVerify(options) {
       entry[name] = outcome
     }
     // The keys come from the start tree; the end tree's must match for a result to be reusable.
-    const startKey = keyFactory(root, startTree, catalog.packages, isFrontend, base)
+    const startKey = keyFactory(root, startTree, catalog.packages, isServer, base)
     const sources = options.reuse ? readSources(outDir) : []
     const lookup = (pkg, name) => findReusable(sources, pkg.dir, name, startKey(pkg, name))
     const step = async (pkg, name, hit) => {
@@ -269,6 +271,8 @@ export async function runVerify(options) {
     }
 
     // The database service is listed once, and started once, for testDb and the e2e migration.
+    // A project with no such Compose service has its database inside the package (a local file),
+    // so those steps are plain package commands and Docker is not involved.
     let listed
     const hasDatabase = async () => {
       listed ??= await runCommand(`${docker} compose config --services`, { cwd: root, timeout: MIN })
@@ -277,9 +281,14 @@ export async function runVerify(options) {
     // POSIX shells exit 127 for a missing command; cmd.exe says "not recognized".
     const dockerMissing = (run) =>
       run.exit === 127 || /not recognized|command not found|ENOENT/i.test(run.output)
+    // The database is inside the package exactly when the project has a fullstack package (a
+    // local file, no Compose service); any other project must list a `database` service.
+    const hasCompose = existsSync(path.join(root, 'docker-compose.yml'))
+    const inPackage = catalog.packages.some((p) => kindOf(p.template) === 'fullstack')
     let database
     const ensureDatabase = async () => {
       if (database !== undefined) return database
+      if (inPackage) return (database = { ok: true })
       if (!(await hasDatabase())) {
         const reason = 'no database service in `docker compose config --services`'
         database = { ok: false, reason }
@@ -294,10 +303,9 @@ export async function runVerify(options) {
       return database
     }
 
-    // A lone frontend has no Compose file and no database: nothing there needs Docker.
-    const hasCompose = existsSync(path.join(root, 'docker-compose.yml'))
+    // A lone frontend or a fullstack package has no Compose file: nothing there needs Docker.
     const needsDocker =
-      selected.some((p) => has(p, 'testDb')) ||
+      (!inPackage && selected.some((p) => has(p, 'testDb'))) ||
       (hasCompose &&
         (!partial || (!options.noE2e && selected.some((p) => has(p, 'testE2e')))))
     if (needsDocker) {
@@ -358,8 +366,9 @@ export async function runVerify(options) {
         // Every server's migrate runs, not only the selected ones: a frontend-only run still
         // needs the backend's database migrated.
         // A server with `e2eDb` prepares its own database in the e2e chain, so its dev
-        // migrate is skipped; a 1.x server without it keeps the step.
-        for (const pkg of catalog.packages.filter((p) => !isFrontend(p) && has(p, 'migrate'))) {
+        // migrate is skipped; a 1.x server without it keeps the step. A fullstack package is no
+        // server: its testE2e chain runs `e2eDb` itself, so verify runs neither it nor `migrate`.
+        for (const pkg of catalog.packages.filter((p) => isServer(p) && has(p, 'migrate'))) {
           const db = await ensureDatabase()
           if (!db.ok) refuse(pkg, 'migrate', db.reason)
           else if (has(pkg, 'e2eDb')) skip(pkg, 'migrate', 'skipped: e2eDb prepares the e2e database')
@@ -412,7 +421,7 @@ export async function runVerify(options) {
       result.security = securityFor(files, patch)
     }
     // A step is reusable only if it passed and its inputs were the same when the run ended.
-    const endKey = keyFactory(root, endTree, catalog.packages, isFrontend, base)
+    const endKey = keyFactory(root, endTree, catalog.packages, isServer, base)
     for (const pkg of selected) {
       for (const name of KEYED) {
         const entry = result.packages[pkg.dir]?.[name]

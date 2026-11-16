@@ -7,7 +7,7 @@ description: Add or change an API endpoint, its request schemas, or the generate
 
 The rules are in `AGENTS.md`; the layer map, the import table, the worked example and the
 engine seam are in the server package's `AGENTS.md` (`backend/AGENTS.md` in a generated
-project); this skill is the procedure.
+project; in a one-package project its shared schemas are the contract, with no `contract` command); this skill is the procedure.
 
 ## Conventions
 
@@ -31,8 +31,7 @@ project); this skill is the procedure.
   the endpoint reads, and the handler reads them typed. A failure is always the same 400
   envelope, naming the part (`invalid body`) and the fields. `backend/AGENTS.md › Adding a
   module` shows the spelling.
-- Rate limits are declared in the router, ahead of validation, so a 429 does not wait for
-  parsing. Each endpoint has its own entry in the package's policy constants (never
+- Rate limits are declared in the router, ahead of validation. Each endpoint has its own entry in the package's policy constants (never
   literals in a router) and so never shares another endpoint's bucket. The subject of the
   limit is hashed into the store key, never stored in clear.
 - Every endpoint's errors are declared in its OpenAPI registration, so the frontend's

@@ -2,6 +2,7 @@
 // Pure functions plus one Bun child process for YAML; the harness stays dependency-free.
 import { spawnSync } from 'node:child_process'
 import { resolveCommand } from '../catalog.mjs'
+import { kindOf } from '../provenance.mjs'
 
 export class ScaffoldError extends Error {
   constructor(message, exit = 2) {
@@ -20,8 +21,7 @@ export const USAGE =
   '[--root <dir>]\n' +
   '       node scripts/scaffold.mjs --help'
 
-const DEFAULT_DIR = { frontend: 'frontend', server: 'backend' }
-const kindOf = (template) => template.split('/')[0]
+const DEFAULT_DIR = { frontend: 'frontend', server: 'backend', fullstack: 'app' }
 
 // Bun parses the YAML (a line scan cannot carry free text safely); the path travels as an
 // argument, never through a shell.
@@ -96,6 +96,14 @@ const entries = (provenance) => Object.entries(provenance.packages ?? {})
 // The request may only add. `stackPackages` is the chosen stack's `packages:` list, or undefined.
 export function checkRequest(provenance, options, stackPackages) {
   const existing = entries(provenance)
+  // A fullstack package holds pages, functions and database: nothing is added beside it.
+  const whole = existing.find(([, pkg]) => kindOf(pkg.template) === 'fullstack')
+  if (whole !== undefined && (options.stack !== undefined || options.capabilities.length > 0)) {
+    throw new ScaffoldError(
+      `${whole[0]} is a fullstack package, the whole application: a server or frontend part ` +
+        'cannot be added beside it',
+    )
+  }
   if (options.deploy !== undefined && options.stack === undefined) {
     throw new ScaffoldError('--deploy needs --stack: a lone package has no deploy mode')
   }
@@ -230,8 +238,18 @@ export function partsOf(base, next, options) {
   return parts
 }
 
-export function ownerOf(provenance, dir) {
-  const template = provenance.packages?.[dir]?.template
-  if (template === undefined) return 'driver'
-  return kindOf(template) === 'frontend' ? 'frontend' : 'backend'
+// The role that owns a conflicting file: the roles whose recorded lane holds the path (all of
+// them when a path is in two lanes), else the kind's role for a package that records no lanes.
+export function ownerOf(provenance, dir, rel) {
+  const pkg = provenance.packages?.[dir]
+  if (pkg === undefined) return 'driver'
+  if (pkg.lanes != null && rel !== undefined) {
+    const inside = rel.slice(dir.length + 1)
+    const holds = (lane) => (lane.endsWith('/') ? inside.startsWith(lane) : inside === lane)
+    const roles = Object.entries(pkg.lanes)
+      .filter(([, lanes]) => lanes.some(holds))
+      .map(([role]) => role)
+    return roles.length === 0 ? 'driver' : roles.join(' and ')
+  }
+  return kindOf(pkg.template) === 'frontend' ? 'frontend' : 'backend'
 }

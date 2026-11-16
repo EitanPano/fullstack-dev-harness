@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs'
 
+// The template kind (`server`, `frontend`, `fullstack`) is the part of the template id before
+// the slash; the scripts name a package's kind by it, never by which commands it happens to have.
+export const kindOf = (template) => template.split('/')[0]
+
 // The generator writes the provenance file in a fixed shape, so a line scan for the facts needed
 // (deploy, and per package its template, http.port and commands) replaces a YAML dependency.
+// `http` reads in both the block and the inline (`{ port: 1 }`) form.
 export function readProvenance(file) {
   const result = { deploy: undefined, packages: [] }
   let text = ''
@@ -50,6 +55,7 @@ export function readProvenance(file) {
       inCommands = key[1] === 'commands'
       folded = undefined
       if (key[1] === 'template') pkg.template = unquote(key[2])
+      if (key[1] === 'http') pkg.port = Number(/\bport:\s*(\d+)/.exec(key[2])?.[1]) || pkg.port
       continue
     }
     if (inCommands && pkg !== undefined) {

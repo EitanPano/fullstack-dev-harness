@@ -87,12 +87,20 @@ async function freePort() {
 
 // A repository with a server package (`backend`) and a frontend, committed, with a plan whose
 // Base is that commit. `commands` overrides one command of one package.
-async function fixture({ commands = {}, ports, noDb = false, plan = true, compose = false } = {}) {
+async function fixture({
+  commands = {},
+  ports,
+  noDb = false,
+  plan = true,
+  compose = false,
+  lone = false,
+} = {}) {
   const base = mkdtempSync(path.join(tmpdir(), 'verify-'))
   bases.push(base)
   const root = path.join(base, 'repo')
-  mkdirSync(path.join(root, 'backend'), { recursive: true })
-  mkdirSync(path.join(root, 'frontend'), { recursive: true })
+  for (const dir of lone ? ['app'] : ['backend', 'frontend']) {
+    mkdirSync(path.join(root, dir), { recursive: true })
+  }
   mkdirSync(path.join(root, '.fullstack'))
   mkdirSync(path.join(root, '.plan'))
   const [backendPort, frontendPort] = ports ?? [await freePort(), await freePort()]
@@ -106,11 +114,22 @@ async function fixture({ commands = {}, ports, noDb = false, plan = true, compos
     },
     frontend: { contract: stub('pass'), check: stub('pass'), testE2e: stub('pass') },
   }
-  const lines = ['deploy: split', 'packages:']
-  for (const [dir, template, port] of [
-    ['frontend', 'frontend/react', frontendPort],
-    ['backend', 'server/python-fastapi', backendPort],
-  ]) {
+  // One fullstack package: no Compose file, no deploy mode, every command on the same package.
+  defaults.app = {
+    check: stub('pass'),
+    testDb: stub('pass'),
+    migrate: stub('pass'),
+    e2eDb: stub('pass'),
+    testE2e: stub('pass'),
+  }
+  const lines = lone ? ['packages:'] : ['deploy: split', 'packages:']
+  const members = lone
+    ? [['app', 'fullstack/astro-cloudflare-pages', frontendPort]]
+    : [
+        ['frontend', 'frontend/react', frontendPort],
+        ['backend', 'server/python-fastapi', backendPort],
+      ]
+  for (const [dir, template, port] of members) {
     lines.push(`  ${dir}:`, `    template: ${template}`, '    http:', `      port: ${port}`)
     lines.push('    commands:')
     for (const [name, line] of Object.entries({ ...defaults[dir], ...commands[dir] })) {
@@ -132,9 +151,12 @@ async function fixture({ commands = {}, ports, noDb = false, plan = true, compos
     '<!-- configuration:end -->',
   ].join('\n')
   writeFileSync(path.join(root, 'README.md'), `# Fixture\n\n${none}\n`)
-  writeFileSync(path.join(root, 'backend', 'contract.json'), 'v1')
-  writeFileSync(path.join(root, 'backend', 'app.ts'), 'export const a = 1\n')
-  writeFileSync(path.join(root, 'frontend', 'app.ts'), 'export const b = 1\n')
+  if (lone) writeFileSync(path.join(root, 'app', 'app.ts'), 'export const a = 1\n')
+  else {
+    writeFileSync(path.join(root, 'backend', 'contract.json'), 'v1')
+    writeFileSync(path.join(root, 'backend', 'app.ts'), 'export const a = 1\n')
+    writeFileSync(path.join(root, 'frontend', 'app.ts'), 'export const b = 1\n')
+  }
   if (noDb) writeFileSync(path.join(base, 'no-db'), '')
   if (compose) writeFileSync(path.join(root, 'docker-compose.yml'), 'services: {}\n')
   git(root, 'init', '-q')
@@ -1174,6 +1196,20 @@ test('env-prefixed names and credential directories stay out of the review body'
   assert.match(text, /\+PLACEHOLDER=1/)
 })
 
+test('wrangler local secret files stay out of the review body, the example does not', async () => {
+  const fx = await reviewFixture()
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars'), 'DEVVARS-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars.production'), 'DEVVARS-PROD-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars.example'), 'PLACEHOLDER=1\n')
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const text = readFileSync(path.join(outDir(fx), 'review.diff'), 'utf8')
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.dev\.vars(,|\n)/)
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.dev\.vars\.production/)
+  assert.doesNotMatch(text, /DEVVARS-BODY|DEVVARS-PROD-BODY/)
+  assert.doesNotMatch(text, /not shown: .*\.dev\.vars\.example/)
+  assert.match(text, /\+PLACEHOLDER=1/)
+})
+
 test('a failing git call leaves no review package and exits 2', async () => {
   const { writeReviewPackage } = await import('./verify/review.mjs')
   const fx = await reviewFixture()
@@ -1258,6 +1294,44 @@ test('--package and --no-e2e runs skip the readme check', async () => {
   assert.equal(packaged.exit, 0)
   assert.equal(read(fx, 'verify-partial.json').checks.some((c) => c.name === 'readme'), false)
   assert.equal((await runVerify(opts(fx, { noE2e: true }).options)).exit, 0)
+})
+
+// One fullstack package, as the astro-cloudflare-pages stack records it: no Compose file, so the
+// database steps are plain package commands and docker is never called.
+test('a one-package project runs testDb and the e2e chain and never calls docker', async () => {
+  const absent = await fixture({ lone: true })
+  const run = await runVerify(opts(absent, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(run.exit, 0, JSON.stringify(run.result.packages))
+  const result = read(absent)
+  assert.equal(result.ok, true)
+  assert.equal(result.packages.app.testDb.exit, 0)
+  assert.equal(result.packages.app.testE2e.exit, 0)
+  assert.equal(result.checks.some((check) => check.name === 'database'), false)
+  assert.equal('migrate' in result.packages.app, false)
+  assert.deepEqual(runs(absent), ['pass', 'pass', 'pass'])
+  const stubbed = await fixture({ lone: true })
+  assert.equal((await runVerify(opts(stubbed).options)).exit, 0)
+  assert.equal(existsSync(path.join(stubbed.base, 'docker.log')), false)
+})
+
+test('a one-package project leaves migrate to its e2e chain, with or without e2eDb', async () => {
+  const commands = { app: { e2eDb: null, migrate: 'node ../stub.mjs marker' } }
+  const fx = await fixture({ lone: true, commands })
+  const { exit } = await runVerify(opts(fx, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(exit, 0)
+  assert.equal(runs(fx).includes('marker'), false)
+})
+
+// The database is in the package only for a fullstack package; a Compose file without a
+// `database` service in a two-package project is a refusal, as before.
+test('a Compose file without a database service fails testDb and starts nothing', async () => {
+  const fx = await fixture({ noDb: true, compose: true })
+  const { exit } = await runVerify(opts(fx).options)
+  const docker = readFileSync(path.join(fx.base, 'docker.log'), 'utf8')
+  assert.equal(exit, 1)
+  assert.equal(read(fx).packages.backend.testDb.ok, false)
+  assert.match(read(fx).packages.backend.testDb.reason, /no database service/)
+  assert.doesNotMatch(docker, /up -d/)
 })
 
 describe('verify', { concurrency: 6 }, () => {

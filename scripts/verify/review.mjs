@@ -8,6 +8,7 @@ import { matching } from './glob.mjs'
 // can raise them without the content being copied to disk.
 const SECRET_NAME = [
   /^\.env(\..+)?$/i,
+  /^\.dev\.vars(\..*)?$/i,
   /\.(pem|key|p12|pfx|jks|keystore|kdbx|tfstate)$/i,
   /^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/i,
   /^(\.npmrc|\.netrc|\.pgpass|\.git-credentials|\.htpasswd|kubeconfig)$/i,
@@ -15,15 +16,17 @@ const SECRET_NAME = [
   /^(credentials|secrets?)\.(json|ya?ml|toml|env|txt|properties|ini)$/i,
   /service[-_]?account.*\.json$/i,
 ]
-const SECRET_ALLOWED = /^\.env\.(example|sample|template)$/i
+const SECRET_ALLOWED = /^\.(env|dev\.vars)\.(example|sample|template)$/i
 // Directories that only ever hold credentials, anywhere in the path.
-const SECRET_DIR = /(^|[/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker)([/\\]|$)/i
+const SECRET_DIR =
+  /(^|[/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker|\.wrangler[/\\]config)([/\\]|$)/i
 const isSecretName = (file) => {
   if (SECRET_DIR.test(file)) return true
   const name = file.slice(file.lastIndexOf('/') + 1)
   if (SECRET_ALLOWED.test(name)) return false
   // The hook treats any base name starting with `.env` as secret (`.envrc`, `.env-foo`).
-  return /^\.env/i.test(name) || SECRET_NAME.some((pattern) => pattern.test(name))
+  if (/^\.env/i.test(name) || /^\.dev\.vars(?![a-z0-9])/i.test(name)) return true
+  return SECRET_NAME.some((pattern) => pattern.test(name))
 }
 
 function run(root, args) {

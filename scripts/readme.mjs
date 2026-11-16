@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { defaultCacheRoot, locateCatalog } from './catalog.mjs'
-import { readProvenance } from './provenance.mjs'
+import { kindOf, readProvenance } from './provenance.mjs'
 import { isMain } from './verify/main.mjs'
 
 export const START = '<!-- configuration:start -->'
@@ -183,12 +183,17 @@ function repositoryUrl(root) {
 
 // In development the app is the frontend's dev server, which proxies /api; only the Compose
 // image of a `single` deploy serves the built frontend from the server's port.
+// A fullstack package is the whole application: its own dev server, and no Compose file.
 function usageNotes(root, { deploy, packages }) {
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
   const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
-  const port = (frontend ?? server)?.port
+  const whole = packages.find((pkg) => kindOf(pkg.template) === 'fullstack')
+  const port = (frontend ?? server ?? whole)?.port
   const notes = []
-  if (port !== undefined) notes.push(`Open http://localhost:${port} once the dev servers are up.`)
+  if (port !== undefined) {
+    const servers = packages.length === 1 ? 'server is' : 'servers are'
+    notes.push(`Open http://localhost:${port} once the dev ${servers} up.`)
+  }
   if (existsSync(path.join(root, 'docker-compose.yml'))) {
     const composePort = (deploy === 'single' ? server : (frontend ?? server))?.port
     const where =
@@ -241,7 +246,11 @@ export function renderPackageBlocks(root, catalogRoot, { name, clone } = {}) {
       ...(clone ?? [`git clone ${url ?? '<repository-url>'}`, `cd ${dir}`]),
       ...blocks(['install']),
     ]),
-    usage: fenced(dev.length === 0 ? [] : ['# Run each of these in its own terminal.', ...dev]),
+    usage: fenced(
+      packages.length > 1 && dev.length > 0
+        ? ['# Run each of these in its own terminal.', ...dev]
+        : dev,
+    ),
     'usage-notes': usageNotes(root, { deploy, packages }),
     tests: fenced(blocks(['check', 'test', 'testE2e'])),
   }
