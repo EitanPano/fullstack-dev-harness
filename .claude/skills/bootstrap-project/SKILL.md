@@ -108,9 +108,9 @@ id:
 - "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular, Vue).
 - A stack with no frontend skips this question.
 - A stack of one `fullstack/` package (`astro-cloudflare-pages`) fits content pages a search
-  engine reads with no server to run. It has no deploy mode and its Data store is the
-  platform's. To migrate a Cloudflare Pages site: the package's `AGENTS.md › Migrating a Pages
-  site`.
+  engine reads with no server to run. It has no deploy mode and no `auth` flag (Auth is
+  `none`; pass no `--flag auth`), and its Data store is the platform's. To migrate a Cloudflare
+  Pages site: the package's `AGENTS.md › Migrating a Pages site`.
 
 With `Server: later`, keep the frontend template alone (`--template frontend/<id>` from a kept
 stack, chosen by the same rule), skip the server, capability and deploy-mode questions, and pass

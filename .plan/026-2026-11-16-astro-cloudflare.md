@@ -329,6 +329,11 @@ From a sweep of the hard-coded assumptions on f99b0ea.
 Rulings of the session under the delegation; the ledger holds the detail. Each stands for
 Eitan's review at the `dev` → `main` merge.
 
+- **No accounts (Eitan, 2026-11-17: "skip authentication in astro app").** C3 is not built
+  and the template has no `auth` flag. V05 and the `auth` half of V07 fall away; the cases are
+  `default`, `jobs`, `islands` and `brand`; the `islands` flag ships the integration and no
+  island (the auth forms were to be the islands). The password-hash ruling below is kept only
+  as input for a later plan. ADR 0014, T6.
 - **G2 without a separate stop.** S1 and S2 passed, so the build went on with ADR 0014 marked
   "accepted under the delegation"; its rows the session decided carry a ▲.
 - **Spikes.** S1, S2, S4, S5, S6, S7 and S8 passed. S3 is partial: scrypt at N = 2^17 needs the
