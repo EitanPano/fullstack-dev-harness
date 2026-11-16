@@ -93,7 +93,7 @@ adds later ones; layer maps: its `AGENTS.md`.
 ## Rules
 
 In `.claude/rules/`: `code-style.md` (`scripts/`, hooks), `naming.md`, `ui-and-styling.md`
-(`frontend/`), `git-workflow.md` (approval before git writes; Conventional Commits).
+(`frontend/`), `git-workflow.md` (approval before commit, merge, push, tag; Conventional Commits).
 
 ## Definition of done
 
@@ -107,7 +107,7 @@ Done means every item holds, with evidence.
 3. No test was deleted, skipped or focused. `verify` enforces the focus and skip spellings;
    QA checks deleted tests and filtered gate commands. Justify each in a report.
 4. Errors follow `error-handling`. No secrets, stack traces or query text leave the server.
-5. A schema or endpoint change ran the packages' `contract` commands, where they exist, and committed the results; a
+5. A schema or endpoint change ran the packages' `contract` commands and committed the results; a
    data-model change ships what `database` requires and passes `testDb`.
 6. UI changes meet the frontend's `AGENTS.md › Styling`; the frontend reports `UI pass:`,
    QA `UX:` (open rubric findings are P2); the accessibility scan passes.

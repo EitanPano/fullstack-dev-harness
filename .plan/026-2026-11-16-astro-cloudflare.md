@@ -2,7 +2,7 @@
 
 Status: active
 Owner: Eitan
-Last updated: 2026-11-16
+Last updated: 2026-11-17
 Approval: delegated (2026-11-16, "set the astro-cloudflare to active, do the commits, pushes and
 prs to dev on your own. after you complete, create a dev->main pr for me to merge manually.")
 Input: Eitan's request of 2026-11-16 ("a new serverless stack: Astro + cloudflare pages
@@ -325,3 +325,43 @@ From a sweep of the hard-coded assumptions on f99b0ea.
   Windows from the on-disk spelling.
 
 ## Changes during the task
+
+Rulings of the session under the delegation; the ledger holds the detail. Each stands for
+Eitan's review at the `dev` → `main` merge.
+
+- **G2 without a separate stop.** S1 and S2 passed, so the build went on with ADR 0014 marked
+  "accepted under the delegation"; its rows the session decided carry a ▲.
+- **Spikes.** S1, S2, S4, S5, S6, S7 and S8 passed. S3 is partial: scrypt at N = 2^17 needs the
+  whole memory of an isolate, and no session can test a deployed project. Chosen instead of the
+  plan's PBKDF2 fallback: scrypt N = 2^14, r = 8, p = 5 (an OWASP-listed set, 16 MiB), the
+  parameters stored in the hash. P1's first deploy is its proof.
+- **Order.** C2 → C3 → C4 → C5 → C6 in sequence; the plan let C4 run beside C2 and C3. One
+  package-wide `check` and one lockfile make two builders in one checkout flaky.
+- **`check` and `testDb`.** `check` runs every vitest project, the `workerd` API suite
+  included; `testDb` is that suite alone.
+- **Findings the template carries:** TypeScript pinned to 6 (`astro check` refuses 7); vitest
+  4.1 with `@cloudflare/vitest-plugin`, the renamed pool; `@shared/*` the only alias;
+  `build.format: 'file'`; the CSP delivered from `dist/_headers` by a post-build script; test
+  isolation per file, so tables are emptied before each test; no `.dev.vars` (it hides `.env`).
+- **H1.** The Docker-free database steps are decided by kind: a project with a `fullstack/`
+  package. The table's wording ("no Compose service `database`") would have turned a
+  two-package project's clear refusal into a suite run without its database (review, P1).
+  `isFrontend` became `isServer`, by template kind. `history.mjs` reads an inline `flags` map.
+- **H2, stricter than the table.** A sub-agent's `wrangler` is an allowlist (`dev`,
+  `pages dev`, `pages functions build`, `types`, `d1 migrations create`, and `d1 migrations
+  apply|list`, `d1 execute`, `d1 export` with `--local`); the six words were a denylist that
+  `time-travel restore`, `pages deployment create` and a version-pinned `wrangler@4` passed
+  (review, P1). It covers every sub-agent, `general-purpose` included; the interactive session
+  is asked by `settings.json`. `.dev.vars` is a secret file whatever S6 found, and so is
+  wrangler's login file. A package key never names `scripts`, `db`, `docs` or `node_modules`.
+  `mklink` and `fsutil` are write programs: a link made in a lane led out of it.
+- **H3.** Not net zero: 46 words over across twelve files, every cap held. The first pass
+  reached zero by cutting guidance the review then asked back. Beyond the table: the backend's
+  gate in a one-package project (`--no-e2e`; a `check` failure in the frontend's lane is a
+  handoff), three one-package clauses in `scaffold-step.md`, `app/src/**` in the UI rule's
+  paths.
+- **Left as notes, not built:** a `lanes:` change in `.fullstack/catalog.yaml` triggers no
+  security review; a package script that calls `wrangler deploy` is invisible to a hook; the
+  sentences still false for a one-package project that the ledger's `report-h3.md` lists.
+- **Pushes.** The active `gh` account could not push to these repositories; each push and PR
+  command used the other logged-in account for that command only.

@@ -39,11 +39,12 @@ You own `<package>/AGENTS.md`: a rename or a removal updates the lines it invali
    `check` skips the store-backed suites; a Compose `database` service is started first:
    `docker compose up -d --wait database`) and watch them fail. Keep the run's summary for
    `Tests first:`.
-4. **Implement** per `<package>/AGENTS.md › Adding a module` and the `api-design` skill:
-   `service`, `controller`, `routes`, the mount line and the registration line. A data-model
+4. **Implement** per `<package>/AGENTS.md › Adding a module` and the `api-design` skill. A data-model
    change ships what `Adding the data layer` and the `database` skill require, in the same
    task.
-5. **Gates**: `node scripts/verify.mjs --plan <plan> --package <package> --reuse` until it exits 0. It
+5. **Gates**: `node scripts/verify.mjs --plan <plan> --package <package> --reuse` until it exits 0
+   (in a one-package project add `--no-e2e`; a `check` failure only in the frontend's lane goes
+   to `Handoff:`). It
    is a partial run (`verify-partial.json`); the driver's full run is the evidence. Run it in
    the foreground with `timeout: 600000`, never in the background: ending your turn while it
    runs ends your stage. A partial run that needs more than ten minutes is a blocker for your

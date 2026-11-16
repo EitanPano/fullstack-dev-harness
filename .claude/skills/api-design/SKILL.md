@@ -15,7 +15,7 @@ project; in a one-package project its shared schemas are the contract, with no `
   `/api/post/{id}/comment`. No verbs in paths; an action that is not CRUD is a sub-resource
   (`POST /api/order/{id}/cancellation`).
 - Methods: `GET` (read, idempotent), `POST` (create or non-idempotent action), `PATCH`
-  (partial update), `PUT` (full replace), `DELETE`.
+  (partial update), `PUT` (full replace, rarely), `DELETE`.
 - Status: `200` read/update, `201` create (body is the created entity), `204` delete with
   no body, and the error table from the `error-handling` skill.
 - JSON only. Timestamps are ISO 8601 strings in UTC, converted from the stored date value
@@ -93,7 +93,7 @@ composes controllers.
 
 ## Auth and the caller
 
-A server template ships authentication behind its `auth` flag.
+A server template ships authentication behind its `auth` flag; a product starts from it.
 `.doc/architecture.md` (Auth) states the model and `backend/AGENTS.md` (Authentication)
 says where its rules live. When that section says Auth: none, every endpoint is public, no
 caller or role exists, and the rules below apply once a plan adds accounts. The gate and
