@@ -24,6 +24,10 @@ const GLOBS = [
   '**/nginx/**',
   '**/.dockerignore',
   '**/next.config.*',
+  // Cloudflare Pages: bindings, response headers and the middleware every request meets.
+  '**/wrangler.jsonc',
+  '**/functions/**/_middleware.ts',
+  '**/_headers',
   // Privilege tools, and the auth entity's roles (plan 016).
   '**/*seed*',
   '**/models/user/**',

@@ -276,6 +276,24 @@ test('securityPaths adds the seed and auth-entity globs and drops auth/ui', () =
   assert.deepEqual(securityPaths([...hit, ...miss]), hit)
 })
 
+test('securityPaths matches the Cloudflare deploy files and the Pages middleware', () => {
+  const hit = [
+    'app/wrangler.jsonc',
+    'wrangler.jsonc',
+    'app/functions/_middleware.ts',
+    'app/functions/api/_middleware.ts',
+    'app/public/_headers',
+  ]
+  const miss = [
+    'app/wrangler.json',
+    'app/functions/api/post.ts',
+    'app/functions/_routes.json',
+    'app/src/_headers.md',
+    'app/src/pages/_middleware.ts',
+  ]
+  assert.deepEqual(securityPaths([...hit, ...miss]), hit)
+})
+
 test('securityPaths joins the files the line trigger names', () => {
   const files = ['backend/src/api/user/routes.ts', 'frontend/src/feature/auth/ui/login-form.tsx', 'x.ts']
   assert.deepEqual(securityPaths(files), [])

@@ -1,7 +1,28 @@
 import { readFileSync } from 'node:fs'
 
+// The template kind (`server`, `frontend`, `fullstack`) is the part of the template id before
+// the slash; the scripts name a package's kind by it, never by which commands it happens to have.
+export const kindOf = (template) => template.split('/')[0]
+
+const unquoteItem = (value) =>
+  value
+    .replace(/\s+#.*$/, '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+
+// `[a, b, 'c']` as an array; a plain item list may not hold commas inside quotes.
+const inlineList = (text) =>
+  text
+    .trim()
+    .replace(/^\[|\]$/g, '')
+    .split(',')
+    .map(unquoteItem)
+    .filter((item) => item !== '')
+
 // The generator writes the provenance file in a fixed shape, so a line scan for the facts needed
-// (deploy, and per package its template, http.port and commands) replaces a YAML dependency.
+// (deploy, and per package its template, http.port, commands and lanes) replaces a YAML
+// dependency. `http` and `lanes` read in both the block and the inline (`{ port: 1 }`, `[a, b]`)
+// form.
 export function readProvenance(file) {
   const result = { deploy: undefined, packages: [] }
   let text = ''
@@ -15,6 +36,8 @@ export function readProvenance(file) {
   let pkg
   let inHttp = false
   let inCommands = false
+  let inLanes = false
+  let role
   // The command whose block is being read, so its continuation lines join onto it: a folded
   // block (`>`) joins with spaces, a literal one (`|`) with newlines.
   let folded
@@ -33,6 +56,7 @@ export function readProvenance(file) {
       result.packages.push(pkg)
       inHttp = false
       inCommands = false
+      inLanes = false
       folded = undefined
       continue
     }
@@ -41,6 +65,7 @@ export function readProvenance(file) {
       pkg = undefined
       inHttp = false
       inCommands = false
+      inLanes = false
       folded = undefined
       continue
     }
@@ -48,8 +73,12 @@ export function readProvenance(file) {
     if (key !== null && pkg !== undefined) {
       inHttp = key[1] === 'http'
       inCommands = key[1] === 'commands'
+      inLanes = key[1] === 'lanes'
+      role = undefined
       folded = undefined
       if (key[1] === 'template') pkg.template = unquote(key[2])
+      if (key[1] === 'http') pkg.port = Number(/\bport:\s*(\d+)/.exec(key[2])?.[1]) || pkg.port
+      if (inLanes) pkg.lanes = {}
       continue
     }
     if (inCommands && pkg !== undefined) {
@@ -66,6 +95,17 @@ export function readProvenance(file) {
         pkg.commands[folded] = `${pkg.commands[folded]}${joiner}${more[1]}`.trim()
         continue
       }
+    }
+    if (inLanes && pkg !== undefined) {
+      const entry = /^ {6}(\w+):\s*(.*?)\s*$/.exec(line)
+      if (entry !== null) {
+        role = entry[1]
+        pkg.lanes[role] = entry[2].startsWith('[') ? inlineList(entry[2]) : []
+        continue
+      }
+      const item = /^ {8}-\s+(.*?)\s*$/.exec(line)
+      if (item !== null && role !== undefined) pkg.lanes[role].push(unquoteItem(item[1]))
+      continue
     }
     const port = /^ {6}port:\s*(\d+)\s*$/.exec(line)
     if (port !== null && inHttp && pkg !== undefined) pkg.port = Number(port[1])

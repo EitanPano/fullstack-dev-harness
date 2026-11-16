@@ -40,7 +40,7 @@ export function writeConflicts(root, options, conflicts, next, parts) {
   mkdirSync(dir, { recursive: true })
   const rows = conflicts.map(({ path: rel, conflict, markers, nextCopy }) => {
     const pkg = packageOf(next, rel)
-    const owner = pkg === undefined ? 'driver' : ownerOf(next, pkg)
+    const owner = pkg === undefined ? 'driver' : ownerOf(next, pkg, rel)
     let row = `- [ ] ${rel} ${DASH} ${pkg ?? '.'} ${DASH} ${owner} ${DASH} ${conflict}`
     if (!markers && nextCopy !== undefined) {
       const copy = path.join(dir, 'next', rel)

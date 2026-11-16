@@ -290,6 +290,45 @@ test('--packages reports an unusable catalog lock as one line', () => {
   assert.match(run.stderr, /catalog\.lock/)
 })
 
+// What the astro-cloudflare-pages stack records: one fullstack package, no deploy mode.
+const FULLSTACK_YAML = [
+  'stack: astro-cloudflare-pages',
+  'providers: {}',
+  'packages:',
+  '  app:',
+  '    template: fullstack/astro-cloudflare-pages',
+  '    commands:',
+  '      install: bun install',
+  '      dev: bun run dev',
+  '      check: bun run check',
+  '      test: bun run test',
+  '      testE2e: bun run test:e2e',
+  '    http: { port: 4321, health: /api/health }',
+  '',
+].join('\n')
+
+test('a one-package project prints one dev command, its URL, and no Compose or deploy text', () => {
+  const catalog = mkdtempSync(path.join(tmpdir(), 'readme-cat-'))
+  bases.push(catalog)
+  mkdirSync(path.join(catalog, 'fullstack', 'astro-cloudflare-pages'), { recursive: true })
+  writeFileSync(
+    path.join(catalog, 'fullstack', 'astro-cloudflare-pages', 'template.yaml'),
+    "tools:\n  - { name: bun, min: '1.4' }\n",
+  )
+  const root = repo({
+    '.fullstack/catalog.yaml': FULLSTACK_YAML,
+    'app/.env.example': '# Signs the session cookie\nAUTH_KEY=change-me\n',
+  })
+  const blocks = renderPackageBlocks(root, catalog, { name: 'demo' })
+  assert.match(blocks.usage, /```bash\n# app\ncd app\nbun run dev\ncd \.\.\n```/)
+  assert.doesNotMatch(blocks.usage, /own terminal/)
+  assert.match(blocks['usage-notes'], /Open http:\/\/localhost:4321 once the dev server is up/)
+  assert.doesNotMatch(blocks['usage-notes'], /[Cc]ompose|Docker/)
+  assert.doesNotMatch(blocks.prerequisites, /Docker/)
+  assert.match(blocks.tests, /cd app\nbun run check\nbun run test\nbun run test:e2e\ncd \.\./)
+  assert.match(renderConfiguration(root), /\| `AUTH_KEY` \| Signs the session cookie \| — \|/)
+})
+
 describe('readme', { concurrency: 6 }, () => {
   for (const [name, run] of tests) it(name, run)
 })
