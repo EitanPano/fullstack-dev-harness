@@ -34,6 +34,7 @@ import {
   tokenize,
   withoutQuotes
 } from './lib/guardrail.mjs'
+import { recordedLanes } from './lib/lanes.mjs'
 
 // A lane ending in `/` is a directory prefix; anything else is one exact file. In a lane a `*`
 // segment is one task folder: any single segment but an empty one, `.` or `..`.
@@ -125,9 +126,12 @@ if (!isCanonicalPath(rawPath)) {
 }
 
 const root = projectRoot(payload)
+// A one-package project records its lanes in .fullstack/catalog.yaml; they add to the
+// constants and never replace them. Read once, only for the three roles that can gain any.
+const effective = [...lanes, ...recordedLanes(root, role)]
 const { rel, escapes } = toProjectRelative(rawPath, root, sessionCwd(payload) ?? root)
-if (escapes || !lanes.some(lane => matchesLane(rel, lane))) {
-  block(`"${role}" may not write "${rel || rawPath}". Allowed: ${lanes.join(', ')}`)
+if (escapes || !effective.some(lane => matchesLane(rel, lane))) {
+  block(`"${role}" may not write "${rel || rawPath}". Allowed: ${effective.join(', ')}`)
 }
 
 allow()
