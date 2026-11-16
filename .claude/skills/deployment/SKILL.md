@@ -5,7 +5,7 @@ description: Choose or change how the project ships. Use when a plan or the user
 
 # Deployment
 
-A project with a server and a frontend ships in one of two modes. The mode is chosen at the
+A server with a frontend ships in one of two modes; a hosted one-package stack deploys by its package's `AGENTS.md › Deployment`. The mode is chosen at the
 bootstrap (`--deploy`) and moved later only through this skill, as a planned change.
 
 | | `single` | `split` |
@@ -68,7 +68,7 @@ Every `docker compose` command below that inspects or stops the stack (`config`,
    the comment, the `COPY --from=spa ...` line and the `ENV STATIC_DIR=...` line. The server's
    static code stays; it is inert without `STATIC_DIR`.
 5. Check the files: `docker compose -p <name> --profile app config` exits 0 (warnings about
-   unset secrets are harmless; export them first to silence them), the frontend service shows
+   unset secrets are harmless), the frontend service shows
    `profiles: [app]` and no `scale: 0`, and the server service shows no `spa` context, the
    `TRUST_PROXY` default `1` and the loopback port binding.
 6. Run the gates: the `check` command of both packages (resolved from
@@ -76,8 +76,7 @@ Every `docker compose` command below that inspects or stops the stack (`config`,
    the switch works. Then run the app profile (Running the app profile) and smoke:
    - through the frontend's port: `/` and a deep link return the page, and `/api/health`
      answers JSON through the proxy;
-   - on the server's loopback port: `/api/health` answers and `/` is the JSON 404 (the server
-     image holds no SPA);
+   - on the server's loopback port: `/api/health` answers and `/` is the JSON 404;
    - `docker compose -p <name> --profile app exec <frontend service> id -u` prints a
      non-zero uid (101 in the catalog's image).
 

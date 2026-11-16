@@ -7,7 +7,7 @@ description: Add or change an API endpoint, its request schemas, or the generate
 
 The rules are in `AGENTS.md`; the layer map, the import table, the worked example and the
 engine seam are in the server package's `AGENTS.md` (`backend/AGENTS.md` in a generated
-project); this skill is the procedure.
+project; in a one-package project its shared schemas are the contract, with no `contract` command); this skill is the procedure.
 
 ## Conventions
 
@@ -15,7 +15,7 @@ project); this skill is the procedure.
   `/api/post/{id}/comment`. No verbs in paths; an action that is not CRUD is a sub-resource
   (`POST /api/order/{id}/cancellation`).
 - Methods: `GET` (read, idempotent), `POST` (create or non-idempotent action), `PATCH`
-  (partial update), `PUT` (full replace, rarely), `DELETE`.
+  (partial update), `PUT` (full replace), `DELETE`.
 - Status: `200` read/update, `201` create (body is the created entity), `204` delete with
   no body, and the error table from the `error-handling` skill.
 - JSON only. Timestamps are ISO 8601 strings in UTC, converted from the stored date value
@@ -31,8 +31,7 @@ project); this skill is the procedure.
   the endpoint reads, and the handler reads them typed. A failure is always the same 400
   envelope, naming the part (`invalid body`) and the fields. `backend/AGENTS.md › Adding a
   module` shows the spelling.
-- Rate limits are declared in the router, ahead of validation, so a 429 does not wait for
-  parsing. Each endpoint has its own entry in the package's policy constants (never
+- Rate limits are declared in the router, ahead of validation. Each endpoint has its own entry in the package's policy constants (never
   literals in a router) and so never shares another endpoint's bucket. The subject of the
   limit is hashed into the store key, never stored in clear.
 - Every endpoint's errors are declared in its OpenAPI registration, so the frontend's
@@ -94,7 +93,7 @@ composes controllers.
 
 ## Auth and the caller
 
-A server template ships authentication behind its `auth` flag; a product starts from it.
+A server template ships authentication behind its `auth` flag.
 `.doc/architecture.md` (Auth) states the model and `backend/AGENTS.md` (Authentication)
 says where its rules live. When that section says Auth: none, every endpoint is public, no
 caller or role exists, and the rules below apply once a plan adds accounts. The gate and
