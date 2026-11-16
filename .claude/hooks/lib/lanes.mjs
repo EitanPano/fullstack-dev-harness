@@ -9,7 +9,14 @@ import path from 'node:path'
 
 const ROLES = new Set(['backend', 'frontend', 'qa'])
 const PACKAGE_KEY = /^[a-z][a-z0-9-]*$/
-// First path segments that name the harness's own machinery; a lane never starts there.
+// Directories of the harness or the project that are no generated package: a package key never
+// names one, so a record cannot turn `scripts/` or `db/` into a lane.
+const NOT_PACKAGES = new Set([
+  '.fullstack', '.claude', '.plan', '.orchestrate', '.git', '.doc', 'scripts', 'db', 'docs',
+  'node_modules'
+])
+// First segments inside a package that stay out of every lane. Entries sit under `<pkg>/`, so
+// this guards the package's own nested metadata (a `.git` there), not the harness directories.
 const RESERVED = new Set(['.fullstack', '.claude', '.plan', '.orchestrate', '.git', '.doc'])
 
 // The extra lanes of `role` under `root`, each prefixed with its package directory. Any problem
@@ -183,7 +190,8 @@ export function confinedLanes(record, role) {
   if (!ROLES.has(role)) return []
   const out = []
   for (const [pkg, roles] of Object.entries(record)) {
-    if (!PACKAGE_KEY.test(pkg) || !Object.hasOwn(roles, role)) continue
+    if (!PACKAGE_KEY.test(pkg) || NOT_PACKAGES.has(pkg)) continue
+    if (!Object.hasOwn(roles, role)) continue
     for (const entry of roles[role]) {
       if (isPlainEntry(entry)) out.push(`${pkg}/${entry}`)
     }

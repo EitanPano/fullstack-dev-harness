@@ -281,16 +281,14 @@ export async function runVerify(options) {
     // POSIX shells exit 127 for a missing command; cmd.exe says "not recognized".
     const dockerMissing = (run) =>
       run.exit === 127 || /not recognized|command not found|ENOENT/i.test(run.output)
-    // A fullstack project has no Compose file at all; with one, only a successful listing that
-    // lacks `database` proves the database is not a service (a failed listing is Docker's fault).
+    // The database is inside the package exactly when the project has a fullstack package (a
+    // local file, no Compose service); any other project must list a `database` service.
     const hasCompose = existsSync(path.join(root, 'docker-compose.yml'))
-    const wholeApp = !hasCompose && catalog.packages.some((p) => kindOf(p.template) === 'fullstack')
-    const inPackage = async () =>
-      wholeApp || (hasCompose && !(await hasDatabase()) && listed.exit === 0)
+    const inPackage = catalog.packages.some((p) => kindOf(p.template) === 'fullstack')
     let database
     const ensureDatabase = async () => {
       if (database !== undefined) return database
-      if (await inPackage()) return (database = { ok: true })
+      if (inPackage) return (database = { ok: true })
       if (!(await hasDatabase())) {
         const reason = 'no database service in `docker compose config --services`'
         database = { ok: false, reason }
@@ -307,7 +305,7 @@ export async function runVerify(options) {
 
     // A lone frontend or a fullstack package has no Compose file: nothing there needs Docker.
     const needsDocker =
-      (!wholeApp && selected.some((p) => has(p, 'testDb'))) ||
+      (!inPackage && selected.some((p) => has(p, 'testDb'))) ||
       (hasCompose &&
         (!partial || (!options.noE2e && selected.some((p) => has(p, 'testE2e')))))
     if (needsDocker) {

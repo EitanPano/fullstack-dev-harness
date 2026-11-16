@@ -39,7 +39,13 @@ const REACH = [
   'bunx --bun wrangler',
   'npx wrangler',
   'npx --yes wrangler',
-  'npx -y wrangler@latest'.replace('@latest', ''),
+  'npx -y wrangler@latest',
+  'bunx wrangler@latest',
+  'npx wrangler@4',
+  'bunx --bun wrangler@4.1.0',
+  'npx -y npm:wrangler@4',
+  'pnpm dlx wrangler@beta',
+  'node node_modules/wrangler@4/bin/wrangler.js',
   'pnpm exec wrangler',
   'pnpm dlx wrangler',
   'yarn wrangler',
@@ -83,6 +89,44 @@ refused('pwsh -NoProfile -Command "wrangler login"')
 refused('echo ok; wrangler deploy')
 refused('wrangler whoami && wrangler deploy')
 refused('docker compose exec app wrangler deploy')
+refused('bunx wrangler@latest pages deploy dist')
+refused('npx wrangler@4 deploy')
+refused('bunx --bun wrangler@4.1.0 deploy')
+refused('npx -y npm:wrangler@4 deploy')
+
+// A sub-agent's wrangler is an allowlist: anything off it reaches the platform or is unknown.
+for (const command of [
+  'wrangler pages deployment list',
+  'wrangler d1 time-travel restore DB --timestamp 1',
+  'wrangler pages deployment create dist',
+  'wrangler pages project create p',
+  'wrangler d1 create x',
+  'wrangler tail',
+  'wrangler versions upload',
+  'wrangler kv key put k v --binding KV',
+  'wrangler r2 object put b/k --file f',
+  'wrangler d1 execute DB --command "select 1"',
+  'wrangler d1 export DB',
+  'wrangler d1 migrations apply DB',
+  'wrangler whoami',
+  'wrangler dev --remote',
+  'wrangler dev --remote=false',
+  'wrangler dev --experimental-remote-bindings',
+  'wrangler dev --x-remote-bindings',
+  'wrangler d1 execute DB --local --remote --file x.sql',
+  'wrangler --newflag dev',
+  'wrangler --config w.jsonc deploy',
+  'wrangler -c w.jsonc pages deployment list',
+  'wrangler docs deploy',
+  'wrangler --help deploy',
+  'wrangler pages --help',
+  'wrangler pages',
+  'wrangler pages functions',
+  'wrangler d1 migrations',
+  'wrangler dev; wrangler whoami'
+]) {
+  refused(command)
+}
 
 // The same through the PowerShell tool.
 for (const command of ['wrangler deploy', 'bunx wrangler pages deploy dist', 'npx wrangler dev --remote']) {
@@ -117,7 +161,7 @@ test('settings.json asks before every wrangler command that reaches the platform
     await readFile(new URL('../../settings.json', import.meta.url), 'utf8')
   )
   for (const tool of ['Bash', 'PowerShell']) {
-    for (const word of [...SUBCOMMANDS, '--remote']) {
+    for (const word of [...SUBCOMMANDS, '--remote', 'time-travel', 'versions', 'tail']) {
       assert.ok(settings.permissions.ask.includes(`${tool}(*wrangler*${word}*)`), `${tool} ${word}`)
     }
   }
@@ -141,7 +185,19 @@ for (const command of [
   'wrangler --version',
   'wrangler -v',
   'wrangler --help',
-  'wrangler pages deployment list',
+  'wrangler -h',
+  'wrangler help',
+  'wrangler docs',
+  'wrangler',
+  'wrangler dev --config workers/jobs/wrangler.jsonc --test-scheduled',
+  'wrangler d1 migrations apply DB --local --persist-to .e2e-state',
+  'wrangler d1 execute DB --local --persist-to .e2e-state --file seed.sql',
+  'wrangler d1 migrations list DB --local',
+  'wrangler d1 export DB --local --output x.sql',
+  'wrangler pages dev dist --port 8788 --persist-to .e2e-state --binding RATE_LIMIT_SCALE=100',
+  'wrangler --config w.jsonc --env preview dev',
+  'wrangler -c=w.jsonc types',
+  'bunx wrangler@4 dev',
   'git log --grep deploy',
   'git log --grep=wrangler',
   'grep -rn "wrangler deploy" docs',

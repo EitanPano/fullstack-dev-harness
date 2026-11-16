@@ -26,7 +26,10 @@ const GLOBS = [
   '**/next.config.*',
   // Cloudflare Pages: bindings, response headers and the middleware every request meets.
   '**/wrangler.jsonc',
+  '**/wrangler.json',
+  '**/wrangler.toml',
   '**/functions/**/_middleware.ts',
+  '**/functions/**/_middleware.js',
   '**/_headers',
   // Privilege tools, and the auth entity's roles (plan 016).
   '**/*seed*',

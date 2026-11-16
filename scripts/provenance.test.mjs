@@ -136,13 +136,7 @@ test('a literal block joins its lines with newlines, a folded one with spaces', 
   assert.deepEqual(read(text).packages[0].commands, { check: 'one\ntwo', lint: 'three four' })
 })
 
-const LANE_ROLES = {
-  backend: ['functions/', 'server/', 'shared/', 'migrations/', 'wrangler.jsonc', 'package.json'],
-  frontend: ['src/', 'public/', 'astro.config.mjs', 'package.json'],
-  qa: ['tests/'],
-}
-
-test('a one-package fullstack record: inline http and inline lanes are read', () => {
+test('a one-package fullstack record: inline http is read', () => {
   const text = [
     'stack: astro-cloudflare-pages',
     'providers: {}',
@@ -169,30 +163,8 @@ test('a one-package fullstack record: inline http and inline lanes are read', ()
   assert.equal(app.template, 'fullstack/astro-cloudflare-pages')
   assert.equal(app.port, 4321)
   assert.deepEqual(app.commands, { check: 'bun run check', testDb: 'bun run test:db' })
-  assert.deepEqual(app.lanes, LANE_ROLES)
-})
-
-test('lanes in block form (a list under each role) and a record without lanes', () => {
-  const text = [
-    'packages:',
-    '  app:',
-    '    template: fullstack/x',
-    '    lanes:',
-    '      backend:',
-    '        - functions/',
-    '        - "package.json" # shared',
-    '      qa:',
-    '        - tests/',
-    '    http:',
-    '      port: 4321',
-    '  other:',
-    '    template: frontend/react',
-    '',
-  ].join('\n')
-  const [app, other] = read(text).packages
-  assert.deepEqual(app.lanes, { backend: ['functions/', 'package.json'], qa: ['tests/'] })
-  assert.equal(app.port, 4321)
-  assert.equal(other.lanes, undefined)
+  // The recorded lanes are read by the hooks and Bun's parser, not here.
+  assert.equal(app.lanes, undefined)
 })
 
 test('answers.brand and the v1.4.0 start and e2eDb commands: brand stays out of the commands', () => {

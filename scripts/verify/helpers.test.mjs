@@ -283,9 +283,11 @@ test('securityPaths matches the Cloudflare deploy files and the Pages middleware
     'app/functions/_middleware.ts',
     'app/functions/api/_middleware.ts',
     'app/public/_headers',
+    'app/wrangler.json',
+    'app/wrangler.toml',
+    'app/functions/api/_middleware.js',
   ]
   const miss = [
-    'app/wrangler.json',
     'app/functions/api/post.ts',
     'app/functions/_routes.json',
     'app/src/_headers.md',

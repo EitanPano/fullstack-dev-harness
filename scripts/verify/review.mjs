@@ -18,13 +18,15 @@ const SECRET_NAME = [
 ]
 const SECRET_ALLOWED = /^\.(env|dev\.vars)\.(example|sample|template)$/i
 // Directories that only ever hold credentials, anywhere in the path.
-const SECRET_DIR = /(^|[/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker)([/\\]|$)/i
+const SECRET_DIR =
+  /(^|[/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker|\.wrangler[/\\]config)([/\\]|$)/i
 const isSecretName = (file) => {
   if (SECRET_DIR.test(file)) return true
   const name = file.slice(file.lastIndexOf('/') + 1)
   if (SECRET_ALLOWED.test(name)) return false
   // The hook treats any base name starting with `.env` as secret (`.envrc`, `.env-foo`).
-  return /^\.env/i.test(name) || SECRET_NAME.some((pattern) => pattern.test(name))
+  if (/^\.env/i.test(name) || /^\.dev\.vars(?![a-z0-9])/i.test(name)) return true
+  return SECRET_NAME.some((pattern) => pattern.test(name))
 }
 
 function run(root, args) {

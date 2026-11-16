@@ -118,6 +118,18 @@ for (const key of ['../evil', '.', '..', 'a/b', 'App', '1app', '.claude', 'a b',
   })
 }
 
+// A key that names a harness or project directory that is no generated package grants nothing.
+for (const key of ['scripts', 'db', 'docs', 'node_modules']) {
+  test(`a record keyed ${key} grants nothing`, () => {
+    assert.deepEqual(confinedLanes({ [key]: { backend: ['ok/'] } }, 'backend'), [])
+  })
+}
+
+test('app, backend and frontend keys still work', () => {
+  const record = { app: { qa: ['t/'] }, backend: { qa: ['t/'] }, frontend: { qa: ['t/'] } }
+  assert.deepEqual(confinedLanes(record, 'qa'), ['app/t/', 'backend/t/', 'frontend/t/'])
+})
+
 test('only backend, frontend and qa gain lanes', () => {
   const record = { app: { reviewer: ['x/'], orchestrator: ['x/'], 'general-purpose': ['x/'] } }
   for (const role of ['reviewer', 'orchestrator', 'general-purpose', 'other', '__proto__']) {

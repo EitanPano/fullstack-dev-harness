@@ -33,10 +33,20 @@ const MONGO_CLIENTS = new Set(['mongosh', 'mongo'])
 // Programs that run a program inside a container, after `exec` or `run`. Their flag tables are
 // not modelled: every token after the subcommand is judged as a program start instead.
 const CONTAINER_RUNTIMES = new Set(['docker', 'docker-compose', 'podman', 'nerdctl', 'kubectl'])
-// wrangler (also `wrangler.js` and friends once the extension is cut) and what makes it reach
-// outside the machine: these subcommand words anywhere in its arguments, and `--remote`.
+// wrangler (also `wrangler.js` and friends once the extension is cut). A sub-agent may run only
+// the local subcommands below; everything else reaches the hosted platform or is unknown.
 const WRANGLER = /^wrangler(\.(c|m)?js)?$/
-const WRANGLER_WORDS = new Set(['deploy', 'publish', 'login', 'secret', 'delete', 'rollback'])
+// Global options before the subcommand, with a value in the next argument or glued by `=`.
+const WRANGLER_VALUE_FLAGS = new Set(['--config', '-c', '--cwd', '--env', '-e', '--env-file'])
+const WRANGLER_PLAIN_FLAGS = new Set(['--experimental-json-config', '-j'])
+// Subcommands that never touch the platform, as word prefixes; the second list needs `--local`.
+const WRANGLER_LOCAL = [
+  ['dev'], ['pages', 'dev'], ['pages', 'functions', 'build'], ['types'], ['d1', 'migrations', 'create']
+]
+const WRANGLER_NEEDS_LOCAL = [
+  ['d1', 'migrations', 'apply'], ['d1', 'migrations', 'list'], ['d1', 'execute'], ['d1', 'export']
+]
+const WRANGLER_INFO = new Set(['--version', '-v', '--help', '-h', 'help', 'docs'])
 const WRANGLER_RUNNERS = new Set(['yarn', 'pnpm', 'npm', 'bun', 'bunx', 'npx', 'pnpx', 'uvx'])
 
 // mongosh spellings that drop a database or collection, or write with an empty filter (every
@@ -167,10 +177,38 @@ function refuse(rule, program) {
 // program (runners and wrappers are already peeled), `node …/wrangler.js` and the runners the
 // table does not peel (`yarn wrangler`, `pnpm wrangler`) are read here.
 function wranglerArgs(program, args) {
-  if (WRANGLER.test(program)) return args
+  if (WRANGLER.test(bareProgram(program))) return args
   const reaches = runtimeOf(program) !== null || WRANGLER_RUNNERS.has(program)
-  const at = reaches ? args.findIndex(arg => WRANGLER.test(programName(arg))) : -1
+  const at = reaches ? args.findIndex(arg => WRANGLER.test(bareProgram(programName(arg)))) : -1
   return at === -1 ? null : args.slice(at + 1)
+}
+
+// A runner may name the package with a registry prefix and a version or tag
+// (`npm:wrangler@4`, `wrangler@latest`): both are cut before the name is matched.
+function bareProgram(name) {
+  return name.replace(/^npm:/, '').replace(/(?<=.)@[^@]*$/, '')
+}
+
+// Null when a sub-agent may run these wrangler arguments, else the word to name in the refusal.
+function wranglerRefusal(args) {
+  const words = args.map(arg => arg.toLowerCase())
+  if (words.some(word => word.startsWith('-') && word.split('=')[0].includes('remote'))) return 'remote'
+  let at = 0
+  while (at < words.length && words[at].startsWith('-')) {
+    const flag = words[at].split('=')[0]
+    if (WRANGLER_VALUE_FLAGS.has(flag)) at += words[at].includes('=') ? 1 : 2
+    else if (WRANGLER_PLAIN_FLAGS.has(flag) && !words[at].includes('=')) at += 1
+    else break
+  }
+  const rest = words.slice(at)
+  if (rest.length === 0) return null
+  if (rest.length === 1 && WRANGLER_INFO.has(rest[0])) return null
+  const starts = list => list.every((word, i) => rest[i] === word)
+  if (WRANGLER_LOCAL.some(starts)) return null
+  if (WRANGLER_NEEDS_LOCAL.some(starts)) {
+    return rest.some(word => word === '--local' || word === '--local=true') ? null : 'without --local'
+  }
+  return /^[a-z0-9-]+$/.test(rest[0]) ? rest[0] : 'command'
 }
 
 function findRule(program, args) {
@@ -209,8 +247,8 @@ function findRule(program, args) {
   // Sub-agents are refused here; the interactive session is asked by settings.json instead.
   const wrangler = resolveRole(payload) === null ? null : wranglerArgs(program, args)
   if (wrangler !== null) {
-    const hit = wrangler.find(arg => WRANGLER_WORDS.has(arg.toLowerCase()) || /^--remote(=|$)/i.test(arg))
-    if (hit !== undefined) return `wrangler ${hit.toLowerCase()} (a person deploys; agents never reach the hosted platform)`
+    const hit = wranglerRefusal(wrangler)
+    if (hit !== null) return `wrangler ${hit} (a person deploys; agents never reach the hosted platform)`
   }
 
   // Database tooling that applies or drops schema directly.

@@ -1322,13 +1322,15 @@ test('a one-package project leaves migrate to its e2e chain, with or without e2e
   assert.equal(runs(fx).includes('marker'), false)
 })
 
-test('a Compose file without a database service runs testDb as a plain command', async () => {
+// The database is in the package only for a fullstack package; a Compose file without a
+// `database` service in a two-package project is a refusal, as before.
+test('a Compose file without a database service fails testDb and starts nothing', async () => {
   const fx = await fixture({ noDb: true, compose: true })
   const { exit } = await runVerify(opts(fx).options)
   const docker = readFileSync(path.join(fx.base, 'docker.log'), 'utf8')
-  assert.equal(exit, 0)
-  assert.equal(read(fx).packages.backend.testDb.ok, true)
-  assert.equal(read(fx).checks.some((check) => check.name === 'database'), false)
+  assert.equal(exit, 1)
+  assert.equal(read(fx).packages.backend.testDb.ok, false)
+  assert.match(read(fx).packages.backend.testDb.reason, /no database service/)
   assert.doesNotMatch(docker, /up -d/)
 })
 

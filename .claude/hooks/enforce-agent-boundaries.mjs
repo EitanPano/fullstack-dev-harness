@@ -60,7 +60,7 @@ const WRITE_PROGRAMS = new Set([
   'tee', 'cp', 'mv', 'rsync', 'install', 'ln', 'dd', 'truncate', 'touch', 'patch', 'rm', 'unlink',
   'rmdir', 'rd', 'del', 'erase', 'remove-item', 'ri', 'set-content', 'sc', 'add-content', 'ac',
   'out-file', 'copy-item', 'cpi', 'copy', 'move-item', 'mi', 'move', 'new-item', 'ni',
-  'rename-item', 'rni', 'ren', 'rename', 'rimraf'
+  'rename-item', 'rni', 'ren', 'rename', 'rimraf', 'mklink', 'fsutil'
 ])
 // git subcommands that never change the working tree or the history.
 const GIT_READ = new Set([

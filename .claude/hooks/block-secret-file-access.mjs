@@ -46,8 +46,10 @@ const SECRET_NAME = [
   /service[-_]?account.*\.json$/i
 ]
 const SECRET_NAME_ALLOWED = /^\.(env|dev\.vars)\.(example|sample|template)$/i
-// Directories that only ever hold credentials.
-const SECRET_DIR = /(^|[\/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker)([\/\\]|$)/i
+// Directories that only ever hold credentials, wrangler's login among them (the project's own
+// `.wrangler/state` and `.wrangler/tmp` are not).
+const SECRET_DIR =
+  /(^|[\/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker|\.wrangler[\/\\]config)([\/\\]|$)/i
 
 const PATH_FIELDS = ['file_path', 'path', 'notebook_path']
 const PATH_LIST_FIELDS = ['paths', 'file_paths']
@@ -196,7 +198,7 @@ function isSecretPath(value) {
   if (/[*?]/.test(base)) base = base.replace(/[*?].*$/, '')
   if (base === '') return false
   if (SECRET_NAME_ALLOWED.test(base)) return false
-  if (/^\.env/i.test(base)) return true
+  if (/^\.env/i.test(base) || /^\.dev\.vars(?![a-z0-9])/i.test(base)) return true
   return SECRET_NAME.some(pattern => pattern.test(base))
 }
 
