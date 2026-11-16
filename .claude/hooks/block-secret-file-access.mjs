@@ -37,6 +37,7 @@ import {
 // File names that hold credentials.
 const SECRET_NAME = [
   /^\.env(\..+)?$/i, // .env, .env.local, .env.production, …
+  /^\.dev\.vars(\..*)?$/i, // wrangler's local secrets, and per environment
   /\.(pem|key|p12|pfx|jks|keystore|kdbx|tfstate)$/i,
   /^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/i,
   /^(\.npmrc|\.netrc|\.pgpass|\.git-credentials|\.htpasswd|kubeconfig)$/i,
@@ -44,7 +45,7 @@ const SECRET_NAME = [
   /^(credentials|secrets?)\.(json|ya?ml|toml|env|txt|properties|ini)$/i,
   /service[-_]?account.*\.json$/i
 ]
-const SECRET_NAME_ALLOWED = /^\.env\.(example|sample|template)$/i
+const SECRET_NAME_ALLOWED = /^\.(env|dev\.vars)\.(example|sample|template)$/i
 // Directories that only ever hold credentials.
 const SECRET_DIR = /(^|[\/\\])(\.aws|\.ssh|\.gnupg|\.kube|\.docker)([\/\\]|$)/i
 
@@ -228,7 +229,7 @@ function inlineNamesSecret(code) {
 }
 
 function isBareSecret(piece) {
-  return /^\.env/i.test(piece.split(/[\\/]/).pop() ?? '') || SECRET_DIR.test(piece)
+  return /^\.(env|dev\.vars)/i.test(piece.split(/[\\/]/).pop() ?? '') || SECRET_DIR.test(piece)
 }
 
 // Whatever follows the last redirect operator in the token is the path it targets, glued to a

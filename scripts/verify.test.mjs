@@ -1196,6 +1196,20 @@ test('env-prefixed names and credential directories stay out of the review body'
   assert.match(text, /\+PLACEHOLDER=1/)
 })
 
+test('wrangler local secret files stay out of the review body, the example does not', async () => {
+  const fx = await reviewFixture()
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars'), 'DEVVARS-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars.production'), 'DEVVARS-PROD-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars.example'), 'PLACEHOLDER=1\n')
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const text = readFileSync(path.join(outDir(fx), 'review.diff'), 'utf8')
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.dev\.vars(,|\n)/)
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.dev\.vars\.production/)
+  assert.doesNotMatch(text, /DEVVARS-BODY|DEVVARS-PROD-BODY/)
+  assert.doesNotMatch(text, /not shown: .*\.dev\.vars\.example/)
+  assert.match(text, /\+PLACEHOLDER=1/)
+})
+
 test('a failing git call leaves no review package and exits 2', async () => {
   const { writeReviewPackage } = await import('./verify/review.mjs')
   const fx = await reviewFixture()

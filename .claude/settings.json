@@ -27,6 +27,7 @@
       "Read(**/.env.local)",
       "Read(**/.env.development)",
       "Read(**/.env.production)",
+      "Read(**/.dev.vars)",
       "Read(**/*.pem)",
       "Read(**/*.key)",
       "Read(**/id_rsa)",
@@ -48,7 +49,21 @@
       "PowerShell(*DROP DATABASE*)"
     ],
     "ask": [
-      "Bash(node scripts/harness-update.mjs*)"
+      "Bash(node scripts/harness-update.mjs*)",
+      "Bash(*wrangler*deploy*)",
+      "Bash(*wrangler*publish*)",
+      "Bash(*wrangler*login*)",
+      "Bash(*wrangler*secret*)",
+      "Bash(*wrangler*delete*)",
+      "Bash(*wrangler*rollback*)",
+      "Bash(*wrangler*--remote*)",
+      "PowerShell(*wrangler*deploy*)",
+      "PowerShell(*wrangler*publish*)",
+      "PowerShell(*wrangler*login*)",
+      "PowerShell(*wrangler*secret*)",
+      "PowerShell(*wrangler*delete*)",
+      "PowerShell(*wrangler*rollback*)",
+      "PowerShell(*wrangler*--remote*)"
     ]
   },
   "hooks": {
