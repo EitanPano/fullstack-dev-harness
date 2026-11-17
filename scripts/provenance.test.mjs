@@ -136,36 +136,43 @@ test('a literal block joins its lines with newlines, a folded one with spaces', 
   assert.deepEqual(read(text).packages[0].commands, { check: 'one\ntwo', lint: 'three four' })
 })
 
-test('a one-package fullstack record: inline http is read', () => {
-  const text = [
-    'stack: astro-cloudflare-pages',
-    'providers: {}',
-    'packages:',
-    '  app:',
-    '    template: fullstack/astro-cloudflare-pages',
-    '    version: 1.0.0',
-    '    flags: { auth: true, jobs: false, islands: false }',
-    '    capabilities: {}',
-    '    commands:',
-    '      check: bun run check',
-    '      testDb: bun run test:db',
-    '    http: { port: 4321, health: /api/health }',
-    '    lanes:',
-    '      backend: [functions/, server/, shared/, migrations/, wrangler.jsonc, package.json]',
-    "      frontend: [src/, public/, 'astro.config.mjs', package.json]",
-    '      qa: [tests/]',
-    '',
-  ].join('\n')
-  const result = read(text)
-  assert.equal(result.deploy, undefined)
-  assert.equal(result.packages.length, 1)
-  const [app] = result.packages
-  assert.equal(app.template, 'fullstack/astro-cloudflare-pages')
-  assert.equal(app.port, 4321)
-  assert.deepEqual(app.commands, { check: 'bun run check', testDb: 'bun run test:db' })
-  // The recorded lanes are read by the hooks and Bun's parser, not here.
-  assert.equal(app.lanes, undefined)
-})
+const nested = [
+  'stack: astro-cloudflare',
+  'providers: {}',
+  'packages:',
+  '  KEY:',
+  '    template: serverless/cloudflare',
+  '    version: 1.0.0',
+  '    flags: { jobs: false }',
+  '    capabilities: {}',
+  '    commands:',
+  '      check: bun run check',
+  '      testDb: bun run test:db',
+  '    http: { port: 8788, health: /api/health }',
+  '  frontend:',
+  '    template: frontend/astro',
+  '    commands:',
+  '      check: bun run check',
+  '    http: { port: 4321, health: / }',
+  '',
+].join('\n')
+
+for (const key of ['serverless/cloudflare', '"serverless/cloudflare"', "'serverless/cloudflare'"]) {
+  test(`a two-segment package key ${key} is one package and the keys after it still read`, () => {
+    const result = read(nested.replace('KEY', key))
+    assert.equal(result.deploy, undefined)
+    assert.deepEqual(
+      result.packages.map((pkg) => pkg.dir),
+      ['serverless/cloudflare', 'frontend'],
+    )
+    const [api, web] = result.packages
+    assert.equal(api.template, 'serverless/cloudflare')
+    assert.equal(api.port, 8788)
+    assert.deepEqual(api.commands, { check: 'bun run check', testDb: 'bun run test:db' })
+    assert.equal(web.template, 'frontend/astro')
+    assert.equal(web.port, 4321)
+  })
+}
 
 test('answers.brand and the v1.4.0 start and e2eDb commands: brand stays out of the commands', () => {
   const text = [

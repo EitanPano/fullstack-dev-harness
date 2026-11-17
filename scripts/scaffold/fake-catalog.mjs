@@ -22,10 +22,13 @@ for (let i = 0; i < argv.length; i += 1) {
 }
 const SERVER = { template: 'server/fake-server', dir: 'backend' }
 const FRONTEND = { template: 'frontend/fake', dir: o.dir ?? 'frontend' }
-const members = o.stack ? [SERVER, { ...FRONTEND, dir: 'frontend' }] : [FRONTEND]
+const SERVERLESS = { template: 'serverless/cloudflare', dir: 'serverless/cloudflare' }
+const FE = { ...FRONTEND, dir: 'frontend' }
+const members = o.stack === 'astro-cf' ? [SERVERLESS, FE] : o.stack ? [SERVER, FE] : [FRONTEND]
+if (o.stack === 'astro-cf' && o.deploy) throw new Error('a serverless stack has no deploy mode')
 const answers = o.answers ? JSON.parse(readFileSync(o.answers, 'utf8')) : {}
-const defaults: any = { auth: true, pwa: false }
-const flagOwner: any = { auth: 'server', pwa: 'frontend' }
+const defaults: any = { auth: true, pwa: false, jobs: false }
+const flagOwner: any = { auth: 'server', pwa: 'frontend', jobs: 'serverless' }
 const pkgs: any = {}
 for (const m of members) {
   const kind = m.template.split('/')[0]
@@ -68,10 +71,13 @@ for (const p of Object.values(pkgs) as any[]) {
   put(p.dir + '/package.json', '{"name":"' + p.dir + '"}\\n')
   put(p.dir + '/bun.lock', 'lock\\n')
   if (p.kind === 'frontend') {
-    const api = hasServer ? 'yes' : 'none'
+    const api = hasServer || members.some((q) => q.template.startsWith('serverless/')) ? 'yes' : 'none'
     const title = 'title: app\\n1\\n2\\n3\\n4\\n5\\napi: '
     put(p.dir + '/src/app.txt', title + api + '\\npwa: ' + p.flags.pwa + '\\n')
     if (!hasServer) put(p.dir + '/src/standalone.txt', 'standalone\\n')
+  } else if (p.kind === 'serverless') {
+    put(p.dir + '/functions/api.txt', 'jobs: ' + p.flags.jobs + '\\n')
+    put(p.dir + '/' + '.env' + '.example', '# Port the functions listen on.\\nPORT=8788\\n')
   } else {
     const database = p.caps.database ?? 'none'
     put(p.dir + '/src/server.txt', 'auth: ' + p.flags.auth + '\\ndatabase: ' + database + '\\n')
@@ -82,7 +88,7 @@ for (const p of Object.values(pkgs) as any[]) {
 if (hasServer) put('docker-compose.yml', 'deploy: ' + deploy + '\\n')
 const commit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim()
 const step = (dir: string, name: string) =>
-  '      ' + name + ': node ../run-step.cjs ' + dir + ' ' + name + '\\n'
+  '      ' + name + ': node ' + '../'.repeat(dir.split('/').length) + 'run-step.cjs ' + dir + ' ' + name + '\\n'
 const version = o['catalog-version'] ?? 'local'
 let y = 'schemaVersion: 1\\ncatalog:\\n  repository: https://example.invalid/t\\n'
 y += '  version: ' + version
@@ -136,6 +142,7 @@ export function makeCatalog(parent) {
         packages.map(([t, d]) => `  - template: ${t}\n    dir: ${d}\n`).join(''),
     )
   stack('fe-be', [['server/fake-server', 'backend'], ['frontend/fake', 'frontend']])
+  stack('astro-cf', [['serverless/cloudflare', 'serverless/cloudflare'], ['frontend/fake', 'frontend']])
   stack('other', [['frontend/other', 'frontend']])
   git(dir, ['init', '-q'])
   git(dir, ['add', '-A'])

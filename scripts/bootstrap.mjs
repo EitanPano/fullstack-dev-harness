@@ -48,7 +48,7 @@ import {
   finishProject,
   writeProjectReadme,
 } from './history.mjs'
-import { kindOf, readProvenance } from './provenance.mjs'
+import { readProvenance } from './provenance.mjs'
 
 const README_TEMPLATE = ['.claude', 'skills', 'bootstrap-project', 'readme-template.md']
 
@@ -296,12 +296,8 @@ function printNextSteps() {
 function printDeploySteps({ deploy, packages }, withProvider, hasCompose) {
   const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
-  // A fullstack package is the whole application: one dev server, serving pages and functions.
-  const whole = packages.find((pkg) => kindOf(pkg.template) === 'fullstack')
   if (frontend?.port !== undefined) {
     console.log(`  Once started, the frontend dev server is at http://localhost:${frontend.port}.`)
-  } else if (whole?.port !== undefined) {
-    console.log(`  Once started, the dev server is at http://localhost:${whole.port}.`)
   }
   if (!hasCompose) return
   const compose = 'docker compose --profile app up --build'

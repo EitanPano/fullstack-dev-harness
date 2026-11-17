@@ -1,4 +1,4 @@
-// Recorded lanes: `.fullstack/catalog.yaml` adds write lanes for backend, frontend and qa.
+// Derived lanes: each package's template kind in `.fullstack/catalog.yaml` adds write lanes.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -12,28 +12,23 @@ const HOOK = path.resolve(here, '..', 'enforce-agent-boundaries.mjs')
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lanes-'))
 after(() => fs.rmSync(tmp, { recursive: true, force: true }))
 
-const INLINE = [
+const BARE = [
+  'stack: astro-cloudflare',
   'packages:',
-  '  app:',
-  '    template: fullstack/astro-cloudflare-pages',
-  '    lanes:',
-  '      backend: [functions/, server/, shared/, migrations/, wrangler.jsonc, package.json]',
-  '      frontend: [src/, public/, astro.config.mjs, package.json]',
-  '      qa: [tests/]',
+  '  serverless/cloudflare:',
+  '    template: serverless/cloudflare',
+  '    version: 1.0.0',
+  '  frontend:',
+  '    template: frontend/astro',
+  '    version: 1.0.0',
+  'providers: {}',
   ''
 ].join('\n')
 
-const BLOCK = [
+const QUOTED_INLINE = [
   'packages:',
-  '  app:',
-  '    lanes:',
-  '      backend:',
-  '        - functions/',
-  '        - wrangler.jsonc',
-  '      frontend:',
-  '        - src/',
-  '      qa:',
-  '        - tests/',
+  '  "serverless/cloudflare": { template: serverless/cloudflare, version: 1.0.0 }',
+  "  'frontend': { template: 'frontend/astro' }",
   ''
 ].join('\n')
 
@@ -68,62 +63,51 @@ function expect(catalog, cases) {
   }
 }
 
-test('inline lanes: backend writes its paths, not the frontend ones', () => {
-  expect(INLINE, [
-    ['backend', 'app/functions/x.ts', true],
-    ['backend', 'app/functions/deep/x.ts', true],
-    ['backend', 'app/wrangler.jsonc', true],
-    ['backend', 'app/src/x.astro', false],
-    ['backend', 'app/wrangler.jsonc.bak', false],
-    ['backend', 'app/functionsx/a.ts', false],
-    ['backend', 'app/tests/e2e/x.spec.ts', false]
-  ])
-})
+const SHAPES = {
+  'bare keys': BARE,
+  'quoted keys and inline templates': QUOTED_INLINE,
+  'CRLF': BARE.replace(/\n/g, '\r\n'),
+  'a BOM': '\uFEFF' + BARE
+}
 
-test('inline lanes: frontend is the mirror', () => {
-  expect(INLINE, [
-    ['frontend', 'app/src/x.astro', true],
-    ['frontend', 'app/public/a.png', true],
-    ['frontend', 'app/astro.config.mjs', true],
-    ['frontend', 'app/functions/x.ts', false],
-    ['frontend', 'app/wrangler.jsonc', false]
-  ])
-})
+for (const [name, catalog] of Object.entries(SHAPES)) {
+  test(`${name}: backend writes the serverless package, not the frontend`, () => {
+    expect(catalog, [
+      ['backend', 'serverless/cloudflare/functions/x.ts', true],
+      ['backend', 'serverless/cloudflare/wrangler.jsonc', true],
+      ['backend', 'frontend/src/x.astro', false],
+      ['backend', 'serverless/cloudflarex/a.ts', false]
+    ])
+  })
 
-test('inline lanes: qa writes tests, not source', () => {
-  expect(INLINE, [
-    ['qa', 'app/tests/e2e/x.spec.ts', true],
-    ['qa', 'app/src/x', false],
-    ['qa', 'app/functions/x.ts', false]
-  ])
-})
+  test(`${name}: frontend is the mirror`, () => {
+    expect(catalog, [
+      ['frontend', 'frontend/src/x.astro', true],
+      ['frontend', 'serverless/cloudflare/functions/x.ts', false]
+    ])
+  })
 
-test('a path in two lanes is writable by both', () => {
-  expect(INLINE, [
-    ['backend', 'app/package.json', true],
-    ['frontend', 'app/package.json', true],
-    ['qa', 'app/package.json', false]
-  ])
-})
+  test(`${name}: qa writes tests, not source`, () => {
+    expect(catalog, [
+      ['qa', 'serverless/cloudflare/tests/x.test.ts', true],
+      ['qa', 'frontend/tests/e2e/x.spec.ts', true],
+      ['qa', 'frontend/src/x', false],
+      ['qa', 'serverless/cloudflare/functions/x.ts', false]
+    ])
+  })
+}
 
-test('block lists work like inline lists', () => {
-  expect(BLOCK, [
-    ['backend', 'app/functions/x.ts', true],
-    ['backend', 'app/src/x.astro', false],
-    ['frontend', 'app/src/x.astro', true],
-    ['qa', 'app/tests/a.ts', true]
-  ])
-})
-
-test('a CRLF file works', () => {
-  expect(INLINE.replace(/\n/g, '\r\n'), [
-    ['backend', 'app/functions/x.ts', true],
-    ['qa', 'app/tests/a.ts', true]
+test('a renamed standard package derives backend from its template', () => {
+  const catalog = 'packages:\n  api:\n    template: server/bun-express\n'
+  expect(catalog, [
+    ['backend', 'api/src/x.ts', true],
+    ['qa', 'api/tests/x.ts', true],
+    ['frontend', 'api/src/x.ts', false]
   ])
 })
 
 test('the constant lanes still apply with a record', () => {
-  expect(INLINE, [
+  expect(BARE, [
     ['backend', 'backend/src/x.ts', true],
     ['backend', '.orchestrate/t/backend.md', true],
     ['frontend', 'frontend/src/x.ts', true],
@@ -135,13 +119,14 @@ for (const [name, catalog] of [
   ['no file', null],
   ['an empty file', ''],
   ['garbage', '\u0001 {{{ not yaml ]]'],
-  ['lanes as a string', 'packages:\n  app:\n    lanes: backend\n'],
   ['no packages key', 'name: x\n'],
-  ['a two-package project without lanes', 'packages:\n  backend:\n    template: a\n  frontend:\n    template: b\n']
+  ['a two-package project of unknown kinds', 'packages:\n  a:\n    template: job/x\n  b:\n    template: nope\n'],
+  ['a lanes map only', 'packages:\n  app:\n    lanes:\n      backend: [functions/]\n']
 ]) {
   test(`constants only with ${name}`, () => {
     expect(catalog, [
       ['backend', 'app/functions/x.ts', false],
+      ['backend', 'serverless/cloudflare/x.ts', false],
       ['frontend', 'app/src/x', false],
       ['qa', 'app/tests/x', false],
       ['backend', 'backend/x.ts', true],
@@ -153,95 +138,85 @@ for (const [name, catalog] of [
 test('an unreadable catalog (a directory) is constants only', () => {
   const root = project(null)
   fs.mkdirSync(path.join(root, '.fullstack', 'catalog.yaml'))
-  assert.equal(verdict(root, 'backend', 'app/functions/x.ts').allowed, false)
+  assert.equal(verdict(root, 'backend', 'serverless/cloudflare/x.ts').allowed, false)
   assert.equal(verdict(root, 'backend', 'backend/x.ts').allowed, true)
 })
 
-test('unsafe entries and package keys are ignored', () => {
-  const entries = ['../x', '/abs', 'C:/x', 'a\\b', './x', '*', '""', 'src/../../x']
-  const catalog = [
-    'packages:',
-    '  app:',
-    '    lanes:',
-    `      backend: [${entries.join(', ')}, functions/]`,
-    '  ../evil:',
-    '    lanes:',
-    '      backend: [x/]',
-    '  .:',
-    '    lanes:',
-    '      backend: [y/]',
-    ''
-  ].join('\n')
+test('unsafe or unnamed package keys grant nothing', () => {
+  const keys = ['scripts', 'db', '../x', 'a/b/c', 'serverless/..', '.claude', 'docs']
+  const catalog = ['packages:', ...keys.flatMap(k => [`  "${k}":`, '    template: server/x']), ''].join('\n')
   expect(catalog, [
-    ['backend', 'app/functions/x.ts', true],
+    ['backend', 'scripts/a.mjs', false],
     ['backend', 'x/a.ts', false],
-    ['backend', 'y/a.ts', false],
-    ['backend', 'a.ts', false],
-    ['backend', 'app/src/x', false],
+    ['backend', 'a/b/c/x.ts', false],
+    ['backend', 'serverless/x.ts', false],
     ['backend', '.claude/settings.json', false],
-    ['backend', 'app/x', false]
+    ['backend', 'docs/x.md', false],
+    ['qa', 'scripts/tests/x.mjs', false]
   ])
 })
 
-test('a recorded lane never reaches the repository machinery', () => {
+test('an unknown template kind or one with no slash grants nothing', () => {
+  const catalog = 'packages:\n  one:\n    template: worker/x\n  two:\n    template: server\n'
+  expect(catalog, [
+    ['backend', 'one/x.ts', false],
+    ['backend', 'two/x.ts', false]
+  ])
+})
+
+test('a package nested under another recorded package is dropped', () => {
   const catalog = [
     'packages:',
-    '  app:',
-    '    lanes:',
-    '      backend: [../.fullstack/, ../.claude/, ../.plan/, ../backend/, .fullstack/catalog.yaml]',
-    '      frontend: [../.fullstack/catalog.yaml, ../]',
-    '      qa: [../.fullstack/catalog.yaml, /]',
+    '  serverless:',
+    '    template: frontend/x',
+    '  serverless/cloudflare:',
+    '    template: serverless/cloudflare',
     ''
   ].join('\n')
-  const root = project(catalog)
+  expect(catalog, [
+    ['backend', 'serverless/cloudflare/x.ts', false],
+    ['frontend', 'serverless/x.ts', true]
+  ])
+})
+
+test('a recorded package never reaches the repository machinery', () => {
+  const root = project(BARE)
   for (const role of ['backend', 'frontend', 'qa']) {
     for (const rel of [
       '.fullstack/catalog.yaml',
       '.claude/settings.json',
-      '.plan/000-backlog.md',
-      'app/.fullstack/catalog.yaml'
+      '.plan/000-backlog.md'
     ]) {
       assert.equal(verdict(root, role, rel).allowed, false, `${role} ${rel}`)
     }
   }
 })
 
-test('no role writes .fullstack/catalog.yaml, whatever is recorded', () => {
-  const catalog = INLINE + '      reviewer: [.fullstack/catalog.yaml]\n'
-  const root = project(catalog)
+test('no role writes .fullstack/catalog.yaml', () => {
+  const root = project(BARE)
   for (const role of ['backend', 'frontend', 'qa', 'orchestrator', 'reviewer']) {
     assert.equal(verdict(root, role, '.fullstack/catalog.yaml').allowed, false, role)
   }
 })
 
 test('reviewer and orchestrator gain nothing from a record', () => {
-  const catalog = [
-    'packages:',
-    '  app:',
-    '    lanes:',
-    '      reviewer: [src/]',
-    '      orchestrator: [src/]',
-    '      general-purpose: [src/]',
-    ''
-  ].join('\n')
-  expect(catalog, [
-    ['reviewer', 'app/src/x', false],
-    ['orchestrator', 'app/src/x', false],
+  expect(BARE, [
+    ['reviewer', 'frontend/src/x', false],
+    ['orchestrator', 'serverless/cloudflare/x', false],
     ['reviewer', '.orchestrate/t/review.md', true],
     ['orchestrator', '.orchestrate/t/plan.md', true]
   ])
 })
 
 test('an unknown role gains nothing and the catalog is read from the project root only', () => {
-  const root = project(INLINE)
-  assert.equal(verdict(root, 'mystery', 'app/functions/x.ts').allowed, false)
-  // The session sits in another directory with its own catalog: it is ignored.
-  const other = project(INLINE)
+  const root = project(BARE)
+  assert.equal(verdict(root, 'mystery', 'serverless/cloudflare/x.ts').allowed, false)
+  const other = project(BARE)
   const rootNoRecord = project(null)
   const payload = {
     cwd: other,
     tool_name: 'Write',
-    tool_input: { file_path: path.join(other, 'app/functions/x.ts'), content: 'x' },
+    tool_input: { file_path: path.join(other, 'serverless/cloudflare/x.ts'), content: 'x' },
     agent_type: 'backend'
   }
   const env = { ...process.env, CLAUDE_PROJECT_DIR: rootNoRecord }
@@ -250,17 +225,16 @@ test('an unknown role gains nothing and the catalog is read from the project roo
   assert.notEqual(result.status, 0)
 })
 
-test('the block message lists the constants and the recorded lanes', () => {
-  const root = project(INLINE)
-  const got = verdict(root, 'backend', 'app/src/x.astro')
+test('the block message lists the constants and the derived lanes', () => {
+  const root = project(BARE)
+  const got = verdict(root, 'backend', 'frontend/src/x.astro')
   assert.equal(got.allowed, false)
   assert.match(got.stderr, /backend\//)
-  assert.match(got.stderr, /app\/functions\//)
-  assert.match(got.stderr, /app\/wrangler\.jsonc/)
+  assert.match(got.stderr, /serverless\/cloudflare\//)
 })
 
 if (process.platform === 'win32') {
-  test('recorded lanes fold case on Windows', () => {
-    expect(INLINE, [['backend', 'APP/Functions/x.ts', true]])
+  test('derived lanes fold case on Windows', () => {
+    expect(BARE, [['backend', 'Serverless/Cloudflare/Functions/x.ts', true]])
   })
 }

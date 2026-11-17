@@ -21,7 +21,11 @@ export const USAGE =
   '[--root <dir>]\n' +
   '       node scripts/scaffold.mjs --help'
 
-const DEFAULT_DIR = { frontend: 'frontend', server: 'backend', fullstack: 'app' }
+// A serverless package lives in a nested directory named for its template: `serverless/cloudflare`.
+const defaultDir = (template) =>
+  kindOf(template) === 'serverless'
+    ? template
+    : { frontend: 'frontend', server: 'backend' }[kindOf(template)]
 
 // Bun parses the YAML (a line scan cannot carry free text safely); the path travels as an
 // argument, never through a shell.
@@ -91,21 +95,21 @@ export function parseArgs(argv) {
   return o
 }
 
+const isServer = (template) => ['server', 'serverless'].includes(kindOf(template))
 const entries = (provenance) => Object.entries(provenance.packages ?? {})
 
 // The request may only add. `stackPackages` is the chosen stack's `packages:` list, or undefined.
 export function checkRequest(provenance, options, stackPackages) {
   const existing = entries(provenance)
-  // A fullstack package holds pages, functions and database: nothing is added beside it.
-  const whole = existing.find(([, pkg]) => kindOf(pkg.template) === 'fullstack')
-  if (whole !== undefined && (options.stack !== undefined || options.capabilities.length > 0)) {
-    throw new ScaffoldError(
-      `${whole[0]} is a fullstack package, the whole application: a server or frontend part ` +
-        'cannot be added beside it',
-    )
-  }
   if (options.deploy !== undefined && options.stack === undefined) {
     throw new ScaffoldError('--deploy needs --stack: a lone package has no deploy mode')
+  }
+  // The generator refuses a deploy mode for a stack with a serverless API; so does the request.
+  const brings = (stackPackages ?? []).some((s) => kindOf(s.template) === 'serverless')
+  if (options.deploy !== undefined && brings) {
+    throw new ScaffoldError(
+      `--deploy does not apply to stack ${options.stack}: its serverless API has no deploy mode`,
+    )
   }
   if (options.stack !== undefined) {
     if (provenance.stack) {
@@ -129,8 +133,8 @@ export function checkRequest(provenance, options, stackPackages) {
   // A capability belongs to a server, which the project has or the stack brings. An unknown flag
   // or capability id is left to the generator, which owns the template manifests.
   const hasServer =
-    existing.some(([, pkg]) => kindOf(pkg.template) === 'server') ||
-    (stackPackages ?? []).some((s) => kindOf(s.template) === 'server')
+    existing.some(([, pkg]) => isServer(pkg.template)) ||
+    (stackPackages ?? []).some((s) => isServer(s.template))
   if (options.capabilities.length > 0 && !hasServer) {
     throw new ScaffoldError('--capability needs a server: the project has no server; add --stack')
   }
@@ -165,7 +169,7 @@ function loneTemplateArguments(provenance) {
   if (list.length !== 1) throw new ScaffoldError('provenance has no stack and not one package', 3)
   const [dir, pkg] = list[0]
   const args = ['--template', pkg.template]
-  if (dir !== DEFAULT_DIR[kindOf(pkg.template)]) args.push('--dir', dir)
+  if (dir !== defaultDir(pkg.template)) args.push('--dir', dir)
   return args
 }
 
@@ -238,18 +242,10 @@ export function partsOf(base, next, options) {
   return parts
 }
 
-// The role that owns a conflicting file: the roles whose recorded lane holds the path (all of
-// them when a path is in two lanes), else the kind's role for a package that records no lanes.
-export function ownerOf(provenance, dir, rel) {
-  const pkg = provenance.packages?.[dir]
-  if (pkg === undefined) return 'driver'
-  if (pkg.lanes != null && rel !== undefined) {
-    const inside = rel.slice(dir.length + 1)
-    const holds = (lane) => (lane.endsWith('/') ? inside.startsWith(lane) : inside === lane)
-    const roles = Object.entries(pkg.lanes)
-      .filter(([, lanes]) => lanes.some(holds))
-      .map(([role]) => role)
-    return roles.length === 0 ? 'driver' : roles.join(' and ')
-  }
-  return kindOf(pkg.template) === 'frontend' ? 'frontend' : 'backend'
+// The role that owns a conflicting file: a frontend package is the frontend's, a server or
+// serverless package the backend's. Root files and unknown packages are the driver's.
+export function ownerOf(provenance, dir) {
+  const template = provenance.packages?.[dir]?.template
+  if (template === undefined) return 'driver'
+  return kindOf(template) === 'frontend' ? 'frontend' : 'backend'
 }
