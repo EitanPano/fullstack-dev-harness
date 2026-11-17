@@ -32,14 +32,15 @@ importers, and list the old path there. The driver removes it.
    and an e2e test for the journey with the accessibility scan, per `frontend/AGENTS.md ›
    Tests`. Run the package's `test` command, watch them fail, and keep the run's summary: it
    goes in the report as `Tests first:`.
-4. **Implement** per `frontend/AGENTS.md › Adding a feature`, with a loading and an error
+4. **Implement** per `frontend/AGENTS.md › Adding a feature` (before hand-writing a control or
+   its behaviour, read `.claude/skills/ui-design/platform-guidance.md`), with a loading and an error
    state on every route (its own or its group's), a skeleton per new data
    section, and the plan's `UX` section as the brief for each route; its `shell` line names
    all the chrome the app is to have.
 5. **Gates**: `node scripts/verify.mjs --plan <plan> --package frontend --no-e2e --reuse`
    until it exits 0, then stop with `E2E: pending backend` when the plan has a backend stage.
    Without one, run `node scripts/verify.mjs --plan <plan> --package frontend --reuse` (it
-   includes `testE2e`). The e2e suite runs the production build (slower than `dev`) and starts
+   includes `testE2e`). The e2e suite runs the production build and starts
    the API itself with the server's `start`, after `e2eDb` when the project has a database;
    `verify` brings the database service up. Both are partial runs; the driver's full
    run is the evidence. Run it in the foreground with `timeout: 600000`, never in the
@@ -50,13 +51,13 @@ importers, and list the old path there. The driver removes it.
 6. **UI pass** (`ui-design` skill), once e2e has captured the screens: in a task with a
    backend stage, in the "backend ready" continuation; without one, in the same dispatch, after
    the partial `verify` with e2e. It runs only when the plan's `UX` names a route; otherwise
-   report `UI pass: n/a (no route in UX)`. The screens are the three files per route that
-   `ui-design › Rubric` names. A route is captured only when it is in the package's nav table
+   report `UI pass: n/a (no route in UX)`. The screens are the three files per route in
+   `ui-design › Rubric`. A route is captured only when it is in the package's nav table
    or in the screens list its `AGENTS.md › Tests` names (`SIGNED_IN_ROUTES` `{ route, setup }`,
    and Angular's and Vue's `AUTH_ROUTES`, in `tests/e2e/screen-routes.ts`): add a signed-in route and a
    public route outside the nav there, or the files do not exist. A role-gated route needs the
    setup that promotes the account, per that section.
-   - Per route, Read the three screenshots (about 1.5k tokens each), apply the rubric's judged
+   - Per route, Read the three screenshots, apply the rubric's judged
      checks and fix what fails. One fix pass per route, then the partial `verify` with e2e.
    - A route that cannot be captured (a dynamic `/x/[id]` on the fresh e2e database) is
      reported as `UI pass: <route> — not captured (<reason>)`; QA records it as a P2.
@@ -77,10 +78,11 @@ Gates: verify --package frontend <ok|fail>
 E2E: <pending backend | N passed>
 Contract: <types regenerated yes | no | not needed | pending backend>
 UI pass: <route — ok | fixed <check numbers> — <screenshot paths> | not captured (<reason>), one per route | n/a (no route in UX)>
+Guidance: <guide id — what it changed, one per line | none | unavailable (<reason>)>
 Docs: <anything the driver must write into .doc/ besides the change log, or none>
 Glossary: <new domain terms with one-line definitions, or none>
 Delete: <repository-relative path inside your lane, one per line, or none>
-Handoff: <screenshot paths; checks still open after the pass; assumptions QA should verify; any plan-vs-design conflict and what you followed; commands outside the AGENTS.md table>
+Handoff: <screenshot paths; checks still open after the pass; assumptions QA should verify; a plan-vs-design conflict (the plan wins); commands outside the AGENTS.md table>
 Refusals: <command — the hook's reason, one per line | none>
 Deviations: <plan step not followed as written, and why | none>
 Blockers: <only when Verdict: fail>
@@ -99,4 +101,3 @@ End your final response with the report's `Verdict:` line.
 - Never delete, skip or focus a test; a test that must go is named in the report.
 - Never run a scaffolder: the app exists. The one exception is a scaffolder the
   package's `AGENTS.md` names, for a primitive; an `init` stays forbidden.
-- If the plan and the design disagree, follow the plan and record the conflict.

@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { loadManifest, trackedFiles } from './manifest.mjs'
+import { isInstructionFile } from '../.claude/hooks/lib/instruction-scope.mjs'
+import { groupsOf, loadManifest, readJson, trackedFiles } from './manifest.mjs'
 
 // The instruction files are prompts: every word is re-read on each turn of each agent that loads
 // it, and a broken pointer fails silently in a loop run. These checks read the real tree.
@@ -14,6 +15,11 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DESCRIPTION_LIMIT = { skill: 480, agent: 280 }
 const LISTING_LIMIT = 3800
 const STARTUP_LIMIT = 7300 // words, largest role's always-loaded files + body + preloaded skills
+// The guidance is a hook's refusal text, paid once per session and per sub-agent (plan 028). A
+// line budget alone is met by longer lines.
+const GUIDANCE = '.claude/instruction-files.md'
+const GUIDANCE_LIMIT = { lines: 40, width: 100 }
+const SKILL_BODY_LIMIT = 500 // lines
 const WORD_LIMIT = { 'AGENTS.md': 1200, '.claude/skills/dev-loop/SKILL.md': 2600 }
 // What every session and sub-agent loads before its own prompt.
 const ALWAYS_LOADED = [
@@ -26,6 +32,13 @@ const ALWAYS_LOADED = [
 
 // `.claude/README.md` names old catalogs on purpose: it says which projects stay behind.
 const VERSION_EXEMPT = new Set(['.claude/README.md'])
+// Markdown written for people: out of the instruction scope, still checked for pointers.
+const FOR_PEOPLE = new Set([
+  'README.md',
+  'CONTRIBUTING.md',
+  '.orchestrate/README.md',
+  '.claude/skills/bootstrap-project/readme-template.md',
+])
 // Ignored or generated paths a doc may name that no clone tracks.
 const PATH_EXEMPT = new Set(['.claude/settings.local.json'])
 
@@ -33,7 +46,11 @@ const files = trackedFiles(repoRoot)
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8').replace(/\r\n/g, '\n')
 const words = (text) => text.split(/\s+/).filter(Boolean).length
 const body = (text) => text.replace(/^---\n[\s\S]*?\n---\n/, '')
-const docs = files.filter((f) => f.endsWith('.md') && !/^\.plan\/\d{3}-\d/.test(f))
+const markdown = files.filter((f) => f.endsWith('.md'))
+const instructionFiles = markdown.filter(isInstructionFile)
+// The product's own context: agents read it, but the gate is for harness text only.
+const isProjectDoc = (f) => f.startsWith('.doc/')
+const docs = markdown.filter((f) => isInstructionFile(f) || FOR_PEOPLE.has(f) || isProjectDoc(f))
 const skills = files.filter((f) => /^\.claude\/skills\/[^/]+\/SKILL\.md$/.test(f))
 const agents = files.filter((f) => /^\.claude\/agents\/[^/]+\.md$/.test(f))
 const skillNames = new Set(skills.map((f) => f.split('/')[2]))
@@ -86,7 +103,36 @@ describe('descriptions', () => {
   })
 })
 
+describe('scope', () => {
+  // A new file that is none of these fails, so the scope cannot change unseen.
+  it('classifies every tracked Markdown file', () => {
+    const unclassified = markdown.filter(
+      (f) =>
+        !isInstructionFile(f) && !f.startsWith('.plan/') && !FOR_PEOPLE.has(f) && !isProjectDoc(f),
+    )
+    assert.deepEqual(unclassified, [])
+    assert.deepEqual(instructionFiles.filter((f) => FOR_PEOPLE.has(f) || isProjectDoc(f)), [])
+  })
+  // The gate shows the harness's prompt rules; a file the product owns is not harness text.
+  it('gates no file the project owns', () => {
+    const manifest = loadManifest(repoRoot)
+    const owned = instructionFiles.filter((f) => groupsOf(manifest, f).includes('project'))
+    assert.deepEqual(owned, [])
+    const projectFiles = ['.doc/glossary.md', 'frontend/AGENTS.md', 'serverless/x/AGENTS.md']
+    assert.deepEqual(projectFiles.filter(isInstructionFile), [])
+  })
+})
+
 describe('budgets', () => {
+  it('keeps the guidance file within 40 lines', () => {
+    const lines = read(GUIDANCE).trimEnd().split('\n')
+    assert.ok(lines.length <= GUIDANCE_LIMIT.lines, `${lines.length} lines`)
+    assert.deepEqual(lines.filter((line) => line.length > GUIDANCE_LIMIT.width), [])
+  })
+  it('keeps every SKILL.md body within 500 lines', () => {
+    const over = skills.filter((f) => body(read(f)).split('\n').length > SKILL_BODY_LIMIT)
+    assert.deepEqual(over, [])
+  })
   it('keeps the size-limited files within their limits', () => {
     for (const [file, limit] of Object.entries(WORD_LIMIT)) {
       const size = words(read(file))
@@ -104,6 +150,30 @@ describe('budgets', () => {
 })
 
 describe('pointers', () => {
+  it('ships the guidance file with the harness', () => {
+    assert.ok(instructionFiles.includes(GUIDANCE))
+    assert.deepEqual(groupsOf(loadManifest(repoRoot), GUIDANCE), ['harness'])
+  })
+  // A rule with no leading slash is relative to the session's directory: after a `cd` it stops
+  // matching the root `AGENTS.md` (plan 028, live run).
+  it('roots every hook `if` rule at the project', () => {
+    const settings = readJson(join(repoRoot, '.claude/settings.json'))
+    const rules = settings.hooks.PreToolUse.flatMap((group) => group.hooks)
+      .map((hook) => hook.if)
+      .filter(Boolean)
+    assert.deepEqual(rules, ['Edit(/**/*.md)', 'Write(/**/*.md)'])
+  })
+  it('wires only hook scripts that exist', () => {
+    const settings = readJson(join(repoRoot, '.claude/settings.json'))
+    const scripts = Object.values(settings.hooks)
+      .flat()
+      .flatMap((group) => group.hooks)
+      .flatMap((hook) => hook.args ?? [])
+      .filter((arg) => arg.includes('/.claude/hooks/'))
+      .map((arg) => arg.replace('${CLAUDE_PROJECT_DIR}/', ''))
+    assert.ok(scripts.includes('.claude/hooks/show-instruction-guidance.mjs'))
+    assert.deepEqual(scripts.filter((script) => !files.includes(script)), [])
+  })
   it('preloads only skills that exist', () => {
     for (const agent of agents) {
       for (const name of preloaded(agent)) assert.ok(skillNames.has(name), `${agent}: ${name}`)

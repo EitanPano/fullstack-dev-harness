@@ -14,6 +14,7 @@
       "!.claude/skills/bootstrap-project/**",
       ".claude/settings.json",
       ".claude/README.md",
+      ".claude/instruction-files.md",
       ".claude/harness.json",
       "AGENTS.md",
       "CLAUDE.md",
@@ -25,6 +26,7 @@
       "!scripts/verify/*.test.mjs",
       "scripts/provenance.mjs",
       "scripts/loop-stats.mjs",
+      "scripts/guidance.mjs",
       "scripts/manifest.mjs",
       "scripts/readme.mjs",
       "scripts/harness-update.mjs",
@@ -61,7 +63,21 @@
         "CONTRIBUTING.md",
         "scripts/bootstrap.mjs",
         "scripts/history.mjs",
-        "scripts/scaffold/fake-catalog.mjs"
+        "scripts/scaffold/fake-catalog.mjs",
+        "scripts/docs.test.mjs",
+        ".claude/skills/bootstrap-project/readme-template.md"
+      ]
+    },
+    {
+      "file": ".claude/hooks/lib/instruction-scope.mjs",
+      "names": [
+        ".claude/skills/bootstrap-project/readme-template.md"
+      ]
+    },
+    {
+      "file": ".claude/instruction-files.md",
+      "names": [
+        "scripts/docs.test.mjs"
       ]
     },
     {

@@ -43,7 +43,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 | `.claude/` | `agents/`, `skills/`, `rules/`, `hooks/`; `harness.json`, the file manifest | Harness |
 | `catalog.lock` | The pinned catalog version; frozen in a project | Humans |
 | `.fullstack/` | `catalog.yaml` (stack, flags, commands, ports); `harness.json`, the harness version | The bootstrap |
-| `scripts/` | `verify.mjs`, `readme.mjs`, `harness-update.mjs`, `scaffold.mjs`, `catalog.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
+| `scripts/` | `verify.mjs`, `readme.mjs`, `guidance.mjs`, `harness-update.mjs`, `scaffold.mjs`, `catalog.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
 | `frontend/`, `backend/` or `serverless/<provider>/` | Generated packages | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | Compose stack, database init | Backend agent |
 | `.orchestrate/<slug>/` | Loop output per task: draft `plan.md`, reports, `ticket.md`, verify results, review diffs | The loop |
@@ -139,5 +139,5 @@ Done means every item holds, with evidence.
 - Product and acceptance criteria: `.doc/product-definition.md`; architecture decisions and
   change log: `.doc/architecture.md`; domain terms: `.doc/glossary.md`. A project's own agent
   rules: `.doc/conventions.md`; harness updates never change it.
-- A section that still holds a `<!-- FILL: … -->` marker is undecided. The orchestrator
+- A section still holding a `<!-- FILL: … -->` marker is undecided. The orchestrator
   asks first, never plans against it.

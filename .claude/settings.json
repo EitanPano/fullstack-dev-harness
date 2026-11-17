@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "$comment": "Guardrail wiring. Claude Code only reads hook and permission config from this file; a hook script in .claude/hooks/ that is not listed here never runs. See AGENTS.md. Hooks use exec form (node + args: no shell, cwd-independent through ${CLAUDE_PROJECT_DIR}) with onFailure: block, so a hook that crashes, times out or cannot start blocks the call instead of letting it through. permissions.deny is a second, prefix-matched layer that Claude Code evaluates regardless of what the hooks return; the hooks see whole command strings and catch what a prefix cannot. MCP servers are not pre-approved: add a .mcp.json and approve it once, deliberately.",
+  "$comment": "Guardrail wiring. Claude Code only reads hook and permission config from this file; a hook script in .claude/hooks/ that is not listed here never runs. See AGENTS.md. Hooks use exec form (node + args: no shell, cwd-independent through ${CLAUDE_PROJECT_DIR}) with onFailure: block, so a hook that crashes, times out or cannot start blocks the call instead of letting it through. permissions.deny is a second, prefix-matched layer that Claude Code evaluates regardless of what the hooks return; the hooks see whole command strings and catch what a prefix cannot. MCP servers are not pre-approved: add a .mcp.json and approve it once, deliberately. show-instruction-guidance.mjs is no guardrail: it shows .claude/instruction-files.md once per session in place of the first Edit or Write of a harness prompt (if takes one rule, so one handler per tool), and its SessionStart entry re-arms it after a compaction or /clear.",
   "permissions": {
     "allow": [
       "Bash(bun install*)",
@@ -15,6 +15,7 @@
       "Bash(node scripts/verify.mjs*)",
       "Bash(node scripts/readme.mjs*)",
       "Bash(node scripts/loop-stats.mjs*)",
+      "Bash(node scripts/guidance.mjs*)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",
@@ -112,6 +113,40 @@
             "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/enforce-agent-boundaries.mjs"],
             "timeout": 10,
             "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/show-instruction-guidance.mjs"],
+            "if": "Edit(/**/*.md)",
+            "timeout": 10,
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/show-instruction-guidance.mjs"],
+            "if": "Write(/**/*.md)",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/show-instruction-guidance.mjs", "--reset"],
+            "timeout": 10
           }
         ]
       }

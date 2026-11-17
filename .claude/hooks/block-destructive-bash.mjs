@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PreToolUse guardrail on Bash|PowerShell: blocks destructive commands in every permission mode.
 // - Every rule applies to everyone, except the wrangler rule: it refuses sub-agents, and the
-//   interactive session meets the `ask` entries of settings.json instead.
+//   interactive session meets the `ask` entries of settings.json instead. The
+//   modern-web-guidance rule has its own message and applies to everyone too.
 // - Rules match the program and its flags after wrappers, runners and container exec are
 //   peeled, so `echo "rm -r x"` passes and `docker compose exec db psql …` is a psql call.
 // - Database text rules (SQL, redis, mongosh) apply only when that client is in the command.
@@ -47,6 +48,10 @@ const WRANGLER_NEEDS_LOCAL = [
   ['d1', 'migrations', 'apply'], ['d1', 'migrations', 'list'], ['d1', 'execute'], ['d1', 'export']
 ]
 const WRANGLER_INFO = new Set(['--version', '-v', '--help', '-h', 'help', 'docs'])
+// modern-web-guidance runs only through scripts/guidance.mjs (exact pin, telemetry off); its
+// CLI script `modern-web.mjs` is matched too, for `node …/modern-web.mjs`.
+const GUIDANCE = /^(modern-web-guidance|modern-web\.mjs)$/
+const RUNNER_VERBS = new Set(['exec', 'dlx', 'x'])
 const WRANGLER_RUNNERS = new Set(['yarn', 'pnpm', 'npm', 'bun', 'bunx', 'npx', 'pnpx', 'uvx'])
 
 // mongosh spellings that drop a database or collection, or write with an empty filter (every
@@ -117,6 +122,12 @@ allow()
 function judge(tokens) {
   const program = programName(tokens[0])
   programs.add(program)
+  if (guidanceArgs(program, tokens.slice(1)) !== null) {
+    block(
+      'blocked: modern-web-guidance runs only through ' +
+        '`node scripts/guidance.mjs search|retrieve` (exact pin, telemetry off).'
+    )
+  }
   const hit = findRule(program, tokens.slice(1))
   if (hit !== null) refuse(hit, program)
 }
@@ -181,6 +192,16 @@ function wranglerArgs(program, args) {
   const reaches = runtimeOf(program) !== null || WRANGLER_RUNNERS.has(program)
   const at = reaches ? args.findIndex(arg => WRANGLER.test(bareProgram(programName(arg)))) : -1
   return at === -1 ? null : args.slice(at + 1)
+}
+
+// The arguments modern-web-guidance receives, or null. Behind a runner or an interpreter only the
+// word it runs counts (the first after `exec`, `dlx` or `x`), so `npm view modern-web-guidance`
+// and a query word (`node scripts/guidance.mjs search modern-web-guidance`) pass.
+function guidanceArgs(program, args) {
+  if (GUIDANCE.test(bareProgram(program))) return args
+  if (runtimeOf(program) === null && !WRANGLER_RUNNERS.has(program)) return null
+  const at = args.findIndex(arg => !arg.startsWith('-') && !RUNNER_VERBS.has(arg))
+  return at !== -1 && GUIDANCE.test(bareProgram(programName(args[at]))) ? args.slice(at + 1) : null
 }
 
 // A runner may name the package with a registry prefix and a version or tag

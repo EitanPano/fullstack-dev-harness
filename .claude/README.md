@@ -1,7 +1,6 @@
 # Harness manual
 
-How the dev harness works in this project: the loop, the guardrails and how to recover from them,
-the running environment, the optional integrations, and how to update the harness. The rules every
+How the dev harness works in this project. The rules every
 agent follows are in `AGENTS.md` and `.claude/rules/`. This file ships with the harness and is
 replaced on an update.
 
@@ -18,16 +17,14 @@ replaced on an update.
 3. The backend agent implements the plan's Contract and regenerates the server's contract (the
    contract stage); then the backend and frontend agents work in parallel, the frontend
    regenerating its types and implementing the feature. Both test first. After e2e has captured
-   the screens, the frontend agent runs a UI pass: it reads three screenshots per route (phone
-   light, phone dark, desktop light) against the `ui-design` rubric and fixes what fails.
+   the screens, the frontend agent runs a UI pass: it reads three screenshots per route against the `ui-design` rubric and fixes what fails.
 4. `node scripts/verify.mjs --plan <plan> --reuse` runs the gates and writes
    `.orchestrate/<slug>/verify.json` (run in the background; it can outlive a foreground
    timeout).
 5. One reviewer (plus a security reviewer when `verify.json` says `security.triggered`) and QA
    run in parallel. P0 and P1 findings go back to the implementer, at most two fix rounds, each
    re-reviewed on its own diff. QA adds adversarial tests, runs a UX pass over the same
-   screenshots (a rubric failure is a P2; a broken journey or a WCAG AA failure is a P1), and
-   checks each acceptance criterion with evidence.
+   screenshots, and checks each acceptance criterion with evidence.
 6. The driver writes the change log, updates the root `README.md` (Features, and the
    Configuration block with `node scripts/readme.mjs --configuration`), runs `verify` once more
    on the final tree, and checks that `git write-tree` equals the verified tree. Then you decide
@@ -61,12 +58,19 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
   `.claude/settings.local.json`.
 - `/code-review` runs this project's `code-review` skill, which replaces Claude Code's built-in
   command of that name. The built-in cloud review stays reachable as `/ultrareview`.
+- The first edit of a harness prompt (root `AGENTS.md` or `CLAUDE.md`, `.claude/`) in a session
+  is refused once with the text of `.claude/instruction-files.md`; the same call then passes. A
+  reminder, not a guardrail: any state it cannot read lets the edit through.
 
 ## Running environment
 
 - Bun, Node and git must be on the `PATH` that Claude Code sees. On Windows, Git Bash backs the Bash
   tool.
 - On Linux, the frontend package's `AGENTS.md › Tests` names the browser install.
+- `scripts/guidance.mjs` fetches its pinned `modern-web-guidance` on first use (about 17 MB,
+  then cached; offline, the frontend reports it `unavailable`). Bump the pin in one
+  `chore(guidance)` PR, after reading upstream's diff and checking that `DISABLE_TELEMETRY`
+  still stops its telemetry child.
 - Until you accept the workspace trust dialog, Claude Code ignores the `permissions.allow` list in
   `.claude/settings.json` (the hooks still run), so a headless `claude -p` run in a fresh clone
   falls back to its permission mode for every command.
@@ -84,11 +88,7 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 
 React, Angular and Vue are the single-page frontends. Next is for products whose public pages
 must be found by search engines or show a rich preview when shared. Astro is for content sites:
-prerendered pages, alone or with Cloudflare functions in `serverless/cloudflare/`. The dev loop has exercised
-React and Next. Catalog history: Angular v1.6.0; React on Redux Toolkit, RTK Query and the global
-SCSS tree v1.7.0; Vue v1.8.0; `pages/` and co-located styles v1.9.0; Next on SCSS, one folder
-shape for the four frontends, `/api/auth/signup` v1.12.0; Angular's call runner and the
-401 challenge v1.13.0; Astro and Cloudflare functions v1.14.0. Report any gap you meet.
+prerendered pages, alone or with Cloudflare functions in `serverless/cloudflare/`. Report any gap you meet.
 
 ## Updating the harness
 
