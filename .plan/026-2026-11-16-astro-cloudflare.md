@@ -26,6 +26,53 @@ Stages: catalog work, harness scripts, hooks and docs. No role agent runs. Lean 
 the new cases with e2e once.
 Ledger: `.superpowers/sdd/026-2026-11-16-astro-cloudflare/` (git-ignored).
 
+## Revision of 2026-11-17: two packages, no accounts
+
+Eitan, 2026-11-17, with the one-package build half done: "skip authentication in astro app",
+then "put Astro frontend related folders and files inside the `frontend` folder and put the
+serverless functions and their related folders and files in a new `serverless` folder under
+`cloudflare` (since cloud functions are optional and multiple serverless providers exist).
+creating an astro app or migrating into astro should work properly." Asked the same day, he
+chose the project path `serverless/cloudflare/` and the OpenAPI contract for the API's types.
+
+This revision replaces, below: the title's "in one package"; open questions 1, 3 (as far as
+accounts go) and 5; "The pasted tree, as it lands"; "The package"; tasks C1 to C6; the H rows
+about one package and recorded `lanes`; V04, V05, V07 and V08 as worded. Everything else holds.
+Catalog ADR 0014 was rewritten for it and is the design.
+
+- **Catalog:** `frontend/astro` 1.0.0 (a frontend that works alone and ships no image,
+  `docker: false`), a new kind `serverless` with `serverless/cloudflare` 1.0.0 (the functions,
+  `server/`, D1, the contract, the Pages assembly; the plan's server for a frontend, with no
+  deploy mode and no Compose file), and the stack `astro-cloudflare`. The `fullstack` kind and
+  its template, built first, are removed before the pull request.
+- **Project:** `frontend/` and `serverless/cloudflare/` (a two-segment package directory, new
+  to the tools and the harness). Astro alone is `--template frontend/astro`; the functions are
+  added later by `scripts/scaffold.mjs --stack astro-cloudflare`.
+- **No accounts:** no `auth` flag in either template. Flags: `islands` on the frontend (the
+  React integration, no island shipped), `jobs` on the functions.
+- **Harness:** lanes derive from the kind of each package provenance records (backend: `server`
+  and `serverless` packages; frontend: `frontend` packages; qa: their `tests/`), so no `lanes`
+  map is recorded. `verify`'s Docker-free database steps key on a `serverless` package. The
+  implementers run in parallel again. The one-package wording that PR #64 merged into `dev` is
+  replaced by a pull request of this revision; the wrangler guard, the secret files, the link
+  programs and the security-review globs stay as merged.
+
+| Task | What |
+| --- | --- |
+| A1 | Tools: `fullstack` → `serverless`; two-segment directories; a `serverless` package as the plan's server; `docker: false`; `FRONTEND_PATH`; no `lanes` |
+| A2 | `serverless/cloudflare`: the server half moved out of the one-package template, `schema` back in each module, `contract` and `openapi.json`, `assemble` and `start` serving the frontend's build, the `jobs` flag |
+| A3 | `frontend/astro`: the page half moved out, the generated client under `onlyWhen: server`, alone and in the stack, the `islands` flag; the stack and the index; the old template deleted |
+| A5 | The two guides (with `Migrating a site into Astro` and the functions' migration recipe), READMEs, changelogs, `docs/conventions.md`, `CONTRIBUTING.md` |
+| A6 | One Opus review of the catalog branch, one fix wave, the local proofs, the pull request |
+| H6 | The harness rework above, its review folded into the catalog's where they meet |
+
+Validation as revised: V01 to V03 and V06 hold, on two packages. V04: `frontend/` imports
+nothing of `serverless/`; the client is generated from `openapi.json`. V07: with `jobs` off
+there is no `workers/`; with `islands` off the frontend has no UI framework and its index page
+ships only the theme script; Astro alone generates, builds and passes its e2e with no API code.
+V08: a role agent writes only the packages of its kind, cannot write `.fullstack/catalog.yaml`
+and cannot deploy; a standard project's lanes are unchanged. V09 on both guides. V10 unchanged.
+
 ## Goal
 
 A project can be bootstrapped, or an existing Pages site migrated, onto one package that Astro
@@ -329,11 +376,13 @@ From a sweep of the hard-coded assumptions on f99b0ea.
 Rulings of the session under the delegation; the ledger holds the detail. Each stands for
 Eitan's review at the `dev` → `main` merge.
 
+- **Two packages (Eitan, 2026-11-17).** The revision at the top of this plan. Where an entry
+  below speaks of one package, the `fullstack` kind or recorded `lanes`, the revision wins: the
+  harness pull request of the revision (H6) replaced that code and wording.
 - **No accounts (Eitan, 2026-11-17: "skip authentication in astro app").** C3 is not built
-  and the template has no `auth` flag. V05 and the `auth` half of V07 fall away; the cases are
-  `default`, `jobs`, `islands` and `brand`; the `islands` flag ships the integration and no
-  island (the auth forms were to be the islands). The password-hash ruling below is kept only
-  as input for a later plan. ADR 0014, T6.
+  and neither template has an `auth` flag. V05 falls away; the `islands` flag ships the
+  integration and no island (the auth forms were to be the islands). The password-hash ruling
+  below is kept only as input for a later plan. ADR 0014, T1.
 - **G2 without a separate stop.** S1 and S2 passed, so the build went on with ADR 0014 marked
   "accepted under the delegation"; its rows the session decided carry a ▲.
 - **Spikes.** S1, S2, S4, S5, S6, S7 and S8 passed. S3 is partial: scrypt at N = 2^17 needs the
@@ -348,25 +397,36 @@ Eitan's review at the `dev` → `main` merge.
   4.1 with `@cloudflare/vitest-plugin`, the renamed pool; `@shared/*` the only alias;
   `build.format: 'file'`; the CSP delivered from `dist/_headers` by a post-build script; test
   isolation per file, so tables are emptied before each test; no `.dev.vars` (it hides `.env`).
-- **H1.** The Docker-free database steps are decided by kind: a project with a `fullstack/`
-  package. The table's wording ("no Compose service `database`") would have turned a
-  two-package project's clear refusal into a suite run without its database (review, P1).
-  `isFrontend` became `isServer`, by template kind. `history.mjs` reads an inline `flags` map.
+- **H1, then H6.** The Docker-free database steps are decided by kind: a project whose API is
+  a `serverless` package. The table's wording ("no Compose service `database`") would have
+  turned a standard project's clear refusal into a suite run without its database (review,
+  P1). Packages are named by template kind (`isApi`: `server` or `serverless`). A package
+  directory may have two segments throughout `scripts/`. `history.mjs` reads an inline `flags`
+  map.
 - **H2, stricter than the table.** A sub-agent's `wrangler` is an allowlist (`dev`,
   `pages dev`, `pages functions build`, `types`, `d1 migrations create`, and `d1 migrations
   apply|list`, `d1 execute`, `d1 export` with `--local`); the six words were a denylist that
   `time-travel restore`, `pages deployment create` and a version-pinned `wrangler@4` passed
   (review, P1). It covers every sub-agent, `general-purpose` included; the interactive session
   is asked by `settings.json`. `.dev.vars` is a secret file whatever S6 found, and so is
-  wrangler's login file. A package key never names `scripts`, `db`, `docs` or `node_modules`.
-  `mklink` and `fsutil` are write programs: a link made in a lane led out of it.
-- **H3.** Not net zero: 46 words over across twelve files, every cap held. The first pass
-  reached zero by cutting guidance the review then asked back. Beyond the table: the backend's
-  gate in a one-package project (`--no-e2e`; a `check` failure in the frontend's lane is a
-  handoff), three one-package clauses in `scaffold-step.md`, `app/src/**` in the UI rule's
-  paths.
-- **Left as notes, not built:** a `lanes:` change in `.fullstack/catalog.yaml` triggers no
+  wrangler's login file. `mklink` and `fsutil` are write programs: a link made in a lane led
+  out of it.
+- **Lanes (H6).** A role's lane is its constants plus the packages provenance records, by
+  template kind: `server` and `serverless` for the backend, `frontend` for the frontend, their
+  `tests/` for QA. A key is one or two plain segments and never starts with `scripts`, `db`,
+  `docs` or `node_modules`; any read problem leaves the constants. This also gives a standard
+  project with a renamed package directory its lane.
+- **H3, then H6.** Not net zero: 104 words over across eight files against `main`, every cap
+  held (`AGENTS.md` 1,197 of 1,200). The instruction files start from `main`'s text again, so
+  the wording the first pass cut is back; what was added names the `serverless/` package: the
+  lanes, the layout row and the deployment target in `AGENTS.md`, the backend's and QA's
+  directories, one clause each in `database`, `deployment` and `scaffold-step.md`, the stack
+  choice in `bootstrap-project`, one sentence in the harness manual.
+- **Left as notes, not built:** a package change in `.fullstack/catalog.yaml` triggers no
   security review; a package script that calls `wrangler deploy` is invisible to a hook; the
-  sentences still false for a one-package project that the ledger's `report-h3.md` lists.
+  skills that still spell `backend/AGENTS.md` where a `serverless/` package's guide is meant
+  (the backend agent's prompt gives the reading); `verify`'s port probe gives a listener 750 ms
+  to answer, and on a loaded machine its test (`a busy port fails the e2e step`) failed once and
+  passed alone.
 - **Pushes.** The active `gh` account could not push to these repositories; each push and PR
   command used the other logged-in account for that command only.

@@ -50,7 +50,8 @@ model, glossary, stack, flags, deploy mode, tracker, backlog lines.
 names, roles or password rule is a gap:
 
 - Record it in the summary and in `.doc/architecture.md › Auth` as a decision for the first task
-  that needs it. Change no template code.
+  that needs it (e.g. "roles `member` and `staff` replace `user` and `admin`; decided in the task
+  that adds the first gate"). Change no template code.
 - That task's plan carries `Retired:` with the template's old terms (`writing-plans`), role
   values in literal form (`'admin'`, `UserRole.admin`), never a bare word like `user`.
 - After section 3, confirm the defaults in the generated package: entity and gates in its
@@ -104,13 +105,12 @@ agent into it. It is outside the working tree on purpose.
 Narrow by the Search and sharing answer, deciding by the `static` declaration, never by a stack
 id:
 
-- "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today).
+- "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today),
+  and `frontend/astro` (prerendered pages: a content site with no server to run).
 - "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular, Vue).
 - A stack with no frontend skips this question.
-- A stack of one `fullstack/` package (`astro-cloudflare-pages`) fits content pages a search
-  engine reads with no server to run. It has no deploy mode and no `auth` flag (Auth is
-  `none`; pass no `--flag auth`), and its Data store is the platform's. To migrate a Cloudflare
-  Pages site: the package's `AGENTS.md › Migrating a Pages site`.
+- A `serverless/` server (`astro-cloudflare`) has no deploy mode, Compose file or `auth` flag
+  (pass no `--flag auth`); its Data store is the platform's.
 
 With `Server: later`, keep the frontend template alone (`--template frontend/<id>` from a kept
 stack, chosen by the same rule), skip the server, capability and deploy-mode questions, and pass
@@ -119,7 +119,7 @@ store "decide later".
 
 Ask each remaining choice in turn: the frontend framework when the kept stacks differ in it (name
 the options by template id: `frontend/react`, `frontend/angular`, `frontend/vue`), then the
-server. Show the chosen stack with its reason
+server. Show the chosen stack with its reason (e.g. "single-page app: no public page needs search")
 and accept an override. Ask every flag the templates declare (show its `summary` and
 `default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
@@ -172,7 +172,7 @@ flags from the `Design` form; pass only the fields that hold a value:
 - An empty `Display name` omits the flag; the generator title-cases the project name. A given
   name is 1 to 60 characters of letters, digits, spaces and `. , : ! ? _ -`, starting with a
   letter or digit, with no two underscores in a row.
-- Convert a named colour to a hex and write it into the Design form.
+- Convert a named colour (e.g. "a cool neutral grey") to a hex and write it into the Design form.
   Map a free-text answer to an enumerated field to the nearest allowed value (Type "Roboto"
   becomes `system` or `inter`) and state the mapping to the user.
 - Show every brand value with the stack and deploy mode (section 2) before scaffolding, so an
@@ -198,7 +198,8 @@ The run:
   `<!-- readme:features -->`.
 - Refuses to run twice.
 
-A failure before the move leaves nothing to clean: the generator moves staged output into place all or nothing. The clearing step runs after the move:
+A failure before the move leaves nothing to clean: the generator stages the output and moves it
+into place all or nothing (a failed move is rolled back). The clearing step runs after the move:
 a failure there leaves the scaffold in place and the message names the recovery
 (`node scripts/history.mjs <root> [--auth=false]`).
 
@@ -225,7 +226,7 @@ node scripts/verify.mjs --out .orchestrate/bootstrap
 - `verify` runs the gates of every package in `.fullstack/catalog.yaml`, with no base because the
   scaffold is not committed yet, and must exit 0. On failure, fix the cause (not the gate),
   re-run, and tell the user what was wrong. A failing gate on a fresh scaffold is a catalog bug:
-  say so, name the template and version from the provenance file, and record it in
+  say so explicitly, name the template and version from the provenance file, and record it in
   the final message.
 
 **Dev check.** Start each package's `dev` command (an SPA's server first, as the frontend's
@@ -244,7 +245,7 @@ On Linux and macOS: `lsof -ti :<port> | xargs -r kill`. Confirm the port is free
 check: `Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction SilentlyContinue`
 (Windows) or `lsof -i :<port> -sTCP:LISTEN` (Linux, macOS) prints nothing.
 
-**App check.** No Compose file (a lone frontend, the one-package stack): skip it.
+**App check.** No Compose file (a lone frontend, a `serverless/` server): skip it.
 
 1. Export in the shell (never in a file) a throwaway value for every secret the server's
    `.env.example` lists, and with a provider its `DATABASE_URL`: the server refuses to start in
@@ -254,7 +255,7 @@ check: `Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction Silent
 3. At the root, run `docker compose --profile app up --build --wait` with a fresh `-p <name>`
    (a reused project name reuses its volumes). With a provider, the `<dir>-migrate` one-shot
    service runs the migrations first.
-4. In `single`: one container on the server's port (no frontend container in
+4. Check it. In `single`: one container on the server's port (no frontend container in
    `docker compose ps -a`), where `/` returns the page and `/api/health` answers. In `split`:
    one container per package, reached through the frontend's port.
 5. Stop it with `docker compose --profile app down` (same `-p`).
@@ -270,8 +271,8 @@ development runs with defaults and warns.
 
 Do each item; the dev loop refuses to start until the last one holds.
 
-1. **Backlog.** Follow the grammar at the top of `.plan/000-backlog.md`. With no server package, no
-   data-layer line. With a server and no database provider passed at generation, the first line
+1. **Backlog.** Follow the grammar at the top of `.plan/000-backlog.md`. With no server, or a `serverless/`
+   one, no data-layer line. With a server and no database provider passed at generation, the first line
    is `- [ ] add the <engine> data layer | stack:backend` for a named engine, or
    `- [ ] add the data layer | stack:backend` for "decide later" (the `database` skill says what
    that task delivers). The first in-scope capability is the first line with a provider, the next line without one. Set `tracker:` in the backlog header to
@@ -316,7 +317,7 @@ Do each item; the dev loop refuses to start until the last one holds.
 - Browse the catalog cache.
 - Edit `scripts/`, `.claude/`, `catalog.lock` or other harness files by hand. The one change
   there is `--finish`, which removes this skill's files and the harness-development files through
-  the script.
+  the script, as designed.
 - Create a real env file; secrets stay in the shell environment.
 - Install a database client or start a database service, except the Compose service of a provider
   chosen at generation (section 4).

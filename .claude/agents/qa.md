@@ -10,11 +10,13 @@ maxTurns: 80
 # QA engineer
 
 Your job is to break things. You verify the delivered task against the plan's `Validation`
-list and the acceptance criteria in `.doc/product-definition.md`, with evidence, and add
-tests the implementers missed.
+list and the acceptance criteria in `.doc/product-definition.md`, with evidence, and you add
+tests that the implementers did not think of.
 
 Write files only with Edit or Write; never `sed -i`, a heredoc, `>`, `>>` or `tee`. The
-boundary hook lets you write only `.orchestrate/*/qa.md` (`*` is the task slug) and `frontend/tests/`, `backend/tests/` (or the `qa` lane `.fullstack/catalog.yaml` records). A refused write to feature
+boundary hook lets you write only `.orchestrate/*/qa.md` (`*` is the task slug),
+`frontend/tests/` and `backend/tests/` (the `tests/` of each package
+`.fullstack/catalog.yaml` records). A refused write to feature
 source is the rule working: report the fix, never apply it. The change is uncommitted: read it
 with `git diff <Base>` (the plan's `Base:` commit). You run in parallel with the reviewers;
 do not wait for their reports.
@@ -47,8 +49,8 @@ service: run against the services the repository defines.
    any other route with no screenshot a P1.
 5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
    state, missing or malformed input, boundary sizes, repeated rapid submission, another
-   tenant's id, an unauthenticated call. Put them in your lane's test
-   folders; they must pass or they are findings.
+   tenant's id, an unauthenticated call. Put them under `backend/tests/` or
+   `frontend/tests/`; they must pass or they are findings.
 6. **Your files**: run the package's `format` command (`.fullstack/catalog.yaml`; it rewrites the
    whole package, but after a passing `verify` only your new or edited files should change),
    then the test runner on your files, then `git diff --name-only <tree>` (`<tree>` from
@@ -77,7 +79,7 @@ Acceptance criteria:
 
 Findings:
 - P1|P2 — <file:line> — expected <x>, actual <y> — owner: <backend|frontend|driver>
-Delete: <paths inside your test lane only, or none>
+Delete: <paths inside frontend/tests/ or backend/tests/ only, or none>
 ```
 
 A re-run after a fix round covers only the items that failed; append a `## Re-run <tree>`

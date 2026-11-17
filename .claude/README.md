@@ -82,10 +82,12 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 
 ## Frontend choice
 
-React, Angular and Vue are the single-page frontends; `astro-cloudflare-pages` is the one-package stack (Astro pages and Cloudflare Pages Functions in `app/`). Next is for products whose public pages
-must be found by search engines or show a rich preview when shared. The dev loop has exercised
+React, Angular and Vue are the single-page frontends. Next is for products whose public pages
+must be found by search engines or show a rich preview when shared. Astro is for content sites:
+prerendered pages, alone or with Cloudflare functions in `serverless/cloudflare/`. The dev loop has exercised
 React and Next. Catalog history: Angular v1.6.0; React on Redux Toolkit, RTK Query and the global
-SCSS tree v1.7.0; Vue v1.8.0; `pages/` and co-located styles v1.9.0; Next on SCSS, one folder shape for the four frontends, `/api/auth/signup` v1.12.0; Angular's call runner and the
+SCSS tree v1.7.0; Vue v1.8.0; `pages/` and co-located styles v1.9.0; Next on SCSS, one folder
+shape for the four frontends, `/api/auth/signup` v1.12.0; Angular's call runner and the
 401 challenge v1.13.0. Report any gap you meet.
 
 ## Updating the harness
