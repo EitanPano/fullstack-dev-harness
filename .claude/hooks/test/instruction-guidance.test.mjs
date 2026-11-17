@@ -94,9 +94,17 @@ describe('first call', () => {
       assert.ok(result.stderr.includes(file), result.stderr)
       assert.match(result.stderr, /not a guardrail refusal/)
       assert.ok(result.stderr.includes(TEXT.trim()))
-      assert.match(result.stderr, /Now make the same call again\.\s*$/)
+      // The refused edit was written before the text was read, so the retry is a checked one.
+      assert.match(result.stderr, /revise it where a rule applies, then make the call again\.\s*$/)
+      assert.ok(!result.stderr.includes('same call'), 'an unchanged retry is not asked for')
     })
   }
+  test('T4 asks a call of the same batch to be checked too', () => {
+    assert.equal(call('AGENTS.md').status, 2)
+    const result = call('CLAUDE.md')
+    assert.equal(result.status, 2)
+    assert.match(result.stderr, /Check this call against it/)
+  })
   test('T1 refuses a Write as it does an Edit', () => {
     assert.equal(call('AGENTS.md', { tool: 'Write' }).status, 2)
   })

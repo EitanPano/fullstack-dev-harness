@@ -54,7 +54,7 @@ function refuse(message) {
 const refuseBatch = () =>
   refuse(
     'This call was refused with the one before it; the guidance is in that refusal. ' +
-      'Make the same call again.'
+      'Check this call against it too, then make it again.'
   )
 
 async function readInput() {
@@ -156,8 +156,10 @@ async function main() {
 
   refuse(
     `${rel} is a harness prompt. This is its editing guidance, shown once per session. ` +
-      'It is not a guardrail refusal and needs no report: read it, then make the same call ' +
-      `again.\n\n${text}\n\nNow make the same call again.`
+      'It is not a guardrail refusal and needs no report.\n\n' +
+      `${text}\n\nThe refused edit was written before this text was read. ` +
+      'Check the text you are adding or changing against these rules, ' +
+      'revise it where a rule applies, then make the call again.'
   )
 }
 
