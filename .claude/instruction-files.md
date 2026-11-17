@@ -1,7 +1,7 @@
 # Instruction files
 
-Rules for any Markdown file an agent loads as instructions or context. A hook shows them once per
-session, in place of the first edit of such a file: read them, then make the same call again.
+Rules for the harness's prompts: the root `AGENTS.md` and `CLAUDE.md`, and `.claude/`. A hook
+shows them once per session, in place of the first edit of such a file: read them, then retry.
 
 ## Changing harness text
 

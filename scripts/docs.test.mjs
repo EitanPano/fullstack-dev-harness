@@ -48,7 +48,9 @@ const words = (text) => text.split(/\s+/).filter(Boolean).length
 const body = (text) => text.replace(/^---\n[\s\S]*?\n---\n/, '')
 const markdown = files.filter((f) => f.endsWith('.md'))
 const instructionFiles = markdown.filter(isInstructionFile)
-const docs = markdown.filter((f) => isInstructionFile(f) || FOR_PEOPLE.has(f))
+// The product's own context: agents read it, but the gate is for harness text only.
+const isProjectDoc = (f) => f.startsWith('.doc/')
+const docs = markdown.filter((f) => isInstructionFile(f) || FOR_PEOPLE.has(f) || isProjectDoc(f))
 const skills = files.filter((f) => /^\.claude\/skills\/[^/]+\/SKILL\.md$/.test(f))
 const agents = files.filter((f) => /^\.claude\/agents\/[^/]+\.md$/.test(f))
 const skillNames = new Set(skills.map((f) => f.split('/')[2]))
@@ -105,10 +107,19 @@ describe('scope', () => {
   // A new file that is none of these fails, so the scope cannot change unseen.
   it('classifies every tracked Markdown file', () => {
     const unclassified = markdown.filter(
-      (f) => !isInstructionFile(f) && !f.startsWith('.plan/') && !FOR_PEOPLE.has(f),
+      (f) =>
+        !isInstructionFile(f) && !f.startsWith('.plan/') && !FOR_PEOPLE.has(f) && !isProjectDoc(f),
     )
     assert.deepEqual(unclassified, [])
-    assert.deepEqual(instructionFiles.filter((f) => FOR_PEOPLE.has(f)), [])
+    assert.deepEqual(instructionFiles.filter((f) => FOR_PEOPLE.has(f) || isProjectDoc(f)), [])
+  })
+  // The gate shows the harness's prompt rules; a file the product owns is not harness text.
+  it('gates no file the project owns', () => {
+    const manifest = loadManifest(repoRoot)
+    const owned = instructionFiles.filter((f) => groupsOf(manifest, f).includes('project'))
+    assert.deepEqual(owned, [])
+    const projectFiles = ['.doc/glossary.md', 'frontend/AGENTS.md', 'serverless/x/AGENTS.md']
+    assert.deepEqual(projectFiles.filter(isInstructionFile), [])
   })
 })
 
