@@ -1,15 +1,14 @@
-// Which Markdown files an agent loads as instructions or context. One set of patterns for the
-// guidance hook, the docs test and a review, in the manifest's glob dialect. A path
-// is classified by its spelling alone, so a file that does not exist yet has an answer.
+// The harness's Markdown prompts, the files the guidance hook gates. The product's `.doc/` and a
+// package's `AGENTS.md` (from the catalog) are the project's own text and stay out. One set of
+// patterns for the hook and the docs test; a path is classified by its spelling alone.
 import process from 'node:process'
 
 import { toRegExp } from '../../../scripts/verify/glob.mjs'
 
 export const INCLUDE = [
-  '**/AGENTS.md',
-  '**/CLAUDE.md',
+  'AGENTS.md',
+  'CLAUDE.md',
   '.claude/**/*.md',
-  '.doc/**/*.md',
   '.github/copilot-instructions.md'
 ]
 // The README template becomes the product's README, which is written for people.

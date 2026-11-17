@@ -270,6 +270,12 @@ cell. V12: `CONTRIBUTING.md` 582 → 330 words, `.claude/README.md` 1,344 → 1,
 agents run at `high` today, so R1 pins them `high` and the other three `medium`, or an A/B
 loop comes first (Eitan's call). R1 waits for the gate's merge.
 
+**Scope narrowed (2026-11-17, after #70; Eitan: "it should be triggered only when the llm decides
+to either create or edit a harness related .md file"):** this replaces answer 1. The gate covers
+the root `AGENTS.md` and `CLAUDE.md`, `.claude/**/*.md` and the Copilot pointer. `.doc/**` and
+a package's `AGENTS.md` (catalog text the project owns) are out; `docs.test.mjs` fails if any
+file of the manifest's `project` group is gated. Branch `fix/instruction-scope`.
+
 ## Appendix A: scope
 
 One module, `.claude/hooks/lib/instruction-scope.mjs`. A path is in scope when an include

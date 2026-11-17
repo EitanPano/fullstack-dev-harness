@@ -48,13 +48,10 @@ describe('scope', () => {
   const inScope = [
     'AGENTS.md',
     'CLAUDE.md',
-    'frontend/AGENTS.md',
-    'serverless/cloudflare/AGENTS.md',
     '.claude/README.md',
     '.claude/agents/backend.md',
     '.claude/skills/new/SKILL.md',
     '.claude/instruction-files.md',
-    '.doc/glossary.md',
     '.github/copilot-instructions.md',
     '.claude/worktrees/x/AGENTS.md',
     '.claude\\agents\\backend.md'
@@ -67,6 +64,10 @@ describe('scope', () => {
     '.orchestrate/README.md',
     '.claude/skills/bootstrap-project/readme-template.md',
     'frontend/README.md',
+    'frontend/AGENTS.md',
+    'serverless/cloudflare/AGENTS.md',
+    '.doc/glossary.md',
+    '.doc/conventions.md',
     'frontend/node_modules/p/AGENTS.md',
     'src/x.ts',
     '.claude/settings.json',
@@ -84,7 +85,7 @@ describe('scope', () => {
 })
 
 describe('first call', () => {
-  const first = ['AGENTS.md', '.claude/agents/backend.md', '.doc/glossary.md', 'frontend/AGENTS.md']
+  const first = ['AGENTS.md', '.claude/agents/backend.md', '.claude/rules/naming.md', 'CLAUDE.md']
   for (const file of first) {
     test(`T1 refuses ${file} with the guidance text`, () => {
       const result = call(file)
@@ -113,6 +114,8 @@ describe('first call', () => {
     '.claude/skills/bootstrap-project/readme-template.md',
     'frontend/README.md',
     'frontend/node_modules/p/AGENTS.md',
+    'frontend/AGENTS.md',
+    '.doc/glossary.md',
     'src/x.ts',
     '../outside/AGENTS.md'
   ]
@@ -147,12 +150,12 @@ describe('later calls', () => {
   test('T4 allows the second call once the batch window has passed', () => {
     assert.equal(call('AGENTS.md').status, 2)
     ageMarkers()
-    const result = call('.doc/glossary.md')
+    const result = call('.claude/rules/naming.md')
     assert.equal(result.status, 0, result.stderr)
   })
   test('T4 refuses a call inside the batch window with one line and no file text', () => {
     assert.equal(call('AGENTS.md').status, 2)
-    const result = call('.doc/glossary.md')
+    const result = call('.claude/rules/naming.md')
     assert.equal(result.status, 2)
     assert.match(result.stderr, /^\[instruction-guidance\] /)
     assert.ok(!result.stderr.includes('GUIDANCE-BODY'))
@@ -167,17 +170,17 @@ describe('later calls', () => {
   }
   test('T4 a long batch stays refused while its calls keep coming', () => {
     setMarker(5000, 0)
-    assert.equal(call('.doc/glossary.md').status, 2)
+    assert.equal(call('.claude/rules/naming.md').status, 2)
     const [, last] = fs.readFileSync(path.join(markerDir(), 'session-1.main'), 'utf8').split(' ')
     assert.ok(Date.now() - Number(last) < 400, 'the refusal moves the gap forward')
   })
   test('T4 a call after the gap passes', () => {
     setMarker(2500, 2000)
-    assert.equal(call('.doc/glossary.md').status, 0)
+    assert.equal(call('.claude/rules/naming.md').status, 0)
   })
   test('T4 quick retries cannot keep the gate shut past its cap', () => {
     setMarker(11000, 200)
-    assert.equal(call('.doc/glossary.md').status, 0)
+    assert.equal(call('.claude/rules/naming.md').status, 0)
   })
   test('a marker that cannot be read does not refuse for ever', () => {
     fs.mkdirSync(path.join(markerDir(), 'session-1.main'), { recursive: true })

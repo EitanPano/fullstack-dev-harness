@@ -58,8 +58,8 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
   `.claude/settings.local.json`.
 - `/code-review` runs this project's `code-review` skill, which replaces Claude Code's built-in
   command of that name. The built-in cloud review stays reachable as `/ultrareview`.
-- The first edit of an instruction file (`AGENTS.md`, `.claude/`, `.doc/`) in a session is refused
-  once with the text of `.claude/instruction-files.md`; the same call then passes. It is a
+- The first edit of a harness prompt (root `AGENTS.md` or `CLAUDE.md`, `.claude/`) in a session
+  is refused once with the text of `.claude/instruction-files.md`; the same call then passes. A
   reminder, not a guardrail: any state it cannot read lets the edit through.
 
 ## Running environment

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PreToolUse on Edit|Write: refuses the first edit of an instruction file in a session, with
+// PreToolUse on Edit|Write: refuses the first edit of a harness prompt in a session, with
 // `.claude/instruction-files.md` as the refusal text, and lets the retry through.
 // - Not a guardrail: it refuses only after it has parsed an in-scope path, read the guidance
 //   and written its marker. Every other state, a crash included, allows the call.
@@ -155,7 +155,7 @@ async function main() {
   } catch {}
 
   refuse(
-    `${rel} is an instruction file. This is its editing guidance, shown once per session. ` +
+    `${rel} is a harness prompt. This is its editing guidance, shown once per session. ` +
       'It is not a guardrail refusal and needs no report: read it, then make the same call ' +
       `again.\n\n${text}\n\nNow make the same call again.`
   )
