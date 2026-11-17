@@ -136,10 +136,13 @@ id and (frontend) the figma URL if any.
    runs the UI pass in its own dispatch.
 4. Once the implementers are dispatched, start the lookahead (below).
 5. Apply the deletions below. Always run `node scripts/readme.mjs --configuration`: it
-   regenerates the README's Configuration block and is idempotent and cheap. In `README.md`'s
+   idempotently regenerates the README's Configuration block. In `README.md`'s
    Features, remove the ` (planned)` suffix from the line the plan's Goal delivers; add a line
    only when the Goal adds or changes a user-visible capability and no line matches
-   (infrastructure-only tasks add none). Then run
+   (infrastructure-only tasks add none). Write `.doc/architecture.md`'s change-log entry from the
+   plan's Contract, data model and routes, and apply the reports' `Glossary:` and `Docs:` lines
+   (only the driver writes `.doc/`): terms to `.doc/glossary.md`, a `Deploy mode` line to
+   Operational Concerns › Deployment. Then run
    `node scripts/verify.mjs --plan <plan> --reuse`. Red goes back to the owner by file as a
    SendMessage continuation and counts as a fix round. A `retired-terms` hit on a legitimate
    use is not red for an implementer: narrow `Retired:` yourself, record it under
@@ -191,8 +194,7 @@ whose volumes only a human could remove. A QA finding with `owner: driver` is a 
 formatter rewrote outside QA's lane: keep a formatting-only change (re-run `verify`), and send
 anything else to the owning implementer as a finding. Apply QA's `Delete:` lines by the section 3 rule,
 for paths inside QA's lane (`frontend/tests/`, `backend/tests/`) only: `git rm -f` a tracked
-file, remove an untracked one yourself. Collect every P0 and P1 finding and QA's FAIL items. QA's P2 and `UX:` lines are not collected;
-they go to the section 6 summary as open P2s.
+file, remove an untracked one yourself. Collect every P0 and P1 finding and QA's FAIL items. QA's P2 and `UX:` lines go to the section 6 summary as open P2s.
 
 ## 5. Fix rounds (at most two per task)
 
@@ -215,14 +217,11 @@ they go to the section 6 summary as open P2s.
 
 ## 6. Finish
 
-1. Write the change-log entry for `.doc/architecture.md` from the plan's Contract, data model
-   and routes.
-2. Apply the reports' `Glossary:` and `Docs:` lines yourself (only the driver writes `.doc/`):
-   terms to `.doc/glossary.md`, a `Deploy mode` line to Operational Concerns › Deployment.
-3. Set the plan to `Status: done` and move the backlog line under `## DONE` with the date.
-4. Run `verify --reuse` last. The tree changed in steps 1 to 3, so it re-runs; it must pass
-   on the tree that will be committed.
-5. Summarise from `verify.json` and the reports: what shipped, the test counts, open P2
+1. Bring the section 3 `.doc/` entries in line with the fix rounds.
+2. Set the plan to `Status: done` and move the backlog line under `## DONE` with the date.
+3. Run `verify --reuse` last; it re-runs on the changed tree and must pass on the tree that
+   will be committed.
+4. Summarise from `verify.json` and the reports: what shipped, the test counts, open P2
    findings, every `Mechanize:` finding (for a follow-up plan), every `Refusals:` line, and the
    branch name. Ask the user whether to commit.
 
