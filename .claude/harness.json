@@ -25,6 +25,7 @@
       "!scripts/verify/*.test.mjs",
       "scripts/provenance.mjs",
       "scripts/loop-stats.mjs",
+      "scripts/guidance.mjs",
       "scripts/manifest.mjs",
       "scripts/readme.mjs",
       "scripts/harness-update.mjs",
