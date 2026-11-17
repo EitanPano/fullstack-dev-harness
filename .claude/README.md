@@ -88,7 +88,7 @@ prerendered pages, alone or with Cloudflare functions in `serverless/cloudflare/
 React and Next. Catalog history: Angular v1.6.0; React on Redux Toolkit, RTK Query and the global
 SCSS tree v1.7.0; Vue v1.8.0; `pages/` and co-located styles v1.9.0; Next on SCSS, one folder
 shape for the four frontends, `/api/auth/signup` v1.12.0; Angular's call runner and the
-401 challenge v1.13.0. Report any gap you meet.
+401 challenge v1.13.0; Astro and Cloudflare functions v1.14.0. Report any gap you meet.
 
 ## Updating the harness
 
