@@ -430,3 +430,31 @@ Eitan's review at the `dev` → `main` merge.
   passed alone.
 - **Pushes.** The active `gh` account could not push to these repositories; each push and PR
   command used the other logged-in account for that command only.
+
+## As built (2026-11-17)
+
+- **Catalog:** PR #45 into `dev` as b8148ee (CI 61/61): the `serverless` kind,
+  `serverless/cloudflare` 1.0.0, `frontend/astro` 1.0.0, the stack `astro-cloudflare`, ADR 0014,
+  both guides with their migration recipes. Release PR #46 `dev` → `main` is open for Eitan.
+- **Harness:** #64 (H1 to H3) and #65 (H6) in `dev`; this entry is H4.
+- **Review (A6):** Opus on the catalog branch: no P0, three P1, thirteen P2, all fixed in one
+  wave. A scoped re-review of the wave found a P1 in the new policy parser (it read
+  `data-content` for `content`), fixed in a second round. Two rows of ADR 0014 changed:
+  - each page keeps its hashed policy `<meta>` and `assemble` adds one fixed header line (the
+    lift into one line capped a site at about 30 hashes, and pages accepted each other's);
+  - `ENCRYPTION_KEY` is optional with no default (the example env file broke every request).
+- **Proof:** `validate` plain, `--readme`, `--lockfiles`; the cases `serverless/cloudflare/default`
+  and `/jobs`, and `frontend/astro/default`, `/alone`, `/islands`, `/jobs`, `/brand` with e2e
+  (V01, V03, V04, V06, V07). A fresh harness clone bootstrapped with `--stack astro-cloudflare
+  --templates <catalog>`, then `verify: PASS` with no Docker step (V02). Before the fix wave, at
+  catalog c272f4a: `--template frontend/astro` alone, then `scaffold --stack astro-cloudflare`
+  onto it, `verify: PASS` after each. V08: the hooks suite on #65. V09: both guides, by the docs
+  task's mapping; not reread by a reviewer.
+- **Not proven:** a deployment (no session holds an account); a file symbolic link in a build
+  output (the test ran on a junction); `astro dev` under the page policy (Astro's dev manifest
+  injects no policy meta: read from its source, not run); one unexplained exit 9 of `start` in
+  about twelve runs (the script now prints the code and signal); a project path of about 140
+  characters fails the local D1 commands on Windows (in the guide).
+- **Open:** G4 (Eitan): catalog #46, the tag `v1.14.0`. Then H5 (the lock bump into `dev`),
+  harness `dev` → `main`, and P1 with V10. Until the tag, a project is created with
+  `node scripts/bootstrap.mjs --stack astro-cloudflare --name <name> --templates <catalog checkout>`.
