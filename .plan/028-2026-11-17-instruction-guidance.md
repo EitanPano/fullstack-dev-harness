@@ -1,11 +1,11 @@
 # Instruction-file guidance: a standard, a gate and a review
 
-Status: draft
+Status: active
 Owner: Eitan
 Last updated: 2026-11-17
 Input: Eitan's request of 2026-11-17: a guidance file for LLM-facing Markdown, a hook that shows
 it before the first edit of such a file, and a review of the harness's files against it.
-Branch: docs/instruction-guidance (local, cut from `dev` ef5afc1; PR into `dev`)
+Branch: feat/instruction-guidance (cut from `dev` ef5afc1; PR into `dev`)
 Base: ef5afc1
 Stages: harness hooks, scripts and docs. No role agent runs. Lean process (2026-11-11): Sonnet
 implementers, cheap gates per task, one review of the branch at the end.
@@ -205,6 +205,70 @@ answer is the recommendation. `Status:` stays `draft` until Eitan sets it.
   wording candidates wait for a measurement.
 
 ## Changes during the task
+
+2026-11-17, on Eitan's word "execute the new plan" (`Status: active`). Built in the worktree
+`.claude/worktrees/028` on `feat/instruction-guidance`.
+
+**S1 (Claude Code 2.1.326, Windows, `claude -p`, Sonnet driver):**
+
+1. No `scratchpad_dir` in the payload of a `-p` main session, a `general-purpose` subagent or a
+   role agent. A subagent adds `agent_id` and `agent_type`; the main session has neither. An
+   interactive session was not measured.
+2. `"if": "Edit(**/*.md)"` starts the hook for an Edit only, root and nested; a Write needs
+   `"if": "Write(**/*.md)"`. Neither starts it for another file.
+3. Exit 2 with 2,700 characters: all received, as `PreToolUse:Edit hook error: [node
+   ${CLAUDE_PROJECT_DIR}/<script>]: <stderr>`.
+4. Two hooks exiting 2 on one call: Claude receives one message; the other hook ran and its text
+   is lost.
+5. Five Edit calls in one turn reach the hooks one after another, 0.6 to 0.7 s apart (2.3 s with
+   three hooks wired, over 3 s with the gate's two handlers). Retries arrived 1 to 5.6 s after a
+   refusal.
+6. `--resume` keeps `session_id` (`SessionStart` source `resume`). `/compact` and `/clear`
+   cannot be driven from `-p`: not measured.
+7. A `frontend` role agent refused on `frontend/AGENTS.md` retried the same call and reported
+   the task done, not blocked.
+8. `effort.level` today: orchestrator and reviewer `high`; backend, frontend and qa `medium`.
+9. `if` is honoured on 2.1.326; 2.1.295 was not available.
+
+**What changed against the appendices:**
+
+- Marker: `<os tmpdir>/instruction-guidance/<session_id>.<agent_id or "main">`, pruned after
+  seven days (decision 5's fallback, by item 1). Step 3 needs `session_id` only; T6 tests a
+  temp directory that cannot be written.
+- Wiring: two handlers in the one `Edit|Write` group, `if` `Edit(/**/*.md)` and
+  `Write(/**/*.md)` (decision 4's fallback, by item 2). The leading slash roots the rule at the
+  project: without it an Edit of the root `AGENTS.md` after a `cd` went ungated in a live run.
+- Batch: the fixed 3 s window let the fifth of five edits through in the live run (item 5). A
+  call is of the batch when it comes within 1 s of the last refused call, for at most 10 s from
+  the first; the marker holds both times. At 1.5 s a quick retry was refused a second time.
+- The hook imports its two libraries inside the `try`, so a missing library allows the call.
+- From the review: the marker directory is per user (`instruction-guidance-<uid>`, mode 700,
+  refused when another user owns it), because a Linux temp directory is shared; a marker that
+  exists and cannot be read, a marker time ahead of the clock, and a `session_id` with no
+  usable character all allow the call.
+- A marker left empty by a crash is read by its modification time.
+- F9's cut is in D1's change, not R1: it pays for D1's lines (V12).
+- `docs.test.mjs` reach: `.plan/000-backlog.md` left the pointer checks (it is under `.plan/`).
+- `.claude/harness.json` `references` also lists the scope module's mention of the README
+  template.
+- T14's known limit is confirmed by item 4: beside a lane refusal the text may be lost.
+
+**Proof (disposable clone, `claude -p`, Sonnet):** V04: first Edit of `AGENTS.md` refused with
+the text, retry passes; `.doc/glossary.md`, `README.md`, `.plan/000-backlog.md` and a Read
+never refused; a `general-purpose` subagent refused once after the main session had passed.
+V05: five edits in one turn all refused, one with the text, all pass on the retry. Also live: a
+Write of a new `.doc` file is refused once; an Edit after `cd scripts/sub` is refused once.
+
+**Gates (2026-11-17, second session):** hooks suite 2908/2908, scripts suite 427/427. V08: a
+`react-bun-express` project finished at Base, `harness-update --from` the worktree exits 0, no hook
+failure, the three new files written. V10: `--finish` on a project from this tree keeps the
+guidance file, the hook and both libraries; the hook refuses `frontend/AGENTS.md` there and
+allows `README.md`. V11: 32 in scope at ef5afc1, 32 score rows, none missing, no empty Evidence
+cell. V12: `CONTRIBUTING.md` 582 → 330 words, `.claude/README.md` 1,344 → 1,331.
+
+**Open:** V06 (`/compact`, `/clear`) needs one interactive session. Answer 5: the two Opus
+agents run at `high` today, so R1 pins them `high` and the other three `medium`, or an A/B
+loop comes first (Eitan's call). R1 waits for the gate's merge.
 
 ## Appendix A: scope
 
