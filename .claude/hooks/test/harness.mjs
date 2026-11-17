@@ -62,3 +62,27 @@ function verdictOf(payload, hooks) {
   }
   return { blocked: false, hook: null, stderr: '' }
 }
+
+export const GUIDANCE_HOOK = 'show-instruction-guidance.mjs'
+
+// An Edit or Write of `filePath` as the instruction-guidance hook sees it: a session, and an
+// `agent_id` inside a sub-agent only.
+export function guidancePayload(filePath, { session = 'session-1', agent, role, tool = 'Edit' } = {}) {
+  const payload = { tool_name: tool, tool_input: { file_path: filePath }, session_id: session }
+  if (agent !== undefined) payload.agent_id = agent
+  if (role !== undefined) payload.agent_type = role
+  return payload
+}
+
+// Spawns the guidance hook against `root` with the OS temp directory moved to `tmp`, where it
+// keeps its markers. `input` replaces the payload with raw stdin.
+export function runGuidance(payload, { root = ROOT, tmp, args = [], input } = {}) {
+  const env = { ...process.env, CLAUDE_PROJECT_DIR: root, TEMP: tmp, TMP: tmp, TMPDIR: tmp }
+  delete env.AGENT_ROLE
+  const result = spawnSync('node', [path.join(HOOKS, GUIDANCE_HOOK), ...args], {
+    input: input ?? JSON.stringify({ cwd: root, ...payload }),
+    env,
+    encoding: 'utf8'
+  })
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr }
+}
