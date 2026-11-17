@@ -58,6 +58,9 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
   `.claude/settings.local.json`.
 - `/code-review` runs this project's `code-review` skill, which replaces Claude Code's built-in
   command of that name. The built-in cloud review stays reachable as `/ultrareview`.
+- The first edit of an instruction file (`AGENTS.md`, `.claude/`, `.doc/`) in a session is refused
+  once with the text of `.claude/instruction-files.md`; the same call then passes. It is a
+  reminder, not a guardrail: any state it cannot read lets the edit through.
 
 ## Running environment
 
@@ -85,11 +88,7 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 
 React, Angular and Vue are the single-page frontends. Next is for products whose public pages
 must be found by search engines or show a rich preview when shared. Astro is for content sites:
-prerendered pages, alone or with Cloudflare functions in `serverless/cloudflare/`. The dev loop has exercised
-React and Next. Catalog history: Angular v1.6.0; React on Redux Toolkit, RTK Query and the global
-SCSS tree v1.7.0; Vue v1.8.0; `pages/` and co-located styles v1.9.0; Next on SCSS, one folder
-shape for the four frontends, `/api/auth/signup` v1.12.0; Angular's call runner and the
-401 challenge v1.13.0; Astro and Cloudflare functions v1.14.0. Report any gap you meet.
+prerendered pages, alone or with Cloudflare functions in `serverless/cloudflare/`. Report any gap you meet.
 
 ## Updating the harness
 

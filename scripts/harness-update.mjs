@@ -274,7 +274,8 @@ function restore(root, backup, touched, newDirs) {
 function hookRuns(settings, root) {
   const sub = (text) => String(text).replaceAll('${CLAUDE_PROJECT_DIR}', root)
   const runs = []
-  // PreToolUse is the only event the harness wires; the payload below is that event's shape.
+  // Only PreToolUse hooks can lock a project out, and the payload below is that event's shape;
+  // the SessionStart entry is not probed.
   for (const group of settings.hooks?.PreToolUse ?? []) {
     for (const hook of group.hooks ?? []) {
       if (hook.type && hook.type !== 'command') continue
