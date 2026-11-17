@@ -290,43 +290,82 @@ test('--packages reports an unusable catalog lock as one line', () => {
   assert.match(run.stderr, /catalog\.lock/)
 })
 
-// What the astro-cloudflare-pages stack records: one fullstack package, no deploy mode.
-const FULLSTACK_YAML = [
-  'stack: astro-cloudflare-pages',
+// What the astro-cloudflare stack records: a serverless API in a nested directory and a
+// frontend, no deploy mode and no Compose file.
+const NESTED_YAML = [
+  'stack: astro-cloudflare',
   'providers: {}',
   'packages:',
-  '  app:',
-  '    template: fullstack/astro-cloudflare-pages',
+  '  serverless/cloudflare:',
+  '    template: serverless/cloudflare',
   '    commands:',
   '      install: bun install',
   '      dev: bun run dev',
   '      check: bun run check',
   '      test: bun run test',
+  '    http: { port: 8788, health: /api/health }',
+  '  frontend:',
+  '    template: frontend/astro',
+  '    commands:',
+  '      install: bun install',
+  '      dev: bun run dev',
+  '      check: bun run check',
   '      testE2e: bun run test:e2e',
-  '    http: { port: 4321, health: /api/health }',
+  '    http: { port: 4321, health: / }',
   '',
 ].join('\n')
+const EXAMPLE_FILE = '.env' + '.example'
 
-test('a one-package project prints one dev command, its URL, and no Compose or deploy text', () => {
+function nestedCatalog() {
   const catalog = mkdtempSync(path.join(tmpdir(), 'readme-cat-'))
   bases.push(catalog)
-  mkdirSync(path.join(catalog, 'fullstack', 'astro-cloudflare-pages'), { recursive: true })
-  writeFileSync(
-    path.join(catalog, 'fullstack', 'astro-cloudflare-pages', 'template.yaml'),
-    "tools:\n  - { name: bun, min: '1.4' }\n",
-  )
+  for (const template of ['serverless/cloudflare', 'frontend/astro']) {
+    mkdirSync(path.join(catalog, template), { recursive: true })
+    writeFileSync(
+      path.join(catalog, template, 'template.yaml'),
+      "tools:\n  - { name: bun, min: '1.4' }\n",
+    )
+  }
+  return catalog
+}
+
+test('a nested serverless package: cd lines climb two levels, the dev URL is the frontend port', () => {
   const root = repo({
-    '.fullstack/catalog.yaml': FULLSTACK_YAML,
-    'app/.env.example': '# Signs the session cookie\nAUTH_KEY=change-me\n',
+    '.fullstack/catalog.yaml': NESTED_YAML,
+    [`serverless/cloudflare/${EXAMPLE_FILE}`]: '# Signs the session cookie\nAUTH_KEY=change-me\n',
   })
-  const blocks = renderPackageBlocks(root, catalog, { name: 'demo' })
-  assert.match(blocks.usage, /```bash\n# app\ncd app\nbun run dev\ncd \.\.\n```/)
-  assert.doesNotMatch(blocks.usage, /own terminal/)
-  assert.match(blocks['usage-notes'], /Open http:\/\/localhost:4321 once the dev server is up/)
+  const blocks = renderPackageBlocks(root, nestedCatalog(), { name: 'demo' })
+  assert.match(
+    blocks.usage,
+    /# serverless\/cloudflare\ncd serverless\/cloudflare\nbun run dev\ncd \.\.\/\.\.\n/,
+  )
+  assert.match(blocks.usage, /# frontend\ncd frontend\nbun run dev\ncd \.\.\n/)
+  assert.match(blocks.usage, /own terminal/)
+  assert.match(blocks['usage-notes'], /Open http:\/\/localhost:4321 once the dev servers are up/)
   assert.doesNotMatch(blocks['usage-notes'], /[Cc]ompose|Docker/)
   assert.doesNotMatch(blocks.prerequisites, /Docker/)
-  assert.match(blocks.tests, /cd app\nbun run check\nbun run test\nbun run test:e2e\ncd \.\./)
+  assert.match(blocks.tests, /cd serverless\/cloudflare\nbun run check\nbun run test\ncd \.\.\/\.\.\n/)
+  assert.match(blocks.installation, /cd serverless\/cloudflare\nbun install\ncd \.\.\/\.\.\n/)
   assert.match(renderConfiguration(root), /\| `AUTH_KEY` \| Signs the session cookie \| — \|/)
+})
+
+test('a lone serverless package prints its own port and one dev command', () => {
+  const yaml = NESTED_YAML.slice(0, NESTED_YAML.indexOf('  frontend:'))
+  const root = repo({ '.fullstack/catalog.yaml': yaml })
+  const blocks = renderPackageBlocks(root, nestedCatalog(), { name: 'demo' })
+  assert.match(blocks['usage-notes'], /Open http:\/\/localhost:8788 once the dev server is up/)
+  assert.doesNotMatch(blocks.usage, /own terminal/)
+})
+
+test('--configuration finds the example file of a nested package', () => {
+  const root = repo({
+    '.fullstack/catalog.yaml': NESTED_YAML,
+    [`serverless/cloudflare/${EXAMPLE_FILE}`]: '# A\nONE=1\n',
+    [`frontend/${EXAMPLE_FILE}`]: '# B\nTWO=2\n',
+  })
+  const text = renderConfiguration(root)
+  assert.match(text, /serverless\/cloudflare: A/)
+  assert.match(text, /frontend: B/)
 })
 
 describe('readme', { concurrency: 6 }, () => {

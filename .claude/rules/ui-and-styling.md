@@ -1,5 +1,5 @@
 ---
-paths: ["frontend/**", "app/src/**"]
+paths: ["frontend/**"]
 ---
 
 # UI and styling

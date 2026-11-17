@@ -154,6 +154,30 @@ describe('adding a server', () => {
   })
 })
 
+describe('adding a serverless API in a nested directory', () => {
+  const CF = ['--stack', 'astro-cf']
+  it('merges into serverless/cloudflare and runs its commands from there', () => {
+    const project = fresh()
+    const result = scaffold(project, CF)
+    assert.equal(result.status, 0, result.err + result.out)
+    assert.match(result.out, /chore\(scaffold\): add serverless\/cloudflare/)
+    assert.equal(read(project, 'serverless/cloudflare/functions/api.txt'), 'jobs: false\n')
+    assert.match(read(project, 'frontend/src/app.txt'), /api: yes/)
+    assert.match(read(project, '.fullstack/catalog.yaml'), /serverless\/cloudflare:/)
+    assert.equal(existsSync(path.join(project, 'docker-compose.yml')), false)
+    assert.match(read(project, '.gitignore'), /fullstack-templates: serverless\/cloudflare/)
+    assert.ok(log().includes('serverless/cloudflare install'), log().join('|'))
+    assert.deepEqual(readdirSync(scratch), [], 'temp folders are removed')
+  })
+  it('refuses --deploy: the stack has no deploy mode, and nothing is written', () => {
+    const project = fresh()
+    const result = scaffold(project, [...CF, '--deploy', 'single'])
+    assert.equal(result.status, 2, result.err + result.out)
+    assert.match(result.err, /--deploy does not apply to stack astro-cf/)
+    assert.equal(git(project, ['status', '--porcelain']), '')
+  })
+})
+
 describe('conflicts and --complete', () => {
   it('lists the conflict, runs nothing, then finishes once the markers are gone', () => {
     const project = fresh()

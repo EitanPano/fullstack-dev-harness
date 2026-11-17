@@ -232,21 +232,24 @@ test('the next steps name Compose only when the project has a docker-compose.yml
   assert.match(alone.result.stdout, /Then:/)
 })
 
-test('a one-package project is told its dev URL and nothing of Compose, deploy or Docker', () => {
+test('a serverless project is told the frontend URL and nothing of Compose, deploy or Docker', () => {
   const record = [
-    'stack: astro-cloudflare-pages',
+    'stack: astro-cloudflare',
     'packages:',
-    '  app:',
-    '    template: fullstack/astro-cloudflare-pages',
-    '    http: { port: 4321, health: /api/health }',
+    '  serverless/cloudflare:',
+    '    template: serverless/cloudflare',
+    '    http: { port: 8788, health: /api/health }',
+    '  frontend:',
+    '    template: frontend/astro',
+    '    http: { port: 4321, health: / }',
     '    commands:',
     '      testE2e: bun run test:e2e',
     '',
   ].join('\n')
-  const { result } = runWithFakeGenerator([], ['--stack', 'astro-cloudflare-pages'], record)
+  const { result } = runWithFakeGenerator([], ['--stack', 'astro-cloudflare'], record)
   assert.equal(result.status, 0, result.stderr)
-  assert.match(result.stdout, /the dev server is at http:\/\/localhost:4321\./)
-  assert.doesNotMatch(result.stdout, /[Cc]ompose|Docker|deploy|frontend dev server/)
+  assert.match(result.stdout, /the frontend dev server is at http:\/\/localhost:4321\./)
+  assert.doesNotMatch(result.stdout, /[Cc]ompose|Docker|deploy/)
 })
 
 test('--help lists --template', () => {

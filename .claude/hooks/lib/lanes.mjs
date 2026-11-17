@@ -1,103 +1,121 @@
-// Recorded write lanes: a strict reader for `packages.<name>.lanes` in .fullstack/catalog.yaml.
+// Derived write lanes: a strict reader for each package's `template:` in .fullstack/catalog.yaml.
 // - Node built-ins only and independent of scripts/, so a broken scripts/ cannot weaken a hook.
-// - It understands exactly one shape: a `packages:` map, each package's `lanes:` map, and per
-//   role an inline `[a, b]` list or a block `- a` list. Comments and quoted scalars are fine.
-//   Anything else inside a package's `lanes` drops that package's lanes, never guesses.
-// - Whatever it returns is confined (see confinedLanes) before a hook uses it.
+// - It understands exactly one shape: a `packages:` map whose keys are one or two plain
+//   segments and whose entries carry `template: <kind>/<id>` (block, or inside `{ … }`).
+//   Anything else drops that package, never guesses. A `lanes:` map is ignored.
+// - The lane follows the template kind: server and serverless are the backend's, frontend the
+//   frontend's, and all three have a `tests/` folder for qa.
 import fs from 'node:fs'
 import path from 'node:path'
 
 const ROLES = new Set(['backend', 'frontend', 'qa'])
-const PACKAGE_KEY = /^[a-z][a-z0-9-]*$/
+const SEGMENT = /^[a-z][a-z0-9-]*$/
+const TEMPLATE = /^([a-z][a-z0-9-]*)\/\S+$/
 // Directories of the harness or the project that are no generated package: a package key never
-// names one, so a record cannot turn `scripts/` or `db/` into a lane.
+// starts with one, so a record cannot turn `scripts/` or `db/` into a lane.
 const NOT_PACKAGES = new Set([
   '.fullstack', '.claude', '.plan', '.orchestrate', '.git', '.doc', 'scripts', 'db', 'docs',
   'node_modules'
 ])
-// First segments inside a package that stay out of every lane. Entries sit under `<pkg>/`, so
-// this guards the package's own nested metadata (a `.git` there), not the harness directories.
-const RESERVED = new Set(['.fullstack', '.claude', '.plan', '.orchestrate', '.git', '.doc'])
 
-// The extra lanes of `role` under `root`, each prefixed with its package directory. Any problem
-// reading the file means no extra lanes.
+// The derived lanes of `role` under `root`, each a package directory. Any problem reading the
+// file means no extra lanes.
 export function recordedLanes(root, role) {
   if (!ROLES.has(role)) return []
   try {
     const text = fs.readFileSync(path.join(root, '.fullstack', 'catalog.yaml'), 'utf8')
-    return confinedLanes(parseLaneRecord(text), role)
+    return lanesFor(parsePackages(text), role)
   } catch {
     return []
   }
 }
 
-// `{ package: { role: [entry, …] } }` for the packages whose lanes parse cleanly; entries are
-// raw strings, not yet checked. Returns {} when the file has no usable record.
-export function parseLaneRecord(text) {
+// `[{ dir, kind }]` for the packages whose key and template parse cleanly; a package nested
+// under another recorded package's directory is dropped. Returns [] when there is no record.
+export function parsePackages(text) {
   const lines = logicalLines(text)
-  if (lines === null) return {}
+  if (lines === null) return []
   const at = lines.findIndex(line => line.indent === 0 && /^packages\s*:$/.test(line.text))
-  if (at === -1) return {}
+  if (at === -1) return []
   const body = []
   for (const line of lines.slice(at + 1)) {
     if (line.indent === 0) break
     body.push(line)
   }
-  if (body.length === 0) return {}
+  if (body.length === 0) return []
   const pkgIndent = body[0].indent
   const found = []
   let current = null
   for (const line of body) {
-    if (line.indent < pkgIndent) return {}
+    if (line.indent < pkgIndent) return []
     if (line.indent === pkgIndent) {
       const entry = keyValue(line.text)
-      current = entry !== null && entry.value === '' ? { name: entry.key, rows: [] } : null
+      current = entry === null ? null : { key: entry.key, value: entry.value, rows: [] }
       if (current !== null) found.push(current)
     } else if (current !== null) {
       current.rows.push(line)
     }
   }
   const out = []
-  for (const { name, rows } of found) {
-    const roles = rolesOf(rows)
-    if (roles !== null) out.push([name, roles])
+  for (const { key, value, rows } of found) {
+    if (!isPackageKey(key)) continue
+    const kind = kindOf(value === '' ? blockTemplate(rows) : inlineTemplate(value))
+    if (kind !== null) out.push({ dir: key, kind })
   }
-  return Object.fromEntries(out)
+  return out.filter(
+    pkg => !out.some(other => other !== pkg && pkg.dir.startsWith(`${other.dir}/`))
+  )
 }
 
-// The role map of one package's rows, or null when it has no lanes or they are malformed.
-function rolesOf(own) {
+// The `template:` value of a block package, or null when it is missing, repeated or empty.
+function blockTemplate(own) {
   if (own.length === 0) return null
   const inner = own[0].indent
-  const lanesAt = own.findIndex(line => line.indent === inner && /^lanes\s*:$/.test(line.text))
-  if (lanesAt === -1) return null
-  const rows = []
-  for (const line of own.slice(lanesAt + 1)) {
-    if (line.indent <= inner) break
-    rows.push(line)
+  const values = own
+    .filter(line => line.indent === inner && /^template\s*:/.test(line.text))
+    .map(line => keyValue(line.text))
+  if (values.length !== 1 || values[0] === null) return null
+  return unquoted(values[0].value)
+}
+
+// The `template` of a flow mapping `{ template: x, … }`, or null.
+function inlineTemplate(value) {
+  if (!value.startsWith('{') || !value.endsWith('}')) return null
+  const all = [
+    ...value.matchAll(/[{,]\s*template\s*:\s*("[^"]*"|'[^']*'|[^,}\s]+)\s*(?=[,}])/g)
+  ]
+  return all.length === 1 ? unquoted(all[0][1]) : null
+}
+
+function unquoted(value) {
+  const text = value.trim()
+  return /^(["']).*\1$/.test(text) ? text.slice(1, -1) : text
+}
+
+function kindOf(template) {
+  if (typeof template !== 'string') return null
+  return TEMPLATE.exec(template)?.[1] ?? null
+}
+
+// One or two plain segments, the first not a harness directory.
+function isPackageKey(key) {
+  const segments = key.split('/')
+  if (segments.length > 2 || !segments.every(segment => SEGMENT.test(segment))) return false
+  return !NOT_PACKAGES.has(segments[0])
+}
+
+// The lanes of `role`: the package directory itself for the backend and the frontend, its
+// `tests/` folder for qa. Any other template kind gains nothing.
+export function lanesFor(packages, role) {
+  if (!ROLES.has(role)) return []
+  const backend = kind => kind === 'server' || kind === 'serverless'
+  const out = []
+  for (const { dir, kind } of packages) {
+    if (role === 'backend' && backend(kind)) out.push(`${dir}/`)
+    else if (role === 'frontend' && kind === 'frontend') out.push(`${dir}/`)
+    else if (role === 'qa' && (backend(kind) || kind === 'frontend')) out.push(`${dir}/tests/`)
   }
-  if (rows.length === 0) return null
-  const roleIndent = rows[0].indent
-  const roles = new Map()
-  let list = null
-  let block = false
-  for (const row of rows) {
-    if (row.indent === roleIndent && !/^-(\s|$)/.test(row.text)) {
-      const entry = keyValue(row.text)
-      if (entry === null || roles.has(entry.key)) return null
-      block = entry.value === ''
-      list = block ? [] : inlineList(entry.value)
-      if (list === null) return null
-      roles.set(entry.key, list)
-    } else if (block && /^-\s+\S/.test(row.text)) {
-      const item = scalar(row.text.replace(/^-\s+/, ''))
-      if (item === null) return null
-      list.push(item)
-    } else {
-      return null
-    }
-  }
-  return Object.fromEntries(roles)
+  return out
 }
 
 // Non-blank lines without comments, as { indent, text }; null when a tab indents one.
@@ -137,73 +155,4 @@ function keyValue(text) {
   const first = match[1][0]
   const bare = first !== '"' && first !== "'"
   return { key: bare ? match[1] : match[1].slice(1, -1), value: (match[2] ?? '').trim() }
-}
-
-// One scalar: a quoted string, or a bare word with no flow syntax in it. Null when it is neither.
-function scalar(text) {
-  const value = text.trim()
-  if (value === '') return null
-  if (value.length >= 2 && /^(["']).*\1$/.test(value)) return value.slice(1, -1)
-  // Block-scalar and quoting syntax is refused; a stray `*` or `&` is just a name that confinement
-  // rejects.
-  if (/^["']/.test(value) || /[[\]{}]/.test(value) || /^[|>`]/.test(value)) return null
-  return value
-}
-
-// `[a, "b c", 'd']` as strings, or null for anything else (a nested list, a bare scalar, a
-// list that does not close).
-function inlineList(text) {
-  if (!text.startsWith('[') || !text.endsWith(']')) return null
-  const inner = text.slice(1, -1)
-  if (inner.trim() === '') return []
-  const items = []
-  let current = ''
-  let quote = null
-  for (const char of inner) {
-    if (quote !== null) {
-      if (char === quote) quote = null
-      current += char
-    } else if (char === '"' || char === "'") {
-      quote = char
-      current += char
-    } else if (char === ',') {
-      items.push(current)
-      current = ''
-    } else {
-      current += char
-    }
-  }
-  if (quote !== null) return null
-  items.push(current)
-  const out = []
-  for (const item of items) {
-    const value = scalar(item)
-    if (value === null) return null
-    out.push(value)
-  }
-  return out
-}
-
-// The recorded lanes of `role`, prefixed with their package. Only a plain relative path inside
-// a plainly named package is kept; the rest is dropped one by one.
-export function confinedLanes(record, role) {
-  if (!ROLES.has(role)) return []
-  const out = []
-  for (const [pkg, roles] of Object.entries(record)) {
-    if (!PACKAGE_KEY.test(pkg) || NOT_PACKAGES.has(pkg)) continue
-    if (!Object.hasOwn(roles, role)) continue
-    for (const entry of roles[role]) {
-      if (isPlainEntry(entry)) out.push(`${pkg}/${entry}`)
-    }
-  }
-  return out
-}
-
-function isPlainEntry(entry) {
-  if (typeof entry !== 'string' || entry === '' || entry !== entry.trim()) return false
-  // Drive letters and streams (`:`), backslashes, globs and control characters.
-  if (/[:\\*?\u0000-\u001f]/.test(entry) || entry.startsWith('/')) return false
-  const segments = (entry.endsWith('/') ? entry.slice(0, -1) : entry).split('/')
-  if (segments.some(segment => segment === '' || segment === '.' || segment === '..')) return false
-  return !RESERVED.has(segments[0].toLowerCase())
 }

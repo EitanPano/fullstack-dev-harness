@@ -1,138 +1,119 @@
-// Unit tests of the strict reader for `packages.<name>.lanes` in .fullstack/catalog.yaml.
+// Unit tests of the strict reader that derives lanes from each package's `template:` kind.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { parseLaneRecord, confinedLanes } from '../lib/lanes.mjs'
+import { lanesFor, parsePackages } from '../lib/lanes.mjs'
 
-const INLINE = `
+const TWO = `
 # a comment
+stack: astro-cloudflare
 packages:
-  app:
-    template: fullstack/astro-cloudflare-pages  # trailing comment
-    lanes:
-      backend: [functions/, server/, wrangler.jsonc, package.json]
-      frontend: ['src/', "public/", astro.config.mjs]
-      qa: [tests/]
+  serverless/cloudflare:
+    template: serverless/cloudflare  # trailing comment
+    version: 1.0.0
+    flags: { jobs: false }
+  frontend:
+    template: frontend/astro
+    version: 1.0.0
+providers: {}
 `
 
-test('reads inline lists, quoted scalars and comments', () => {
-  assert.deepEqual(parseLaneRecord(INLINE), {
-    app: {
-      backend: ['functions/', 'server/', 'wrangler.jsonc', 'package.json'],
-      frontend: ['src/', 'public/', 'astro.config.mjs'],
-      qa: ['tests/']
-    }
-  })
+test('reads a bare two-segment key and the key after it', () => {
+  assert.deepEqual(parsePackages(TWO), [
+    { dir: 'serverless/cloudflare', kind: 'serverless' },
+    { dir: 'frontend', kind: 'frontend' }
+  ])
 })
 
-test('reads block lists, indented or flush with the key', () => {
+test('reads a quoted key, a quoted template and an inline template', () => {
   const text = [
     'packages:',
-    '  app:',
-    '    lanes:',
-    '      backend:',
-    '        - functions/',
-    '        - "wrangler.jsonc"   # why',
-    '      qa:',
-    '      - tests/',
+    '  "serverless/cloudflare":',
+    '    template: "serverless/cloudflare"',
+    "  'frontend': { template: frontend/astro, version: 1.0.0 }",
+    '  api:',
+    '    template: server/bun-express',
     ''
   ].join('\n')
-  assert.deepEqual(parseLaneRecord(text), {
-    app: { backend: ['functions/', 'wrangler.jsonc'], qa: ['tests/'] }
-  })
+  assert.deepEqual(parsePackages(text), [
+    { dir: 'serverless/cloudflare', kind: 'serverless' },
+    { dir: 'frontend', kind: 'frontend' },
+    { dir: 'api', kind: 'server' }
+  ])
 })
 
 test('reads a CRLF file with a BOM', () => {
-  const text = '\uFEFF' + INLINE.replace(/\n/g, '\r\n')
-  assert.deepEqual(parseLaneRecord(text).app.qa, ['tests/'])
+  const got = parsePackages('﻿' + TWO.replace(/\n/g, '\r\n'))
+  assert.equal(got.length, 2)
 })
 
-test('reads an empty inline list as no entries', () => {
-  assert.deepEqual(parseLaneRecord('packages:\n  app:\n    lanes:\n      qa: []\n'), {
-    app: { qa: [] }
-  })
-})
-
-test('a package without lanes, and other packages, are read apart', () => {
-  const text = [
-    'packages:',
-    '  backend:',
-    '    template: x',
-    '  app:',
-    '    lanes:',
-    '      qa: [tests/]'
-  ].join('\n')
-  assert.deepEqual(parseLaneRecord(text), { app: { qa: ['tests/'] } })
+test('ignores a lanes map', () => {
+  const text = 'packages:\n  app:\n    template: x/y\n    lanes:\n      qa: [tests/]\n'
+  assert.deepEqual(lanesFor(parsePackages(text), 'qa'), [])
 })
 
 for (const [name, text] of [
   ['an empty file', ''],
   ['garbage', '\u0000\u0001 not yaml at all {{{ ]]'],
   ['no packages key', 'name: x\n'],
-  ['lanes that is a string', 'packages:\n  app:\n    lanes: nope\n'],
-  ['lanes that is a flow map', 'packages:\n  app:\n    lanes: {qa: [tests/]}\n'],
-  ['a role that is a string', 'packages:\n  app:\n    lanes:\n      qa: tests/\n'],
-  ['a tab indent', 'packages:\n\tapp:\n\t\tlanes:\n\t\t\tqa: [tests/]\n'],
-  ['an unterminated list', 'packages:\n  app:\n    lanes:\n      qa: [tests/\n'],
-  ['a nested list', 'packages:\n  app:\n    lanes:\n      qa: [[tests/]]\n'],
-  ['a duplicate role', 'packages:\n  app:\n    lanes:\n      qa: [a/]\n      qa: [b/]\n']
+  ['a tab indent', 'packages:\n\tapi:\n\t\ttemplate: server/x\n'],
+  ['no template', 'packages:\n  api:\n    version: 1\n'],
+  ['a template with no slash', 'packages:\n  api:\n    template: server\n'],
+  ['a repeated template', 'packages:\n  api:\n    template: server/a\n    template: server/b\n'],
+  ['an inline repeated template', 'packages:\n  api: { template: server/a, template: server/b }\n']
 ]) {
-  test(`reads no lanes from ${name}`, () => {
-    assert.deepEqual(parseLaneRecord(text), {})
+  test(`reads nothing from ${name}`, () => {
+    assert.deepEqual(parsePackages(text), [])
   })
 }
 
 test('a malformed package drops only itself', () => {
+  const text = 'packages:\n  one:\n    version: 1\n  two:\n    template: server/x\n'
+  assert.deepEqual(parsePackages(text), [{ dir: 'two', kind: 'server' }])
+})
+
+test('a package nested under another recorded package is dropped', () => {
   const text = [
     'packages:',
-    '  one:',
-    '    lanes:',
-    '      qa: tests/',
-    '  two:',
-    '    lanes:',
-    '      qa: [tests/]'
+    '  serverless:',
+    '    template: serverless/cloudflare',
+    '  serverless/cloudflare:',
+    '    template: serverless/cloudflare',
+    ''
   ].join('\n')
-  assert.deepEqual(parseLaneRecord(text), { two: { qa: ['tests/'] } })
+  assert.deepEqual(parsePackages(text), [{ dir: 'serverless', kind: 'serverless' }])
 })
 
-test('confinedLanes prefixes the package and keeps plain paths', () => {
-  const record = { app: { backend: ['functions/', 'wrangler.jsonc', 'a/b.ts'] } }
-  assert.deepEqual(confinedLanes(record, 'backend'), [
-    'app/functions/',
-    'app/wrangler.jsonc',
-    'app/a/b.ts'
+for (const key of ['../evil', '.', '..', 'a/b/c', 'App', '1app', '.claude', 'a b', 'a.b', '-x',
+  'serverless/..', 'serverless/.', '../x', 'scripts', 'db', 'docs', 'node_modules',
+  'scripts/x', 'db/x']) {
+  test(`grants nothing to the package key ${JSON.stringify(key)}`, () => {
+    const text = `packages:\n  "${key}":\n    template: server/x\n`
+    for (const role of ['backend', 'frontend', 'qa']) {
+      assert.deepEqual(lanesFor(parsePackages(text), role), [])
+    }
+  })
+}
+
+test('lanesFor derives by kind', () => {
+  const packages = [
+    { dir: 'serverless/cloudflare', kind: 'serverless' },
+    { dir: 'frontend', kind: 'frontend' },
+    { dir: 'api', kind: 'server' },
+    { dir: 'worker', kind: 'job' }
+  ]
+  assert.deepEqual(lanesFor(packages, 'backend'), ['serverless/cloudflare/', 'api/'])
+  assert.deepEqual(lanesFor(packages, 'frontend'), ['frontend/'])
+  assert.deepEqual(lanesFor(packages, 'qa'), [
+    'serverless/cloudflare/tests/',
+    'frontend/tests/',
+    'api/tests/'
   ])
-  assert.deepEqual(confinedLanes(record, 'qa'), [])
-})
-
-for (const entry of ['../x', '/abs', 'C:/x', 'c:x', 'a\\b', './x', 'a/./b', 'a/../b', '*', 'a/*', '',
-  'a//b', ' x', 'x ', '.', '..', '../', 'a?b', 'x\u0000']) {
-  test(`ignores the entry ${JSON.stringify(entry)}`, () => {
-    assert.deepEqual(confinedLanes({ app: { backend: [entry, 'ok/'] } }, 'backend'), ['app/ok/'])
-  })
-}
-
-for (const key of ['../evil', '.', '..', 'a/b', 'App', '1app', '.claude', 'a b', 'a.b', '', '-x']) {
-  test(`ignores the package key ${JSON.stringify(key)}`, () => {
-    assert.deepEqual(confinedLanes({ [key]: { backend: ['ok/'] } }, 'backend'), [])
-  })
-}
-
-// A key that names a harness or project directory that is no generated package grants nothing.
-for (const key of ['scripts', 'db', 'docs', 'node_modules']) {
-  test(`a record keyed ${key} grants nothing`, () => {
-    assert.deepEqual(confinedLanes({ [key]: { backend: ['ok/'] } }, 'backend'), [])
-  })
-}
-
-test('app, backend and frontend keys still work', () => {
-  const record = { app: { qa: ['t/'] }, backend: { qa: ['t/'] }, frontend: { qa: ['t/'] } }
-  assert.deepEqual(confinedLanes(record, 'qa'), ['app/t/', 'backend/t/', 'frontend/t/'])
 })
 
 test('only backend, frontend and qa gain lanes', () => {
-  const record = { app: { reviewer: ['x/'], orchestrator: ['x/'], 'general-purpose': ['x/'] } }
+  const packages = [{ dir: 'api', kind: 'server' }]
   for (const role of ['reviewer', 'orchestrator', 'general-purpose', 'other', '__proto__']) {
-    assert.deepEqual(confinedLanes(record, role), [])
+    assert.deepEqual(lanesFor(packages, role), [])
   }
 })

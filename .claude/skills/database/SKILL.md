@@ -8,7 +8,9 @@ description: Choose, add or change the data layer or the cache store. Use when c
 The server template ships an in-memory store behind two file seams, one for the database
 and one for the cache; nothing survives a restart. The engine is chosen once, in the
 bootstrap, and recorded in `.doc/architecture.md` under Data store. Everything under "Every
-engine" holds whatever was chosen. The client library, files and scripts are the package's `AGENTS.md › Adding the data layer` (`backend/AGENTS.md` in a server project); a hosted one-package stack's engine is the platform's.
+engine" holds whatever was chosen. The client library, the files and the scripts are the
+package's: `backend/AGENTS.md › Adding the data layer`. A `serverless/` package's engine is
+its platform's: its `AGENTS.md` is the rule.
 
 The engine is a catalog provider, chosen at the bootstrap or added later by the data-layer task
 below. `docker compose up -d --wait <service>` starts the database service for local work. `testDb`,
@@ -30,7 +32,7 @@ Ask the user one question: Postgres, MongoDB, or decide later.
   task that stores data until the section is filled. The in-memory store serves meanwhile.
 
 The Data store answer in `.doc/architecture.md` records the engine the user names (or "decide
-later") and the client library. Whether the server
+later") and the client library (for example "Postgres 17 with an ORM"). Whether the server
 template lists a provider is a separate fact. When it lists one for the engine, the bootstrap
 generates it wired (`--capability database=<id>`): that is the data-layer task already done, and
 no such task is written. The package's `AGENTS.md › Adding the data layer` describes what exists,
@@ -46,7 +48,7 @@ backlog line `add the <engine> data layer` or `add the data layer`. Its plan car
 `Scaffold: --capability database=<engine>` (with `--stack <id>` without a server) for an engine
 with a provider, else the hand-built branch. Its deliverables, the e2e chain included, are in
 `.claude/skills/database/data-layer-task.md`. Read that file before planning or starting the
-task.
+task; no other task needs it.
 
 A provider wired at the bootstrap is this task already done, except item 4 (the change-log line
 and the Data Model section), which still falls to the bootstrap. Skip to "What the shipped code
@@ -87,7 +89,8 @@ properties, or a race the memory store hides reaches production:
   (2 s), shutdown closes. The client file obeys four rules: no I/O at import (constructing
   the client must not connect, since `check` imports the app without Docker); connecting
   is retry-safe and releases what it allocated when it rejects; the driver's own connect
-  timeout is below the attempt timeout and its initial-connect retry is off; the ping is the cheapest round trip, with a driver-level timeout.
+  timeout is below the attempt timeout and its initial-connect retry is off, so one attempt
+  is one attempt; the ping is the cheapest round trip, with a driver-level timeout.
   Reconnecting after a drop is the driver's job. An unreachable store surfaces as
   `upstream_unavailable`.
 - **One data-access file per module (the module's `service`).** It holds every query for

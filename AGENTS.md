@@ -18,7 +18,8 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
   permission config Claude Code reads. An unlisted hook never runs. Hooks win
   over instructions and fail closed.
 - Hooks key write lanes on the sub-agent's `agent_type`: `frontend`, `backend`, `qa`,
-  `orchestrator`, `reviewer` each have a lane per task folder, a package's from `.fullstack/catalog.yaml` when recorded; `general-purpose` is
+  `orchestrator`, `reviewer` each have a lane per task folder, plus its packages in
+  `.fullstack/catalog.yaml`; `general-purpose` is
   unrestricted; any other role runs read-only shell commands. Role agents write through
   Edit/Write; shell write channels, deletions, inline interpreters and git commands changing
   the tree or history are refused. `orchestrator` and `reviewer` may run any
@@ -33,7 +34,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 
 | Path | What it is | Who writes it |
 | --- | --- | --- |
-| `README.md` | The product's README, from setup, kept current by the loop | Setup, loop |
+| `README.md` | The product's README, generated at setup, kept current by the loop | Setup, loop |
 | `AGENTS.md`, `CLAUDE.md` | These rules, and their loader | Harness |
 | `.claude/README.md` | The harness manual | Harness |
 | `.doc/` | Product definition, architecture, glossary, conventions | Humans, bootstrap, driver |
@@ -43,7 +44,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 | `catalog.lock` | The pinned catalog version; frozen in a project | Humans |
 | `.fullstack/` | `catalog.yaml` (stack, flags, commands, ports); `harness.json`, the harness version | The bootstrap |
 | `scripts/` | `verify.mjs`, `readme.mjs`, `harness-update.mjs`, `scaffold.mjs`, `catalog.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
-| `frontend/` and `backend/`, or a one-package `app/` | Generated packages | Frontend, backend agent |
+| `frontend/`, `backend/` or `serverless/<provider>/` | Generated packages | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | Compose stack, database init | Backend agent |
 | `.orchestrate/<slug>/` | Loop output per task: draft `plan.md`, reports, `ticket.md`, verify results, review diffs | The loop |
 
@@ -52,7 +53,8 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 ## Stack
 
 - Bun 1.4+, Node 24+ and git; a package's own tools (uv for Python) are checked at setup.
-- The deployment target is Docker Compose (also local infrastructure) or the template's hosted platform (`deployment`).
+- Docker Compose is the deployment target and hosts local infrastructure; a `serverless/`
+  package deploys to its provider instead (`deployment`).
 - The stack comes from the catalog (`https://github.com/EitanPano/fullstack-templates`)
   pinned in `catalog.lock`, recorded in `.fullstack/catalog.yaml`. Resolve a command per
   package there; never spell a package manager command.
@@ -68,11 +70,11 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 | `contract`, `migrate` | OpenAPI out, or types regenerated; apply the data model change. |
 
 `testDb`, `e2eDb` and `migrate` arrive with the database part.
-Never run a scaffolder inside an existing package, except one its `AGENTS.md` names.
+Never run a scaffolder inside an existing package, except one the package's `AGENTS.md` names.
 
 ## Architecture
 
-The bootstrap creates the first package the product needs, `scripts/scaffold.mjs`
+A package exists when the product needs it: the bootstrap creates the first, `scripts/scaffold.mjs`
 adds later ones; layer maps: its `AGENTS.md`.
 
 - Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
@@ -80,12 +82,11 @@ adds later ones; layer maps: its `AGENTS.md`.
   another module's service.
 - Frontend: layers, import direction and where an addition goes are the package's
   `AGENTS.md`; lint enforces the direction.
-- The contract is the template's: OpenAPI with a typed client generated into the agents file's
-  directory (only the data layer it names imports the runtime; a model may import its types and
-  `zod.gen` schemas), or a one-package project's shared schemas.
+- The typed client comes from the contract into the agents file's directory; only the data
+  layer it names imports the runtime; a model may import its types and `zod.gen` schemas.
 - Auth sits behind the server's `auth` flag; its model changes only by plan.
 - HTTP: singular paths, JSON only, the `error-handling` envelope, a request id on every
-  response. The server's request schemas are the single source for the contract; OpenAPI's two
+  response. The server's request schemas are the single source for the OpenAPI document; both
   generated files are committed; no hand-written API types.
 - Configuration is environment variables, read once in the package's env module, listed in
   `.env.example`. The data engine is a catalog provider.
@@ -93,7 +94,7 @@ adds later ones; layer maps: its `AGENTS.md`.
 ## Rules
 
 In `.claude/rules/`: `code-style.md` (`scripts/`, hooks), `naming.md`, `ui-and-styling.md`
-(`frontend/`), `git-workflow.md` (approval before commit, merge, push, tag; Conventional Commits).
+(`frontend/`), `git-workflow.md` (approval before commit, merge, push or tag; Conventional Commits).
 
 ## Definition of done
 
@@ -107,7 +108,7 @@ Done means every item holds, with evidence.
 3. No test was deleted, skipped or focused. `verify` enforces the focus and skip spellings;
    QA checks deleted tests and filtered gate commands. Justify each in a report.
 4. Errors follow `error-handling`. No secrets, stack traces or query text leave the server.
-5. A schema or endpoint change ran the packages' `contract` commands and committed the results; a
+5. A schema or endpoint change ran both `contract` commands and committed both results; a
    data-model change ships what `database` requires and passes `testDb`.
 6. UI changes meet the frontend's `AGENTS.md › Styling`; the frontend reports `UI pass:`,
    QA `UX:` (open rubric findings are P2); the accessibility scan passes.
@@ -125,12 +126,12 @@ Done means every item holds, with evidence.
 | `dev-loop` | A backlog task, plan to reviewed code |
 | `writing-plans` | Creating or revising a plan |
 | `writing-tests` | Adding or reviewing tests |
-| `ui-design` | A route's UX, composing pages, judging screens |
-| `api-design` | An endpoint, schemas or contract change |
+| `ui-design` | Planning a route's UX, composing pages, judging screens |
+| `api-design` | Changing an endpoint, schemas or the contract |
 | `error-handling` | Error responses, status codes, retries, failure UX |
 | `database` | The engine; tables, indexes, migrations, data access |
 | `code-review` | Reviewing a change |
-| `cutting-a-release` | Version numbers, tags |
+| `cutting-a-release` | Version numbers, tagging a release |
 | `deployment` | Deploy mode, `TRUST_PROXY`, Compose, scaling, static host |
 
 ## Product and domain

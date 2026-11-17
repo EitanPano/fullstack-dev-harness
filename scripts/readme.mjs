@@ -119,7 +119,9 @@ const gitIn = (root, args) => spawnSync('git', ['-C', root, ...args], { encoding
 // `cd` per package keeps the lines valid in bash and PowerShell alike (no `&&`, no subshell).
 function packageBlock(pkg, commands) {
   const lines = commands.flatMap((name) => (pkg.commands[name] ?? '').split('\n')).filter(Boolean)
-  return lines.length === 0 ? [] : [`# ${pkg.dir}`, `cd ${pkg.dir}`, ...lines, 'cd ..']
+  // A nested directory (`serverless/cloudflare`) is left by as many `..` as it has segments.
+  const back = pkg.dir.split('/').map(() => '..').join('/')
+  return lines.length === 0 ? [] : [`# ${pkg.dir}`, `cd ${pkg.dir}`, ...lines, `cd ${back}`]
 }
 
 const fenced = (lines) => (lines.length === 0 ? '' : `\`\`\`bash\n${lines.join('\n')}\n\`\`\``)
@@ -183,12 +185,12 @@ function repositoryUrl(root) {
 
 // In development the app is the frontend's dev server, which proxies /api; only the Compose
 // image of a `single` deploy serves the built frontend from the server's port.
-// A fullstack package is the whole application: its own dev server, and no Compose file.
+// A project with only a serverless API opens that API's own port.
 function usageNotes(root, { deploy, packages }) {
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
   const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
-  const whole = packages.find((pkg) => kindOf(pkg.template) === 'fullstack')
-  const port = (frontend ?? server ?? whole)?.port
+  const serverless = packages.find((pkg) => kindOf(pkg.template) === 'serverless')
+  const port = (frontend ?? server ?? serverless)?.port
   const notes = []
   if (port !== undefined) {
     const servers = packages.length === 1 ? 'server is' : 'servers are'
