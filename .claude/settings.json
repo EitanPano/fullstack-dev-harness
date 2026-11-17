@@ -15,6 +15,7 @@
       "Bash(node scripts/verify.mjs*)",
       "Bash(node scripts/readme.mjs*)",
       "Bash(node scripts/loop-stats.mjs*)",
+      "Bash(node scripts/guidance.mjs*)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",

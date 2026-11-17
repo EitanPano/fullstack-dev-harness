@@ -42,8 +42,9 @@ not name; a top-level screen adds a nav-table entry, not a region.
 
 Pattern components: `Page`, `PageHeader`, `Section`, `EmptyState`, `ErrorState`,
 `ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog`: use one before
-a hand-written layout. These are the React and Next names; Angular's and Vue's are in their
-`AGENTS.md › Styling`.
+a hand-written layout. React and Next names; Angular's and Vue's are in their
+`AGENTS.md › Styling`. The frontend agent reads `platform-guidance.md` before hand-writing a
+control or its behaviour.
 
 - **list**: `Page` > `PageHeader` (title, the create action) > `Section` with the rows in a
   48 rem column. Row: name, a status `Badge`, secondary text muted, row actions at the
@@ -110,5 +111,4 @@ and `verify`; the passes judge only the judged ones.
 ## Severity
 
 A rubric failure is a P2. A broken journey or a WCAG AA failure is a P1. The frontend agent
-fixes what it finds once per route; what is still open goes to `Handoff`, so the pass does
-not loop on taste. QA reports against the same numbers.
+fixes once per route; the rest goes to `Handoff`. QA reports against the same numbers.

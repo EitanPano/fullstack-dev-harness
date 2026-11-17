@@ -164,7 +164,7 @@ Three edits in `.doc/architecture.md`, none to `.fullstack/catalog.yaml`:
 
 Who writes them: a driver session applies them itself, in the same change. A role agent
 cannot write `.doc/`: it lists the three lines in its report's `Docs:`, and the driver applies
-them when the dev loop finishes the task (`dev-loop` section 6).
+them before the review (`dev-loop` section 3).
 
 ## 6. TRUST_PROXY
 
