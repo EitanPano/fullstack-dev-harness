@@ -276,6 +276,44 @@ the root `AGENTS.md` and `CLAUDE.md`, `.claude/**/*.md` and the Copilot pointer.
 a package's `AGENTS.md` (catalog text the project owns) are out; `docs.test.mjs` fails if any
 file of the manifest's `project` group is gated. Branch `fix/instruction-scope`.
 
+**Checked retry and A/B (2026-11-17):** P1's retries were byte-identical to the refused calls,
+because the refusal said "make the same call again". It now asks for the edit to be checked and
+revised against the rules. A/B, 5 harness-edit tasks × 4 runs per arm, `claude -p` on Sonnet 5.5,
+project settings only, gate wired or not:
+
+| | Gate | No gate |
+| --- | --- | --- |
+| Judge adherence, 0–10 (blind, 2 passes) | 6.8 | 5.4 (p = 0.001) |
+| Judge task quality, 0–10 | 7.4 | 7.3 (p = 0.83) |
+| Rule breaks per run | 2.0 | 3.2 (p < 0.001) |
+| Retry revised after the refusal | 20/20 | – |
+| Skill description in third person | 8/8 | 0/8 |
+| Docs tests pass | 8/20 | 6/20 |
+| Cost and time per run | $0.24, 41 s | $0.21, 31 s |
+
+Neither arm replaces text: every `AGENTS.md` run breaks its 1,200-word budget, and every
+description edit stays over 480 characters. The top break in both arms is "leave out what a
+model knows".
+
+**Guidance review (2026-11-17):** three changes to `instruction-files.md`, net −1 word:
+- After the edit, run `docs.test.mjs`.
+- Fit your text to its own limit. Over a shared budget, change no other text and report it.
+- "Leave out what a model knows" becomes "name a standard, not its contents". This also fixes
+  its clash with "give the reason".
+
+Same set-up with Bash on, 20 runs per arm against the old text, judged on the old text:
+
+| Version | Adherence | Task | Docs pass | Ran the check | Collateral |
+| --- | --- | --- | --- | --- | --- |
+| old | 5.7–6.0 | 7.7–8.0 | 8/20 | 3/20 | – |
+| "cut as many words as you add" | 6.0 | 6.9 (p = 0.003) | 16/20 | 16/20 | cuts other rules, guardrails too |
+| "tighten your own text" | 6.5 | 7.2 (p < 0.001) | 15/20 | 19/20 | strips the new rule's reason |
+| **shipped** | **7.1 (p = 0.001)** | 7.5 (p = 0.23) | 15/20 | 19/20 | none; every T1 run reports the overrun |
+
+Breaks per run: 1.7 vs 2.3 (p = 0.013). Every description edit fits 480 characters; for the old
+text, none did. With a shell, the agents write a new file through a heredoc as often as with
+Write (4/20 runs in both arms), and those writes skip the gate. Not fixed: the gate is a reminder.
+
 ## Appendix A: scope
 
 One module, `.claude/hooks/lib/instruction-scope.mjs`. A path is in scope when an include
