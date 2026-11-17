@@ -27,6 +27,10 @@
       "Read(**/.env.local)",
       "Read(**/.env.development)",
       "Read(**/.env.production)",
+      "Read(**/.dev.vars)",
+      "Read(**/.dev.vars.local)",
+      "Read(**/.dev.vars.preview)",
+      "Read(**/.dev.vars.production)",
       "Read(**/*.pem)",
       "Read(**/*.key)",
       "Read(**/id_rsa)",
@@ -34,6 +38,8 @@
       "Read(~/.aws/**)",
       "Read(~/.ssh/**)",
       "Read(~/.npmrc)",
+      "Read(~/.wrangler/**)",
+      "Read(**/xdg.config/.wrangler/**)",
       "Bash(rm -rf *)",
       "Bash(git push --force*)",
       "Bash(git push -f*)",
@@ -48,7 +54,27 @@
       "PowerShell(*DROP DATABASE*)"
     ],
     "ask": [
-      "Bash(node scripts/harness-update.mjs*)"
+      "Bash(node scripts/harness-update.mjs*)",
+      "Bash(*wrangler*deploy*)",
+      "Bash(*wrangler*publish*)",
+      "Bash(*wrangler*login*)",
+      "Bash(*wrangler*secret*)",
+      "Bash(*wrangler*delete*)",
+      "Bash(*wrangler*rollback*)",
+      "Bash(*wrangler*--remote*)",
+      "Bash(*wrangler*time-travel*)",
+      "Bash(*wrangler*versions*)",
+      "Bash(*wrangler*tail*)",
+      "PowerShell(*wrangler*deploy*)",
+      "PowerShell(*wrangler*publish*)",
+      "PowerShell(*wrangler*login*)",
+      "PowerShell(*wrangler*secret*)",
+      "PowerShell(*wrangler*delete*)",
+      "PowerShell(*wrangler*rollback*)",
+      "PowerShell(*wrangler*--remote*)",
+      "PowerShell(*wrangler*time-travel*)",
+      "PowerShell(*wrangler*versions*)",
+      "PowerShell(*wrangler*tail*)"
     ]
   },
   "hooks": {

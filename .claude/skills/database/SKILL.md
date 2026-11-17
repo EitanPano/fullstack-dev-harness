@@ -9,7 +9,8 @@ The server template ships an in-memory store behind two file seams, one for the 
 and one for the cache; nothing survives a restart. The engine is chosen once, in the
 bootstrap, and recorded in `.doc/architecture.md` under Data store. Everything under "Every
 engine" holds whatever was chosen. The client library, the files and the scripts are the
-package's: `backend/AGENTS.md › Adding the data layer`.
+package's: `backend/AGENTS.md › Adding the data layer`. A `serverless/` package's engine is
+its platform's: its `AGENTS.md` is the rule.
 
 The engine is a catalog provider, chosen at the bootstrap or added later by the data-layer task
 below. `docker compose up -d --wait <service>` starts the database service for local work. `testDb`,

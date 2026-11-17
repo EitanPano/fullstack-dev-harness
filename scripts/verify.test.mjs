@@ -87,33 +87,62 @@ async function freePort() {
 
 // A repository with a server package (`backend`) and a frontend, committed, with a plan whose
 // Base is that commit. `commands` overrides one command of one package.
-async function fixture({ commands = {}, ports, noDb = false, plan = true, compose = false } = {}) {
+async function fixture({
+  commands = {},
+  ports,
+  noDb = false,
+  plan = true,
+  compose = false,
+  nested = false,
+} = {}) {
   const base = mkdtempSync(path.join(tmpdir(), 'verify-'))
   bases.push(base)
   const root = path.join(base, 'repo')
-  mkdirSync(path.join(root, 'backend'), { recursive: true })
-  mkdirSync(path.join(root, 'frontend'), { recursive: true })
+  for (const dir of nested ? ['serverless/cloudflare', 'frontend'] : ['backend', 'frontend']) {
+    mkdirSync(path.join(root, dir), { recursive: true })
+  }
   mkdirSync(path.join(root, '.fullstack'))
   mkdirSync(path.join(root, '.plan'))
   const [backendPort, frontendPort] = ports ?? [await freePort(), await freePort()]
-  const stub = (mode, ...rest) => `node ../stub.mjs ${mode} ${rest.join(' ')}`.trim()
-  const defaults = {
-    backend: {
-      contract: stub('stable', '../backend/contract.json', 'v1'),
-      check: stub('pass'),
-      testDb: stub('pass'),
-      migrate: stub('pass'),
-    },
-    frontend: { contract: stub('pass'), check: stub('pass'), testE2e: stub('pass') },
+  // The stub sits at the repository root: a package two segments deep reaches it one level up more.
+  const up = (dir) => '../'.repeat(dir.split('/').length)
+  const defaultsFor = (dir) => {
+    const stub = (mode, ...rest) => `node ${up(dir)}stub.mjs ${mode} ${rest.join(' ')}`.trim()
+    if (dir === 'serverless/cloudflare') {
+      return {
+        contract: stub('stable', `${up(dir)}${dir}/contract.json`, 'v1'),
+        check: stub('pass'),
+        testDb: stub('pass'),
+        migrate: stub('pass'),
+        e2eDb: stub('pass'),
+      }
+    }
+    if (dir === 'backend') {
+      return {
+        contract: stub('stable', '../backend/contract.json', 'v1'),
+        check: stub('pass'),
+        testDb: stub('pass'),
+        migrate: stub('pass'),
+      }
+    }
+    return { contract: stub('pass'), check: stub('pass'), testE2e: stub('pass') }
   }
-  const lines = ['deploy: split', 'packages:']
-  for (const [dir, template, port] of [
-    ['frontend', 'frontend/react', frontendPort],
-    ['backend', 'server/python-fastapi', backendPort],
-  ]) {
+  // The two-package Astro and Cloudflare shape: a serverless API in a nested directory and a
+  // frontend, no Compose file, no deploy mode.
+  const lines = nested ? ['packages:'] : ['deploy: split', 'packages:']
+  const members = nested
+    ? [
+        ['frontend', 'frontend/astro', frontendPort],
+        ['serverless/cloudflare', 'serverless/cloudflare', backendPort],
+      ]
+    : [
+        ['frontend', 'frontend/react', frontendPort],
+        ['backend', 'server/python-fastapi', backendPort],
+      ]
+  for (const [dir, template, port] of members) {
     lines.push(`  ${dir}:`, `    template: ${template}`, '    http:', `      port: ${port}`)
     lines.push('    commands:')
-    for (const [name, line] of Object.entries({ ...defaults[dir], ...commands[dir] })) {
+    for (const [name, line] of Object.entries({ ...defaultsFor(dir), ...commands[dir] })) {
       if (line === null) continue
       // The folded form is what the generator writes for a long command.
       const block = (style) => `${style}\n        ${line.replaceAll('\n', '\n        ')}`
@@ -132,8 +161,9 @@ async function fixture({ commands = {}, ports, noDb = false, plan = true, compos
     '<!-- configuration:end -->',
   ].join('\n')
   writeFileSync(path.join(root, 'README.md'), `# Fixture\n\n${none}\n`)
-  writeFileSync(path.join(root, 'backend', 'contract.json'), 'v1')
-  writeFileSync(path.join(root, 'backend', 'app.ts'), 'export const a = 1\n')
+  const api = nested ? 'serverless/cloudflare' : 'backend'
+  writeFileSync(path.join(root, api, 'contract.json'), 'v1')
+  writeFileSync(path.join(root, api, 'app.ts'), 'export const a = 1\n')
   writeFileSync(path.join(root, 'frontend', 'app.ts'), 'export const b = 1\n')
   if (noDb) writeFileSync(path.join(base, 'no-db'), '')
   if (compose) writeFileSync(path.join(root, 'docker-compose.yml'), 'services: {}\n')
@@ -1174,6 +1204,20 @@ test('env-prefixed names and credential directories stay out of the review body'
   assert.match(text, /\+PLACEHOLDER=1/)
 })
 
+test('wrangler local secret files stay out of the review body, the example does not', async () => {
+  const fx = await reviewFixture()
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars'), 'DEVVARS-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars.production'), 'DEVVARS-PROD-BODY\n')
+  writeFileSync(path.join(fx.root, 'backend', '.dev.vars.example'), 'PLACEHOLDER=1\n')
+  await runVerify(opts(fx, { base: fx.base30 }).options)
+  const text = readFileSync(path.join(outDir(fx), 'review.diff'), 'utf8')
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.dev\.vars(,|\n)/)
+  assert.match(text, /\nsecret-named, not shown: .*backend\/\.dev\.vars\.production/)
+  assert.doesNotMatch(text, /DEVVARS-BODY|DEVVARS-PROD-BODY/)
+  assert.doesNotMatch(text, /not shown: .*\.dev\.vars\.example/)
+  assert.match(text, /\+PLACEHOLDER=1/)
+})
+
 test('a failing git call leaves no review package and exits 2', async () => {
   const { writeReviewPackage } = await import('./verify/review.mjs')
   const fx = await reviewFixture()
@@ -1258,6 +1302,83 @@ test('--package and --no-e2e runs skip the readme check', async () => {
   assert.equal(packaged.exit, 0)
   assert.equal(read(fx, 'verify-partial.json').checks.some((c) => c.name === 'readme'), false)
   assert.equal((await runVerify(opts(fx, { noE2e: true }).options)).exit, 0)
+})
+
+// The astro-cloudflare shape: a serverless API in `serverless/cloudflare` and a frontend, no
+// Compose file, so the database steps are plain package commands and docker is never called.
+const API = 'serverless/cloudflare'
+test('a serverless project runs both packages in order and never calls docker', async () => {
+  const absent = await fixture({ nested: true })
+  const run = await runVerify(opts(absent, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(run.exit, 0, JSON.stringify(run.result.packages))
+  const result = read(absent)
+  assert.equal(result.ok, true)
+  assert.equal(result.packages[API].contract.exit, 0)
+  assert.equal(result.packages[API].check.exit, 0)
+  assert.equal(result.packages[API].testDb.exit, 0)
+  assert.equal(result.packages.frontend.contract.exit, 0)
+  assert.equal(result.packages.frontend.check.exit, 0)
+  assert.equal(result.packages.frontend.testE2e.exit, 0)
+  assert.equal(result.checks.some((check) => check.name === 'database'), false)
+  assert.ok(result.checks.some((check) => check.name === 'contract-fresh'))
+  // The API's contract and check run before the frontend's; its dev migrate is skipped.
+  assert.equal(API in result.packages, true)
+  assert.equal(result.packages[API].migrate.exit, null)
+  assert.deepEqual(runs(absent), ['stable', 'pass', 'pass', 'pass', 'pass', 'pass'])
+  const stubbed = await fixture({ nested: true })
+  assert.equal((await runVerify(opts(stubbed).options)).exit, 0)
+  assert.equal(existsSync(path.join(stubbed.base, 'docker.log')), false)
+})
+
+test('a serverless package with e2eDb leaves migrate to its e2e chain', async () => {
+  const commands = { [API]: { migrate: 'node ../../stub.mjs marker' } }
+  const fx = await fixture({ nested: true, commands })
+  const { exit } = await runVerify(opts(fx, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(exit, 0)
+  assert.equal(runs(fx).includes('marker'), false)
+})
+
+test('--package with a two-segment value selects that package and scopes its changes', async () => {
+  const fx = await fixture({ nested: true })
+  const run = await runVerify(opts(fx, { packages: [API], noE2e: true }).options)
+  assert.equal(run.exit, 0, JSON.stringify(run.result))
+  const result = read(fx, 'verify-partial.json')
+  assert.deepEqual(Object.keys(result.packages), [API])
+  assert.equal(result.packages[API].check.exit, 0)
+  // A change inside the other package is no failure of this partial run.
+  writeFileSync(path.join(fx.root, 'frontend', 'app.ts'), 'export const b = 2\n')
+  const again = await runVerify(opts(fx, { packages: [API], noE2e: true }).options)
+  assert.equal(again.exit, 0)
+  const missing = await runVerify(opts(fx, { packages: ['serverless'] }).options)
+  assert.equal(missing.exit, 2)
+})
+
+test('--reuse keys of a nested package reuse a passing step and see its own changes', async () => {
+  const fx = await fixture({ nested: true })
+  assert.equal((await runVerify(opts(fx).options)).exit, 0)
+  // A change inside the frontend leaves the API's steps reusable.
+  writeFileSync(path.join(fx.root, 'frontend', 'app.ts'), 'export const b = 2\n')
+  const second = await runVerify(opts(fx, { reuse: true }).options)
+  assert.equal(second.exit, 0)
+  assert.ok(read(fx).packages[API].check.reused)
+  assert.equal(read(fx).packages.frontend.check.reused, undefined)
+  // A change inside the nested directory is seen by its own keys.
+  writeFileSync(path.join(fx.root, API, 'app.ts'), 'export const a = 2\n')
+  const third = await runVerify(opts(fx, { reuse: true }).options)
+  assert.equal(third.exit, 0)
+  assert.equal(read(fx).packages[API].check.reused, undefined)
+})
+
+// The database is in the package only for a serverless package; a Compose file without a
+// `database` service in a two-package project is a refusal, as before.
+test('a Compose file without a database service fails testDb and starts nothing', async () => {
+  const fx = await fixture({ noDb: true, compose: true })
+  const { exit } = await runVerify(opts(fx).options)
+  const docker = readFileSync(path.join(fx.base, 'docker.log'), 'utf8')
+  assert.equal(exit, 1)
+  assert.equal(read(fx).packages.backend.testDb.ok, false)
+  assert.match(read(fx).packages.backend.testDb.reason, /no database service/)
+  assert.doesNotMatch(docker, /up -d/)
 })
 
 describe('verify', { concurrency: 6 }, () => {

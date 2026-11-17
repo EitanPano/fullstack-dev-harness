@@ -76,7 +76,7 @@ test('a --root that does not exist is reported as missing', () => {
 
 // A fake catalog whose generator records its argv and writes a provenance file, so the test
 // sees exactly what bootstrap forwards without a real scaffold or the network.
-function runWithFakeGenerator(extraArgs, primary = ['--stack', 'x']) {
+function runWithFakeGenerator(extraArgs, primary = ['--stack', 'x'], provenance = 'packages:\n') {
   const catalog = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-catalog-'))
   const root = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-root-'))
   try {
@@ -91,7 +91,7 @@ function runWithFakeGenerator(extraArgs, primary = ['--stack', 'x']) {
         'const argv = process.argv.slice(2)',
         "const out = argv[argv.indexOf('--out') + 1]",
         "mkdirSync(path.join(out, '.fullstack'), { recursive: true })",
-        "writeFileSync(path.join(out, '.fullstack', 'catalog.yaml'), 'packages:\\n')",
+        `writeFileSync(path.join(out, '.fullstack', 'catalog.yaml'), ${JSON.stringify(provenance)})`,
         "writeFileSync(path.join(out, 'argv.json'), JSON.stringify(argv))",
         '',
       ].join('\n'),
@@ -230,6 +230,26 @@ test('the next steps name Compose only when the project has a docker-compose.yml
   const alone = runWithFakeGenerator([], TEMPLATE)
   assert.doesNotMatch(alone.result.stdout, /[Cc]ompose/)
   assert.match(alone.result.stdout, /Then:/)
+})
+
+test('a serverless project is told the frontend URL and nothing of Compose, deploy or Docker', () => {
+  const record = [
+    'stack: astro-cloudflare',
+    'packages:',
+    '  serverless/cloudflare:',
+    '    template: serverless/cloudflare',
+    '    http: { port: 8788, health: /api/health }',
+    '  frontend:',
+    '    template: frontend/astro',
+    '    http: { port: 4321, health: / }',
+    '    commands:',
+    '      testE2e: bun run test:e2e',
+    '',
+  ].join('\n')
+  const { result } = runWithFakeGenerator([], ['--stack', 'astro-cloudflare'], record)
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /the frontend dev server is at http:\/\/localhost:4321\./)
+  assert.doesNotMatch(result.stdout, /[Cc]ompose|Docker|deploy/)
 })
 
 test('--help lists --template', () => {

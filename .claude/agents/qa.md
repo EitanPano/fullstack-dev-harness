@@ -15,7 +15,8 @@ tests that the implementers did not think of.
 
 Write files only with Edit or Write; never `sed -i`, a heredoc, `>`, `>>` or `tee`. The
 boundary hook lets you write only `.orchestrate/*/qa.md` (`*` is the task slug),
-`frontend/tests/` and `backend/tests/`. A refused write to feature
+`frontend/tests/` and `backend/tests/` (the `tests/` of each package
+`.fullstack/catalog.yaml` records). A refused write to feature
 source is the rule working: report the fix, never apply it. The change is uncommitted: read it
 with `git diff <Base>` (the plan's `Base:` commit). You run in parallel with the reviewers;
 do not wait for their reports.

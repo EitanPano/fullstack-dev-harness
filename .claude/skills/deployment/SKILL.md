@@ -5,7 +5,8 @@ description: Choose or change how the project ships. Use when a plan or the user
 
 # Deployment
 
-A project with a server and a frontend ships in one of two modes. The mode is chosen at the
+A project with a server and a frontend ships in one of two modes; a `serverless/` server has
+none (its `AGENTS.md › Deployment`). The mode is chosen at the
 bootstrap (`--deploy`) and moved later only through this skill, as a planned change.
 
 | | `single` | `split` |

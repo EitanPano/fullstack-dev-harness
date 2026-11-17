@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { defaultCacheRoot, locateCatalog } from './catalog.mjs'
-import { readProvenance } from './provenance.mjs'
+import { kindOf, readProvenance } from './provenance.mjs'
 import { isMain } from './verify/main.mjs'
 
 export const START = '<!-- configuration:start -->'
@@ -119,7 +119,9 @@ const gitIn = (root, args) => spawnSync('git', ['-C', root, ...args], { encoding
 // `cd` per package keeps the lines valid in bash and PowerShell alike (no `&&`, no subshell).
 function packageBlock(pkg, commands) {
   const lines = commands.flatMap((name) => (pkg.commands[name] ?? '').split('\n')).filter(Boolean)
-  return lines.length === 0 ? [] : [`# ${pkg.dir}`, `cd ${pkg.dir}`, ...lines, 'cd ..']
+  // A nested directory (`serverless/cloudflare`) is left by as many `..` as it has segments.
+  const back = pkg.dir.split('/').map(() => '..').join('/')
+  return lines.length === 0 ? [] : [`# ${pkg.dir}`, `cd ${pkg.dir}`, ...lines, `cd ${back}`]
 }
 
 const fenced = (lines) => (lines.length === 0 ? '' : `\`\`\`bash\n${lines.join('\n')}\n\`\`\``)
@@ -183,12 +185,17 @@ function repositoryUrl(root) {
 
 // In development the app is the frontend's dev server, which proxies /api; only the Compose
 // image of a `single` deploy serves the built frontend from the server's port.
+// A project with only a serverless API opens that API's own port.
 function usageNotes(root, { deploy, packages }) {
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
   const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
-  const port = (frontend ?? server)?.port
+  const serverless = packages.find((pkg) => kindOf(pkg.template) === 'serverless')
+  const port = (frontend ?? server ?? serverless)?.port
   const notes = []
-  if (port !== undefined) notes.push(`Open http://localhost:${port} once the dev servers are up.`)
+  if (port !== undefined) {
+    const servers = packages.length === 1 ? 'server is' : 'servers are'
+    notes.push(`Open http://localhost:${port} once the dev ${servers} up.`)
+  }
   if (existsSync(path.join(root, 'docker-compose.yml'))) {
     const composePort = (deploy === 'single' ? server : (frontend ?? server))?.port
     const where =
@@ -241,7 +248,11 @@ export function renderPackageBlocks(root, catalogRoot, { name, clone } = {}) {
       ...(clone ?? [`git clone ${url ?? '<repository-url>'}`, `cd ${dir}`]),
       ...blocks(['install']),
     ]),
-    usage: fenced(dev.length === 0 ? [] : ['# Run each of these in its own terminal.', ...dev]),
+    usage: fenced(
+      packages.length > 1 && dev.length > 0
+        ? ['# Run each of these in its own terminal.', ...dev]
+        : dev,
+    ),
     'usage-notes': usageNotes(root, { deploy, packages }),
     tests: fenced(blocks(['check', 'test', 'testE2e'])),
   }

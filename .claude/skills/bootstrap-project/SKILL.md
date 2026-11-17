@@ -105,9 +105,12 @@ agent into it. It is outside the working tree on purpose.
 Narrow by the Search and sharing answer, deciding by the `static` declaration, never by a stack
 id:
 
-- "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today).
+- "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today),
+  and `frontend/astro` (prerendered pages: a content site with no server to run).
 - "no": keep the stacks whose frontend declares `static` (a single-page app: React, Angular, Vue).
 - A stack with no frontend skips this question.
+- A `serverless/` server (`astro-cloudflare`) has no deploy mode, Compose file or `auth` flag
+  (pass no `--flag auth`); its Data store is the platform's.
 
 With `Server: later`, keep the frontend template alone (`--template frontend/<id>` from a kept
 stack, chosen by the same rule), skip the server, capability and deploy-mode questions, and pass
@@ -242,7 +245,7 @@ On Linux and macOS: `lsof -ti :<port> | xargs -r kill`. Confirm the port is free
 check: `Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction SilentlyContinue`
 (Windows) or `lsof -i :<port> -sTCP:LISTEN` (Linux, macOS) prints nothing.
 
-**App check.** A lone frontend has no Compose file: skip it.
+**App check.** No Compose file (a lone frontend, a `serverless/` server): skip it.
 
 1. Export in the shell (never in a file) a throwaway value for every secret the server's
    `.env.example` lists, and with a provider its `DATABASE_URL`: the server refuses to start in
@@ -268,8 +271,8 @@ development runs with defaults and warns.
 
 Do each item; the dev loop refuses to start until the last one holds.
 
-1. **Backlog.** Follow the grammar at the top of `.plan/000-backlog.md`. With no server, no
-   data-layer line. With a server and no database provider passed at generation, the first line
+1. **Backlog.** Follow the grammar at the top of `.plan/000-backlog.md`. With no server, or a `serverless/`
+   one, no data-layer line. With a server and no database provider passed at generation, the first line
    is `- [ ] add the <engine> data layer | stack:backend` for a named engine, or
    `- [ ] add the data layer | stack:backend` for "decide later" (the `database` skill says what
    that task delivers). The first in-scope capability is the first line with a provider, the next line without one. Set `tracker:` in the backlog header to

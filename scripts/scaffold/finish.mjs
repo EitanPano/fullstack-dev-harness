@@ -19,10 +19,13 @@ const DASH = '—'
 
 export const scaffoldDir = (root, slug) => path.join(root, '.orchestrate', slug, 'scaffold')
 
-// The package whose directory holds the path; root files belong to no package.
-function packageOf(provenance, rel) {
+// The package whose directory holds the path, the longest such directory when one nests inside
+// another; root files belong to no package.
+export function packageOf(provenance, rel) {
   const dirs = Object.keys(provenance.packages ?? {})
-  return dirs.find((dir) => rel === dir || rel.startsWith(`${dir}/`))
+    .filter((dir) => rel === dir || rel.startsWith(`${dir}/`))
+    .sort((a, b) => b.length - a.length)
+  return dirs[0]
 }
 
 // The command that finishes a scaffold, with the run's slug and templates override.

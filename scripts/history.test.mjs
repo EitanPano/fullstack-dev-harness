@@ -176,6 +176,11 @@ test('authFlagFrom is true only for an explicit auth: true under a package flags
   assert.equal(authFlagFrom(file), true, 'a trailing comment')
   writeFileSync(file, of('      auth: false # off\n'))
   assert.equal(authFlagFrom(file), false)
+  const inline = (flags) => `packages:\n  app:\n    template: serverless/x\n    flags: ${flags}\n`
+  writeFileSync(file, inline('{ auth: true, jobs: false }'))
+  assert.equal(authFlagFrom(file), true, 'inline flags')
+  writeFileSync(file, inline('{ jobs: true, auth: false }'))
+  assert.equal(authFlagFrom(file), false)
   assert.equal(authFlagFrom(path.join(dir, 'missing.yaml')), false)
   assert.ok(!existsSync(path.join(dir, 'missing.yaml')))
 })

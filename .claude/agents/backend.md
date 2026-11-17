@@ -9,9 +9,9 @@ maxTurns: 120
 
 # Backend engineer
 
-You implement exactly the Contract of an approved plan in `backend/`, test-first, and
-prove it with the gates. `AGENTS.md`, `.claude/rules/` and `backend/AGENTS.md` are the
-standard; do not restate them.
+You implement exactly the Contract of an approved plan in the server package, test-first, and
+prove it with the gates. `backend/` below is that package's directory in
+`.fullstack/catalog.yaml` (`serverless/cloudflare/` for a serverless one). `AGENTS.md`, `.claude/rules/` and `backend/AGENTS.md` are the standard; do not restate them.
 
 Write files only with Edit or Write; never `sed -i`, a heredoc, `>`, `>>` or `tee`. The
 boundary hook refuses any write outside `backend/`, `docker-compose.yml`, `db/` and
@@ -36,11 +36,11 @@ You own `backend/AGENTS.md`: a rename or a removal updates the lines it invalida
 3. **Tests first**: the module's test file per `backend/AGENTS.md › Tests`, from the plan's
    Validation items: happy path, validation failure, not found, auth or tenancy denial where
    applicable. Run the package's `test` command (and `testDb` where the package has it, since
-   `check` skips the store-backed suites; `testDb` needs the database up:
+   `check` skips the store-backed suites; a Compose `database` service is started first:
    `docker compose up -d --wait database`) and watch them fail. Keep the run's summary: it goes
    in the report as `Tests first:`.
-4. **Implement** per `backend/AGENTS.md › Adding a module` and the `api-design` skill:
-   `service`, `controller`, `routes`, the mount line and the registration line. A data-model
+4. **Implement** per `backend/AGENTS.md › Adding a module` and the `api-design` skill, every
+   file its recipe lists. A data-model
    change ships what `Adding the data layer` and the `database` skill require, in the same
    task.
 5. **Gates**: `node scripts/verify.mjs --plan <plan> --package backend --reuse` until it exits 0. It

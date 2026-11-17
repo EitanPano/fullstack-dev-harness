@@ -19,9 +19,9 @@ const hashAt = (root, tree, file) => {
 // The key covers tracked and untracked tree content only, not environment variables (e.g.
 // `E2E_BASE_URL`, `NODE_OPTIONS`, `PYTEST_ADDOPTS`), git-ignored files the suites read (`.env*`)
 // or installed toolchains and browsers. After changing any of them, run without `--reuse`.
-// Builds `keyOf(pkg, name)` for one tree. `frontend` says which packages are not servers: the
+// Builds `keyOf(pkg, name)` for one tree. `isServer` says which packages are servers: the
 // shared inputs include every server's contract file, which the frontend's types come from.
-export function keyFactory(root, tree, packages, isFrontend, base) {
+export function keyFactory(root, tree, packages, isServer, base) {
   const dirs = packages.map((pkg) => pkg.dir).sort()
   const subtree = Object.fromEntries(dirs.map((dir) => [dir, hashAt(root, tree, dir)]))
   const shared = [
@@ -30,7 +30,7 @@ export function keyFactory(root, tree, packages, isFrontend, base) {
     '.fullstack/catalog.yaml',
     '.editorconfig',
     ...packages
-      .filter((pkg) => !isFrontend(pkg))
+      .filter((pkg) => isServer(pkg))
       .map((pkg) => `${pkg.dir}/openapi.json`)
       .sort(),
   ]

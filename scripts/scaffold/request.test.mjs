@@ -7,6 +7,7 @@ import {
   checkRequest,
   compareProvenance,
   nextArguments,
+  ownerOf,
   parseArgs,
   partsOf,
 } from './request.mjs'
@@ -209,6 +210,70 @@ describe('requests', () => {
   it('NEXT of a stack project keeps the recorded stack when none is given', () => {
     const o = parseArgs(['--flag', 'x=true'])
     assert.deepEqual(nextArguments(stacked(), o, io).slice(1, 3), ['--stack', 'vue-bun-express'])
+  })
+})
+
+const cloudflare = {
+  template: 'serverless/cloudflare',
+  version: '1.0.0',
+  flags: { jobs: false },
+  capabilities: {},
+  commands: { install: 'bun install', contract: 'bun run openapi' },
+}
+const astroFrontend = { ...frontend, template: 'frontend/astro', flags: { islands: false } }
+const astroStack = [
+  { template: 'serverless/cloudflare', dir: 'serverless/cloudflare' },
+  { template: 'frontend/astro', dir: 'frontend' },
+]
+const astroLone = () => ({
+  stack: null,
+  packages: { frontend: astroFrontend },
+  answers: { projectName: 'demo' },
+})
+const astroBoth = () => ({
+  stack: 'astro-cloudflare',
+  providers: {},
+  packages: { 'serverless/cloudflare': cloudflare, frontend: astroFrontend },
+  answers: { projectName: 'demo' },
+})
+
+describe('a serverless package in a nested directory', () => {
+  const io = { out: '/o', answers: '/a.json' }
+  it('is added by a stack request on a lone frontend', () => {
+    const o = parseArgs(['--stack', 'astro-cloudflare'])
+    checkRequest(astroLone(), o, astroStack)
+    assert.deepEqual(nextArguments(astroLone(), o, io).slice(1, 3), ['--stack', 'astro-cloudflare'])
+    assert.deepEqual(partsOf(astroLone(), astroBoth(), o), ['serverless/cloudflare'])
+  })
+  it('refuses --deploy with a stack that brings it: there is no deploy mode', () => {
+    const o = parseArgs(['--stack', 'astro-cloudflare', '--deploy', 'single'])
+    refuses(() => checkRequest(astroLone(), o, astroStack), /serverless.*no deploy mode/)
+  })
+  it('keeps --deploy for a stack of server and frontend', () => {
+    checkRequest(lone(), parseArgs(['--stack', 'x', '--deploy', 'split']), stackPackages)
+  })
+  it('has the default directory serverless/<template id>: --dir only when it differs', () => {
+    const only = {
+      stack: null,
+      packages: { 'serverless/cloudflare': cloudflare },
+      answers: { projectName: 'demo' },
+    }
+    assert.equal(baseArguments(only, io).includes('--dir'), false)
+    const moved = { ...only, packages: { api: cloudflare } }
+    assert.deepEqual(baseArguments(moved, io).slice(3, 5), ['--dir', 'api'])
+  })
+  it('takes a flag request and a capability needs a server', () => {
+    const p = astroBoth()
+    checkRequest(p, parseArgs(['--flag', 'jobs=true']), undefined)
+    refuses(() => checkRequest(p, parseArgs(['--stack', 'x']), stackPackages), /already has a stack/)
+  })
+  it('is owned by the backend, its frontend sibling by the frontend', () => {
+    const p = astroBoth()
+    assert.equal(ownerOf(p, 'serverless/cloudflare'), 'backend')
+    assert.equal(ownerOf(p, 'frontend'), 'frontend')
+    assert.equal(ownerOf(stacked(), 'frontend', 'frontend/src/a.ts'), 'frontend')
+    assert.equal(ownerOf(stacked(), 'backend', 'backend/src/a.ts'), 'backend')
+    assert.equal(ownerOf(p, 'nope'), 'driver')
   })
 })
 
