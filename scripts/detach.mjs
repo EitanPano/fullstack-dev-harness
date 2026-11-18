@@ -80,9 +80,10 @@ function checkClone(root) {
   if (worktrees.filter((line) => line.startsWith('worktree ')).length !== 1) {
     refuse('this clone has another worktree: remove it first')
   }
-  // Every ref, not HEAD alone: a branch behind a detached HEAD, or a tag, can hold work that
-  // exists only here.
-  const local = git(root, ['rev-list', '--max-count=1', '--all', '--not', '--remotes'])
+  // The branch too, not HEAD alone: a detached HEAD can sit on a pushed commit while the branch
+  // holds work that exists only here. Tags are not checked: offline, a local tag cannot be told
+  // from a fetched release tag that sits on no branch.
+  const local = git(root, ['rev-list', '--max-count=1', 'HEAD', '--branches', '--not', '--remotes'])
   if (local.status !== 0) refuse(`git rev-list failed: ${local.stderr.trim()}`)
   if (local.stdout.trim() !== '') {
     refuse('a local commit is on no remote-tracking branch: push or drop it first')

@@ -223,6 +223,19 @@ describe('detach', () => {
     assert.equal(git(root, 'remote'), '')
   })
 
+  // A release tag can sit on a commit no branch holds; offline it cannot be told from a local one.
+  it('a clone with a fetched tag on no branch still detaches', () => {
+    const source = origin()
+    git(source, 'checkout', '-q', '--detach')
+    git(source, 'commit', '-q', '--allow-empty', '-m', 'release')
+    git(source, 'tag', 'v2.0.0')
+    git(source, 'checkout', '-q', 'main')
+    const root = clone(source)
+    assert.equal(gitRun(root, 'branch', '-r', '--contains', 'v2.0.0').stdout.trim(), '')
+    assert.equal(detach(root, quiet).clone, true)
+    assert.equal(git(root, 'tag'), '')
+  })
+
   it('a failure after .git was moved aside puts the repository back', () => {
     const root = clone(origin())
     const head = git(root, 'rev-parse', 'HEAD')
@@ -332,16 +345,6 @@ describe('detach guards', () => {
     git(root, 'add', '-A')
     git(root, 'commit', '-q', '-m', 'local work')
     git(root, 'checkout', '-q', '--detach', 'origin/main')
-    refused(root, /no remote-tracking branch/)
-  })
-
-  it('refuses a clone whose tag holds an unpushed commit', () => {
-    const root = clone(origin())
-    put(root, 'work.txt', 'mine\n')
-    git(root, 'add', '-A')
-    git(root, 'commit', '-q', '-m', 'local work')
-    git(root, 'tag', 'mine')
-    git(root, 'reset', '-q', '--hard', 'origin/main')
     refused(root, /no remote-tracking branch/)
   })
 
