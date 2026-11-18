@@ -15,9 +15,9 @@ import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
   authFlagFrom,
-  clearHarnessHistory,
   finishProject,
   resolveAuthMarkers,
+  resolveAuthText,
   writeProjectReadme,
 } from './history.mjs'
 
@@ -95,14 +95,7 @@ test('resolveAuthMarkers leaves no marker in either variant', () => {
   assert.ok(resolveAuthMarkers(mixed, true).includes('- Default: JWT'))
 })
 
-function git(root, ...args) {
-  const flags = ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false']
-  const run = spawnSync('git', ['-C', root, ...flags, ...args], { encoding: 'utf8' })
-  assert.equal(run.status, 0, run.stderr)
-}
-
-// Plans are only the harness's to delete when git tracks them, so a seeded root is a repository.
-function seed(root, { tracked = true } = {}) {
+function seed(root) {
   mkdirSync(path.join(root, '.plan'))
   mkdirSync(path.join(root, '.doc'))
   for (const name of ['000-backlog.md', '001-a.md', '010-b.md', 'notes.md']) {
@@ -113,20 +106,20 @@ function seed(root, { tracked = true } = {}) {
     '| Term |\n| session | s <!-- auth --> |\n| module | m |\n',
   )
   writeFileSync(path.join(root, '.doc', 'architecture.md'), mixed.replace(/\n/g, '\r\n'))
-  if (tracked) {
-    git(root, 'init', '-q')
-    git(root, 'add', '-A')
-    git(root, 'commit', '-q', '-m', 'seed')
-  }
 }
 
-test('clearHarnessHistory removes plans and the auth text under auth off', () => {
+test('resolveAuthText touches only the .doc files', () => {
   const root = tempRoot()
   seed(root)
-  const result = clearHarnessHistory(root, { auth: false })
-  assert.deepEqual(result.removedPlans, ['.plan/001-a.md', '.plan/010-b.md'])
+  const result = resolveAuthText(root, { auth: false })
   assert.deepEqual([...result.docs].sort(), ['.doc/architecture.md', '.doc/glossary.md'])
-  assert.deepEqual(readdirSync(path.join(root, '.plan')).sort(), ['000-backlog.md', 'notes.md'])
+  assert.deepEqual(Object.keys(result), ['docs'])
+  assert.deepEqual(readdirSync(path.join(root, '.plan')).sort(), [
+    '000-backlog.md',
+    '001-a.md',
+    '010-b.md',
+    'notes.md',
+  ])
   const glossary = readFileSync(path.join(root, '.doc', 'glossary.md'), 'utf8')
   assert.ok(!glossary.includes('session'))
   assert.ok(glossary.includes('| module | m |'))
@@ -136,10 +129,10 @@ test('clearHarnessHistory removes plans and the auth text under auth off', () =>
   assert.ok(!arch.includes('JWT'))
 })
 
-test('clearHarnessHistory keeps the auth text under auth on', () => {
+test('resolveAuthText keeps the auth text under auth on', () => {
   const root = tempRoot()
   seed(root)
-  clearHarnessHistory(root, { auth: true })
+  resolveAuthText(root, { auth: true })
   const glossary = readFileSync(path.join(root, '.doc', 'glossary.md'), 'utf8')
   assert.ok(glossary.includes('| session | s |'))
   assert.ok(!glossary.includes('<!--'))
@@ -148,13 +141,9 @@ test('clearHarnessHistory keeps the auth text under auth on', () => {
   assert.ok(!arch.includes('none'))
 })
 
-test('clearHarnessHistory on an empty root returns empty lists and creates nothing', () => {
+test('resolveAuthText on an empty root returns an empty list and creates nothing', () => {
   const root = tempRoot()
-  assert.deepEqual(clearHarnessHistory(root, { auth: true }), {
-    removedPlans: [],
-    keptPlans: [],
-    docs: [],
-  })
+  assert.deepEqual(resolveAuthText(root, { auth: true }), { docs: [] })
   assert.deepEqual(readdirSync(root), [])
 })
 
@@ -207,33 +196,6 @@ test("the repository's own .doc files resolve cleanly in both variants", () => {
   if (marked(arch)) assert.ok(resolveAuthMarkers(arch, false).includes('Auth: none'))
 })
 
-test('clearHarnessHistory keeps a modified tracked plan and an untracked plan', () => {
-  const root = tempRoot()
-  seed(root)
-  writeFileSync(path.join(root, '.plan', '001-a.md'), 'edited by the product\n')
-  writeFileSync(path.join(root, '.plan', '020-own.md'), 'new\n')
-  const result = clearHarnessHistory(root, { auth: false })
-  assert.deepEqual(result.removedPlans, ['.plan/010-b.md'])
-  assert.deepEqual(result.keptPlans, ['.plan/001-a.md', '.plan/020-own.md'])
-  const kept = readFileSync(path.join(root, '.plan', '001-a.md'), 'utf8')
-  assert.equal(kept, 'edited by the product\n')
-  assert.ok(existsSync(path.join(root, '.plan', '020-own.md')))
-})
-
-test('clearHarnessHistory keeps every plan when the root is not a git repository', () => {
-  const root = tempRoot()
-  seed(root, { tracked: false })
-  const result = clearHarnessHistory(root, { auth: true })
-  assert.deepEqual(result.removedPlans, [])
-  assert.deepEqual(result.keptPlans, ['.plan/001-a.md', '.plan/010-b.md'])
-  assert.deepEqual(readdirSync(path.join(root, '.plan')).sort(), [
-    '000-backlog.md',
-    '001-a.md',
-    '010-b.md',
-    'notes.md',
-  ])
-})
-
 test('resolveAuthMarkers throws on a misspelled or misplaced marker', () => {
   for (const text of [
     'a <!--auth-->',
@@ -253,13 +215,12 @@ test('resolveAuthMarkers takes an inline marker only at the end of the content',
   assert.equal(resolveAuthMarkers('x <!-- auth -->  \ny', false), 'y')
 })
 
-test('clearHarnessHistory touches nothing when a marker is malformed', () => {
+test('resolveAuthText touches nothing when a marker is malformed', () => {
   const root = tempRoot()
   seed(root)
   writeFileSync(path.join(root, '.doc', 'architecture.md'), '<!-- auth-start -->\nx\n')
   const glossary = readFileSync(path.join(root, '.doc', 'glossary.md'), 'utf8')
-  assert.throws(() => clearHarnessHistory(root, { auth: false }), /auth-start/)
-  assert.ok(existsSync(path.join(root, '.plan', '001-a.md')))
+  assert.throws(() => resolveAuthText(root, { auth: false }), /auth-start/)
   assert.equal(readFileSync(path.join(root, '.doc', 'glossary.md'), 'utf8'), glossary)
 })
 
@@ -324,7 +285,7 @@ function manifestText(rootCommit) {
   })
 }
 
-function project({ keepHistory = true } = {}) {
+function project() {
   const root = tempRoot()
   gitOut(root, 'init', '-q')
   put(root, '.claude/harness.json', manifestText('0'.repeat(40)))
@@ -342,7 +303,7 @@ function project({ keepHistory = true } = {}) {
   gitOut(root, 'add', '-A')
   gitOut(root, 'commit', '-q', '-m', 'root')
   const first = gitOut(root, 'rev-parse', 'HEAD')
-  put(root, '.claude/harness.json', manifestText(keepHistory ? first : 'f'.repeat(40)))
+  put(root, '.claude/harness.json', manifestText(first))
   gitOut(root, 'commit', '-q', '-am', 'pin')
   put(root, '.plan/002-edited.md', 'mine\n')
   put(root, '.plan/003-new.md', 'mine\n')
@@ -377,11 +338,10 @@ test('finishProject removes the gitignore dev block and keeps the harness block'
 
 test('finishProject records the version and a hash per harness file', () => {
   const root = project()
-  const head = gitOut(root, 'rev-parse', 'HEAD')
   finishProject(root)
   const record = JSON.parse(readFileSync(path.join(root, '.fullstack', 'harness.json'), 'utf8'))
   assert.equal(record.version, '1.2.3')
-  assert.equal(record.commit, head)
+  assert.equal(record.commit, null)
   assert.deepEqual(Object.keys(record.files), [
     '.claude/harness.json',
     '.claude/settings.json',
@@ -390,12 +350,10 @@ test('finishProject records the version and a hash per harness file', () => {
   assert.match(record.files['AGENTS.md'], /^[0-9a-f]{64}$/)
 })
 
-test('finishProject warns on harness history and records no commit without it', () => {
-  const kept = finishProject(project())
-  assert.match(kept.warnings.join('\n'), /Use this template/)
-  const root = project({ keepHistory: false })
-  const fresh = finishProject(root)
-  assert.deepEqual(fresh.warnings, [])
+test('finishProject records no commit', () => {
+  const root = project()
+  const done = finishProject(root)
+  assert.deepEqual(done.warnings, [])
   const record = JSON.parse(readFileSync(path.join(root, '.fullstack', 'harness.json'), 'utf8'))
   assert.equal(record.commit, null)
 })

@@ -13,6 +13,7 @@ import {
   hashFile,
   loadManifest,
   readRecord,
+  setupFiles,
   trackedFiles,
   writeRecord,
 } from './manifest.mjs'
@@ -76,6 +77,17 @@ describe('filesIn', () => {
   })
 })
 
+describe('setupFiles', () => {
+  const withSetup = { ...manifest, setup: ['a/keep/**', 'README.md'] }
+  it('keeps the files a setup glob matches', () => {
+    const files = ['a/keep/x.txt', 'a/x.txt', 'README.md']
+    assert.deepEqual(setupFiles(withSetup, files), ['a/keep/x.txt', 'README.md'])
+  })
+  it('is empty when the manifest has no setup', () => {
+    assert.deepEqual(setupFiles(manifest, ['README.md']), [])
+  })
+})
+
 describe('loadManifest', () => {
   it('rejects a missing field and an unknown group', () => {
     const root = tmp()
@@ -104,6 +116,17 @@ describe('loadManifest', () => {
     assert.throws(() => loadManifest(root), /references/)
     write(root, '.claude/harness.json', JSON.stringify(full({ references: ['a'] })))
     assert.throws(() => loadManifest(root), /references/)
+  })
+  it('rejects a setup that is not a list of globs, and accepts none', () => {
+    const root = tmp()
+    write(root, '.claude/harness.json', JSON.stringify(full({ setup: 'a' })))
+    assert.throws(() => loadManifest(root), /setup/)
+    write(root, '.claude/harness.json', JSON.stringify(full({ setup: [1] })))
+    assert.throws(() => loadManifest(root), /setup/)
+    write(root, '.claude/harness.json', JSON.stringify(full({ setup: ['README.md'] })))
+    assert.deepEqual(loadManifest(root).setup, ['README.md'])
+    write(root, '.claude/harness.json', JSON.stringify(full()))
+    assert.equal(loadManifest(root).setup, undefined)
   })
   it('loads a valid file', () => {
     const root = tmp()
@@ -211,6 +234,23 @@ describe('this repository', () => {
         if (files.includes(target) && !groupsOf(real, target).includes('harness')) {
           bad.push(`${file} imports ${target}`)
         }
+      }
+    }
+    assert.deepEqual(bad, [])
+  })
+  it('keeps setup to dev files, and no setup script imports a dev file outside it', () => {
+    assert.ok(real.setup.length > 0)
+    const empty = real.setup.filter((glob) => setupFiles({ setup: [glob] }, files).length === 0)
+    assert.deepEqual(empty, [], 'every setup entry matches a tracked file')
+    const setup = setupFiles(real, files)
+    assert.deepEqual(setup.filter((file) => !groupsOf(real, file).includes('dev')), [])
+    const bad = []
+    for (const file of setup.filter((f) => f.endsWith('.mjs'))) {
+      const text = readFileSync(join(repoRoot, file), 'utf8')
+      for (const [, spec] of text.matchAll(/(?:from|import)\s*\(?\s*['"](\.{1,2}\/[^'"]+)['"]/g)) {
+        const target = posix.normalize(posix.join(posix.dirname(file), spec))
+        const dev = filesIn(real, 'dev', files).includes(target)
+        if (dev && !setup.includes(target)) bad.push(`${file} imports ${target}`)
       }
     }
     assert.deepEqual(bad, [])

@@ -1,7 +1,7 @@
 # Contributing to the harness
 
 For changes to the harness itself. To build a product with it, start from the
-[README](README.md). Setup removes this file from every project.
+[README](README.md). Detach removes this file from every project.
 
 ## Tests
 
@@ -15,8 +15,9 @@ node --test "scripts/**/*.test.mjs"
 ## Adding a file
 
 Every tracked file belongs to one group in `.claude/harness.json`: `harness` files ship and update
-with the harness, `project` files belong to the product after setup, and `dev` files are removed at
-setup. A `harness` file may name a `dev` file only through the manifest's `references` list.
+with the harness, `project` files belong to the product after setup, and `dev` files are removed
+by detach, except those in `setup`, which `--finish` removes. A `harness` file may name a `dev`
+file only through the manifest's `references` list.
 
 ## Changing the instruction files
 
@@ -26,7 +27,7 @@ file in a session.
 ## Changing the hooks
 
 Any change to `.claude/hooks/` must pass the hooks suite before it merges. A broken hook blocks
-every tool call, so make the change in a worktree, not in the live checkout.
+every tool call, so change it in a worktree.
 
 ## Bumping the catalog
 
@@ -43,10 +44,10 @@ bootstrap clones the pinned catalog into `~/.cache/fullstack-templates/<version>
 
 ## What setup leaves in a project
 
-The bootstrap's finish step (`node scripts/bootstrap.mjs --finish`) turns the clone into a product
-repository. It leaves a generated product `README.md`, no harness tests or setup scripts, and the
-harness version in `.fullstack/harness.json`. `.claude/README.md`, the harness manual, ships to
-every project.
+`node scripts/detach.mjs` removes the dev files outside `setup` and, in a clone, the harness's
+commits. `node scripts/bootstrap.mjs --finish` then removes the `setup` files, leaving a generated
+product `README.md` and the harness version in `.fullstack/harness.json`. `.claude/README.md`
+ships to every project.
 
 ## Releasing the harness
 
