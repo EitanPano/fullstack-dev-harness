@@ -50,6 +50,10 @@ export function loadManifest(root) {
   if (!Array.isArray(manifest.references) || !manifest.references.every(wellFormed)) {
     throw new Error(`${MANIFEST_FILE}: "references" must be a list of { file, names }`)
   }
+  const { setup } = manifest
+  if (setup !== undefined && !(Array.isArray(setup) && setup.every((g) => typeof g === 'string'))) {
+    throw new Error(`${MANIFEST_FILE}: "setup" must be a list of globs`)
+  }
   for (const group of Object.keys(manifest.groups)) {
     if (!GROUPS.includes(group)) throw new Error(`${MANIFEST_FILE}: unknown group "${group}"`)
   }
@@ -82,6 +86,13 @@ export function trackedFiles(root) {
 
 export function filesIn(manifest, group, files) {
   return files.filter((file) => groupsOf(manifest, file).includes(group))
+}
+
+// The dev files the bootstrap still needs after detach; a top-level field, not a group, so an
+// updater that reads this manifest with an older manifest.mjs ignores it.
+export function setupFiles(manifest, files) {
+  const globs = manifest.setup ?? []
+  return files.filter((file) => inGroup(globs, file.replaceAll('\\', '/')))
 }
 
 export function hashFile(file) {

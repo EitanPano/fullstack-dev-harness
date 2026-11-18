@@ -1,13 +1,13 @@
-// Clears what a product must not inherit from the harness: its own plans and the auth text
-// that does not apply when the product has no accounts. Called by bootstrap.mjs after the
-// generator ran, or by hand: `node scripts/history.mjs <root> [--auth=false]`.
+// Clears the auth text that does not apply when the product has no accounts. Called by
+// bootstrap.mjs after the generator ran, or by hand:
+// `node scripts/history.mjs <root> [--auth=false]`.
 //
 // Markers in `.doc/` files:
 //   ... <!-- auth -->               a line (a table row's marker sits inside its last cell)
 //   <!-- auth-start --> ... <!-- auth-end -->   a block
 //   <!-- noauth: TEXT -->           TEXT replaces the line when the product has no auth
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -25,7 +25,6 @@ export const MIN_NODE = 24
 export const MIN_BUN = [1, 4]
 
 const DOC_FILES = ['glossary.md', 'architecture.md']
-const PLAN_FILE = /^\d{3}-.+\.md$/
 // Only a marker at the end of the line's content (before a table row's closing `|`) is inline;
 // any other spelling stays in the text and the post-condition in resolveAuthMarkers rejects it.
 const INLINE = / ?<!-- auth\s*-->(?=\s*(?:\|\s*)?$)/
@@ -66,22 +65,7 @@ export function resolveAuthMarkers(text, auth) {
   return result
 }
 
-// The plan files git tracks and has not modified, or null when `root` is not the top of a git
-// repository. A plan the product wrote itself (untracked or edited) is never the harness's.
-function pristinePlans(root) {
-  const git = (args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' })
-  const prefix = git(['rev-parse', '--show-prefix'])
-  if (prefix.status !== 0 || prefix.stdout.trim() !== '') return null
-  const tracked = git(['ls-files', '-z', '--', '.plan'])
-  const status = git(['status', '--porcelain', '-z', '--', '.plan'])
-  if (tracked.status !== 0 || status.status !== 0) return null
-  const changed = new Set(status.stdout.split('\0').map((entry) => entry.slice(3)))
-  return new Set(tracked.stdout.split('\0').filter((file) => file !== '' && !changed.has(file)))
-}
-
-export function clearHarnessHistory(root, { auth }) {
-  const removedPlans = []
-  const keptPlans = []
+export function resolveAuthText(root, { auth }) {
   const docs = []
   // Resolve every text before touching anything, so a malformed marker leaves the tree as is.
   const writes = []
@@ -92,25 +76,11 @@ export function clearHarnessHistory(root, { auth }) {
     const after = resolveAuthMarkers(before, auth)
     if (after !== before) writes.push({ file, after, rel: `.doc/${name}` })
   }
-  const planDir = path.join(root, '.plan')
-  if (existsSync(planDir)) {
-    const pristine = pristinePlans(root)
-    for (const name of readdirSync(planDir).sort()) {
-      if (!PLAN_FILE.test(name) || name === '000-backlog.md') continue
-      const rel = `.plan/${name}`
-      if (pristine?.has(rel)) {
-        rmSync(path.join(planDir, name))
-        removedPlans.push(rel)
-      } else {
-        keptPlans.push(rel)
-      }
-    }
-  }
   for (const { file, after, rel } of writes) {
     writeFileSync(file, after)
     docs.push(rel)
   }
-  return { removedPlans, keptPlans, docs }
+  return { docs }
 }
 
 // Auth is on only when a package's `flags` block says `auth: true`; a project without a server
@@ -232,16 +202,13 @@ export function finishProject(root) {
         'then run --finish',
     )
   }
-  const sha = head.stdout.trim()
-  const ancestor = gitIn(root, ['merge-base', '--is-ancestor', manifest.rootCommit, 'HEAD'])
-  const kept = ancestor.status === 0
   const files = trackedFiles(root)
   const harnessFiles = filesIn(manifest, 'harness', files)
   if (harnessFiles.length === 0) {
     throw new Error('no harness files are tracked in this repository: nothing to record')
   }
   const { touched, pristine } = headState(root)
-  // A dev file already gone from disk (bootstrap removed it) is neither removed nor kept.
+  // A dev file already gone from disk (detach removed it) is neither removed nor kept.
   const devFiles = filesIn(manifest, 'dev', [...files, ...untrackedFiles(root)]).filter((file) =>
     existsSync(path.join(root, file)),
   )
@@ -250,7 +217,7 @@ export function finishProject(root) {
   )
 
   const record = buildRecord(root, manifest, {
-    commit: kept ? sha : null,
+    commit: null,
     files: harnessFiles,
   })
   writeRecord(root, record)
@@ -273,12 +240,6 @@ export function finishProject(root) {
         'harness content',
     )
   }
-  if (kept) {
-    warnings.push(
-      "this history holds the harness's own commits. To start the project with a fresh one, " +
-        'create it from the GitHub "Use this template" button instead of cloning.',
-    )
-  }
   return { actions, warnings }
 }
 
@@ -293,9 +254,7 @@ if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '')) {
     ? false
     : flags.includes('--auth=true') || authFlagFrom(path.join(root, '.fullstack', 'catalog.yaml'))
   try {
-    const { removedPlans, keptPlans, docs } = clearHarnessHistory(root, { auth })
-    for (const file of removedPlans) console.log(`  removed ${file}`)
-    for (const file of keptPlans) console.log(`  kept (not tracked or modified) ${file}`)
+    const { docs } = resolveAuthText(root, { auth })
     for (const file of docs) console.log(`  resolved the auth markers in ${file}`)
   } catch (error) {
     console.error(error.message)

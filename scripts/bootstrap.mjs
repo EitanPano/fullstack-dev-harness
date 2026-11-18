@@ -14,12 +14,12 @@
 //     [--theme system|light|dark] [--density comfortable|compact]
 //   node scripts/bootstrap.mjs --finish [--root <dir>]
 //
-// Steps: prerequisites → git work tree check (skipped for `--fetch`) → read the lock → locate the
-// catalog (cache clone checked against the locked commit, or a local override) → check the
-// catalog's schemaVersion → install the catalog tools → (`--fetch` prints the index and stops) →
-// refuse a second run → generate → verify `.fullstack/catalog.yaml` → clear the harness's own
-// history → write the project README. `--finish` is the last step before the commit: it records
-// the harness version and removes the harness-development files.
+// Steps: prerequisites → detached check and git work tree check (skipped for `--fetch`) → read
+// the lock → locate the catalog (cache clone checked against the locked commit, or a local
+// override) → check the catalog's schemaVersion → install the catalog tools → (`--fetch` prints
+// the index and stops) → refuse a second run → generate → verify `.fullstack/catalog.yaml` →
+// resolve the auth text → write the project README. `--finish` is the last step before the
+// commit: it records the harness version and removes the harness-development files.
 // `--template <kind>/<id>` generates one package alone, where a stack is several.
 // `--skip-install` maps to the generator's `--skip-post-generate`. Environment:
 // FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE
@@ -44,8 +44,8 @@ import {
   MIN_BUN,
   MIN_NODE,
   authFlagFrom,
-  clearHarnessHistory,
   finishProject,
+  resolveAuthText,
   writeProjectReadme,
 } from './history.mjs'
 import { readProvenance } from './provenance.mjs'
@@ -86,7 +86,10 @@ function main() {
   if (args.finish) return finish()
   step('Checking prerequisites')
   checkPrerequisites()
-  if (!args.fetch) checkGitWorkTree()
+  if (!args.fetch) {
+    checkDetached()
+    checkGitWorkTree()
+  }
 
   step('Reading catalog.lock')
   const lock = catalogStep(() => readLock(harnessRoot))
@@ -141,22 +144,18 @@ function main() {
     fail('the generator did not write a non-empty .fullstack/catalog.yaml')
   }
 
-  step("Clearing the harness's own history")
+  step('Resolving the auth text')
   let cleared
   try {
-    cleared = clearHarnessHistory(root, { auth: authFlagFrom(provenance) })
+    cleared = resolveAuthText(root, { auth: authFlagFrom(provenance) })
   } catch (error) {
     fail(
-      `clearing the harness's own history failed: ${error.message}. The scaffold is in place; ` +
+      `resolving the auth text failed: ${error.message}. The scaffold is in place; ` +
         'fix the marker, then run `node scripts/history.mjs <root> [--auth=false]`',
     )
   }
-  for (const file of cleared.removedPlans) console.log(`  removed ${file}`)
-  for (const file of cleared.keptPlans) console.log(`  kept (not tracked or modified) ${file}`)
   for (const file of cleared.docs) console.log(`  resolved the auth markers in ${file}`)
-  if (cleared.removedPlans.length + cleared.keptPlans.length + cleared.docs.length === 0) {
-    console.log('  nothing to clear')
-  }
+  if (cleared.docs.length === 0) console.log('  nothing to resolve')
 
   step('Writing README.md')
   try {
@@ -216,6 +215,14 @@ function checkPrerequisites() {
     console.warn(
       '  warning: docker is not on PATH; the compose stack and any database service need it',
     )
+  }
+}
+
+// The harness's own plans, tests and history go in step 1 (detach.mjs, which removes itself), so
+// the project never inherits them. `--fetch` writes no project and skips this check.
+function checkDetached() {
+  if (existsSync(path.join(root, 'scripts', 'detach.mjs'))) {
+    fail('scripts/detach.mjs is still here: run `node scripts/detach.mjs` first')
   }
 }
 

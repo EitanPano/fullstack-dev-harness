@@ -15,13 +15,16 @@ tokens, and the last sections are the commit gate.
 ## 0. Preflight
 
 1. Run `git rev-parse --show-toplevel`. On failure, offer `git init` and say the harness becomes
-   the root commit (step 2). `scripts/bootstrap.mjs` refuses to run outside a git work tree
+   the root commit (item 3). `scripts/bootstrap.mjs` refuses to run outside a git work tree
    (`--fetch` writes no project and skips the check).
-2. Run `git rev-parse --verify HEAD`, in a pre-existing repository too. On failure, ask to commit
-   the untouched harness as the root commit before the scaffold (`chore: import the harness`).
-   Say why: `--finish` needs a HEAD to tell the harness's files from the project's changes, and
-   refuses without one. Commit only on a yes.
-3. Check Bun 1.4+, Node 24+ and git. Section 2 checks each chosen template's `tools`.
+2. If `scripts/detach.mjs` exists, run `node scripts/detach.mjs --dry-run`, show it, and run it
+   without the flag on a yes; the bootstrap refuses until it ran. It needs a clean tree: after a
+   fresh `git init`, do item 3 first.
+3. Run `git rev-parse --verify HEAD` (a clone has none after detach). On failure, ask to commit
+   the folder as the root commit before the scaffold (`chore: import the harness`). Say why:
+   `--finish` needs a HEAD to tell the harness's files from the project's changes. Commit only on
+   a yes.
+4. Check Bun 1.4+, Node 24+ and git. Section 2 checks each chosen template's `tools`.
 
 ## 1. Decide the product with the user
 
@@ -199,7 +202,7 @@ The run:
 - Refuses to run twice.
 
 A failure before the move leaves nothing to clean: the generator stages the output and moves it
-into place all or nothing (a failed move is rolled back). The clearing step runs after the move:
+into place all or nothing (a failed move is rolled back). The auth-text step runs after the move:
 a failure there leaves the scaffold in place and the message names the recovery
 (`node scripts/history.mjs <root> [--auth=false]`).
 
@@ -298,15 +301,12 @@ Do each item; the dev loop refuses to start until the last one holds.
 ## 6. Branch, commit gate and hand over
 
 1. Create `chore/bootstrap`; never commit on `main`.
-2. Summarise what exists, including what the scaffold removed, as the bootstrap printed it: the
-   harness's own plans (`.plan/001–…`; a product's first plan is `001`) and the auth text (under
-   Auth none).
+2. Summarise what exists, including the auth text the scaffold removed (under Auth none).
 3. As the last step before asking to commit, run `node scripts/bootstrap.mjs --finish`. It
    refuses while a `<!-- readme:` placeholder remains (fill it and run again); writes
    `.fullstack/harness.json`, the harness version record; removes the `.gitignore` dev block and
-   the harness-development files (tests, setup scripts, this skill); and warns when the git
-   history still holds the harness's commits. This skill's own files are then gone: that is
-   expected, and the commit includes the removals.
+   the setup files (the bootstrap scripts, this skill). They are then gone: that is expected,
+   and the commit includes the removals.
 4. Ask whether to commit the scaffold as `chore(bootstrap): scaffold <project-name>`, including
    `.fullstack/catalog.yaml`; the dev loop starts only from a clean tree, so the first task waits
    for this commit. Commit only on a yes, then point the user to `/dev-loop` for the first task.
@@ -316,8 +316,7 @@ Do each item; the dev loop refuses to start until the last one holds.
 - Run any scaffolder inside an existing package.
 - Browse the catalog cache.
 - Edit `scripts/`, `.claude/`, `catalog.lock` or other harness files by hand. The one change
-  there is `--finish`, which removes this skill's files and the harness-development files through
-  the script, as designed.
+  there is `--finish`, which removes this skill's files and the setup scripts, as designed.
 - Create a real env file; secrets stay in the shell environment.
 - Install a database client or start a database service, except the Compose service of a provider
   chosen at generation (section 4).
