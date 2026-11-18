@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "version": "v1.1.0",
+  "version": "v1.2.0",
   "repository": "https://github.com/EitanPano/fullstack-dev-harness",
   "rootCommit": "70de9c16a76df9307b15ee4ccdeeee3897a0e34b",
   "minCatalog": "v1.5.0",
@@ -49,6 +49,7 @@
       ".claude/hooks/test/**",
       "**/*.test.mjs",
       "scripts/scaffold/fake-catalog.mjs",
+      "scripts/detach.mjs",
       "scripts/bootstrap.mjs",
       "scripts/history.mjs",
       ".claude/skills/bootstrap-project/**",
@@ -56,11 +57,17 @@
       "!.plan/000-backlog.md"
     ]
   },
+  "setup": [
+    "scripts/bootstrap.mjs",
+    "scripts/history.mjs",
+    ".claude/skills/bootstrap-project/**"
+  ],
   "references": [
     {
       "file": ".claude/harness.json",
       "names": [
         "CONTRIBUTING.md",
+        "scripts/detach.mjs",
         "scripts/bootstrap.mjs",
         "scripts/history.mjs",
         "scripts/scaffold/fake-catalog.mjs",

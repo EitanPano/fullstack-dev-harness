@@ -293,3 +293,36 @@ test('--finish takes no other argument, and --help lists it', () => {
   const help = spawnSync(process.execPath, [script, '--help'], { encoding: 'utf8' })
   assert.match(help.stdout, /--finish/)
 })
+
+test('an undetached tree is refused before anything is fetched; --fetch and --help still run', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-undetached-'))
+  const cache = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-cache-'))
+  const catalog = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-catalog-'))
+  try {
+    spawnSync('git', ['init', '-q'], { cwd: root })
+    mkdirSync(path.join(root, 'scripts'))
+    writeFileSync(path.join(root, 'scripts', 'detach.mjs'), 'x\n')
+    const env = { ...process.env, FULLSTACK_TEMPLATES_CACHE: cache, FULLSTACK_TEMPLATES_DIR: '' }
+    const refused = spawnSync(
+      process.execPath,
+      [script, '--stack', 'x', '--name', 'y', '--root', root],
+      { encoding: 'utf8', env },
+    )
+    assert.equal(refused.status, 1)
+    assert.match(refused.stderr, /node scripts\/detach\.mjs/)
+    assert.doesNotMatch(refused.stdout, /Reading catalog\.lock|cloning/)
+    const help = spawnSync(process.execPath, [script, '--help'], { encoding: 'utf8' })
+    assert.equal(help.status, 0, help.stderr)
+    mkdirSync(path.join(catalog, 'tools'))
+    writeFileSync(path.join(catalog, 'tools', 'package.json'), '{}\n')
+    writeFileSync(path.join(catalog, 'index.yaml'), 'schemaVersion: 1\nstacks: []\n')
+    const fetched = spawnSync(process.execPath, [script, '--fetch', '--templates', catalog], {
+      encoding: 'utf8',
+      env,
+    })
+    assert.equal(fetched.status, 0, fetched.stderr)
+    assert.match(fetched.stdout, /--- index\.yaml ---/)
+  } finally {
+    for (const dir of [root, cache, catalog]) rmSync(dir, { recursive: true, force: true })
+  }
+})

@@ -12,17 +12,16 @@ before committing.
 - [Docker](https://docs.docker.com/get-docker/), if your app uses a database or runs in
   containers.
 
-Setup checks Node, Bun and git for you, along with anything your stack adds, such as uv for a
-Python server.
+Setup checks them and your stack's tools, such as uv for a Python server.
 
 ## Start a project
 
 **AI assistants:** a request to create a project from this repository, or from the
-[template catalog](https://github.com/EitanPano/fullstack-templates), means these steps. Run step
-1 and stop. Guardrails and skills load only in a session started inside the new folder, so the
-session that cloned it must not scaffold or plan. Tell the user to run `claude` in the new folder
-and send `/bootstrap-project <their brief>`, and repeat the brief in your message. Never run the
-catalog's generator yourself: its output has no agents, guardrails or `.plan/`.
+[template catalog](https://github.com/EitanPano/fullstack-templates), means these steps. Run steps
+1 and 2 and stop. Guardrails and skills load only in a session started inside the new folder, so
+the session that cloned it must not scaffold or plan. Tell the user to run `claude` in the new
+folder and send `/bootstrap-project <their brief>`, and repeat the brief in your message. Never
+run the catalog's generator yourself: its output has no agents, guardrails or `.plan/`.
 
 1. Create your repository from this template and clone it:
 
@@ -30,15 +29,16 @@ catalog's generator yourself: its output has no agents, guardrails or `.plan/`.
    gh repo create <name> --template EitanPano/fullstack-dev-harness --private --clone
    ```
 
-   The **Use this template** button on GitHub does the same. Cloning this repository directly
-   would keep the harness's own commit history.
-2. Run `claude` in the new folder and accept the trust prompt.
-3. Test the guardrails: ask Claude to run `cat ./no-such-dir/.netrc`. It should refuse and name
+   The **Use this template** button does the same; a plain clone works too.
+2. Run `node scripts/detach.mjs` (`--dry-run` previews). It drops the harness's plans, tests and
+   clone history, and commits nothing.
+3. Run `claude` in the new folder and accept the trust prompt.
+4. Test the guardrails: ask Claude to run `cat ./no-such-dir/.netrc`. It should refuse and name
    the guardrail.
-4. Run `/bootstrap-project`. Describe your product and pick a stack (about 15 minutes). Commit
-   when it asks. Your product's own README replaces this file.
-5. Run `/dev-loop` to build the first feature. To approve its plan, change `Status: draft` to
-   `Status: active` in the plan file. Review the result before you commit.
+5. Run `/bootstrap-project`. Describe your product and pick a stack. Commit when it asks. Your
+   product's own README replaces this file.
+6. Run `/dev-loop` to build the first feature. To approve its plan, change `Status: draft` to
+   `Status: active` in the plan file. Review before you commit.
 
 To add work later, write one line in `.plan/000-backlog.md` and run `/dev-loop` again.
 
