@@ -1,8 +1,8 @@
 # Frontends by type: several frontend packages, each in a typed directory
 
-Status: active
+Status: done
 Owner: Eitan
-Last updated: 2026-11-22
+Last updated: 2026-11-23
 Input: Eitan's brainstorm of 2026-11-22, which began as a surface rules table keyed on
 `frontend/<surface>/`, and his rulings the same day: packages-first; "instead of naming it
 frontend, rename it to the relevant service type"; the types `site`, `platform`, `app`, `admin`;
@@ -398,3 +398,17 @@ proof, as today.
   21 new files): G3 waits for Eitan's word.
 - 2026-11-23 — Not proven by any run: a deployment (no account); the assets service's own path
   decoding beyond the 30 local probes; "can move out later".
+- 2026-11-23 — G3 to G5 on Eitan's word ("commit all and push", "open pr to dev", "merge it and
+  prepare the version bump into main", "do all of it properly"):
+  - catalog: five commits, #47 into `dev` (CI 65/65), #48 `dev` into `main` as 7247d20 (CI
+    66/66; one e2e test timed out once against a cold container and passed on the rerun), tag
+    `v1.15.0` on 7247d20, release workflow 66/66, release published;
+  - harness: #81 into `dev` (e135733); H10 pins `v1.15.0` (7247d20) and adds the two README
+    clauses; the release commit sets `v1.3.0`.
+- 2026-11-23 — P1 on the tag, in a disposable clone of the H10 branch, the catalog cloned from
+  GitHub by `catalog.lock`: `bootstrap.mjs --stack astro-cloudflare --frontend
+  site=frontend/astro` exit 0, 78 s; `scaffold.mjs --frontend admin=frontend/astro --flag
+  admin:islands=true` exit 0, 234 s; `verify.mjs` PASS, 96 s: `check` 420, 185, 185; `testDb`
+  126; `testE2e` 36 and 36. Both suites on the H10 commit: `scripts/` 492, hooks 2913.
+  Plan done; the reference project's move, sign-in on the Worker and the customer app are their
+  own plans.
