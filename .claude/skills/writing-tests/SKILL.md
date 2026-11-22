@@ -51,7 +51,7 @@ report says why (`Tests first: after the fact — <reason>`); QA judges the reas
 ## Suites per package
 
 Each package's `AGENTS.md › Tests` names its runner, test directories, stubs and helpers
-(`backend/AGENTS.md`, `frontend/AGENTS.md`). The commands `test` and `testE2e` come from
+(`backend/AGENTS.md`, `<frontend>/AGENTS.md`). The commands `test` and `testE2e` come from
 `.fullstack/catalog.yaml`, and `testDb` is there too when a provider was chosen at the bootstrap;
 otherwise the data-layer task's scaffold records it. `verify` runs `testDb` wherever the package has
 it.

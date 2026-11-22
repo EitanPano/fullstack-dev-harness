@@ -24,6 +24,9 @@ const GLOBS = [
   '**/nginx/**',
   '**/.dockerignore',
   '**/next.config.*',
+  // A Cloudflare Worker's two entry files: what is mounted, and in which order (plan 030).
+  '**/serverless/*/server/index.ts',
+  '**/serverless/*/server/server.ts',
   // Cloudflare Pages: bindings, response headers and the middleware every request meets.
   '**/wrangler.jsonc',
   '**/wrangler.json',
@@ -34,6 +37,8 @@ const GLOBS = [
   // Privilege tools, and the auth entity's roles (plan 016).
   '**/*seed*',
   '**/models/user/**',
+  // The admin namespace: every admin endpoint of every server template lives here (plan 030).
+  '**/api/admin/**',
 ]
 // A login form is UI; it fires only by a gate line (plan 014, plan 016).
 const UI_ONLY = ['**/auth/ui/**']

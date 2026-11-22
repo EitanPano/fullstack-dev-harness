@@ -45,9 +45,10 @@ legitimate use of it should survive. Retire a role value in literal form (`'admi
 the line.
 
 `Scaffold:` names a part `.fullstack/catalog.yaml` lacks that the task needs (a server:
-`--stack <id> --flag auth=<true|false>`, the flag from the product definition's Auth answer, plus
-`--deploy <single|split>` with a frontend; a flag: `--flag <name>=true`; a capability:
-`--capability <kind>=<id>`); else `none`. Stack ids: `stacks:` in the catalog's `index.yaml`.
+`--stack <id> --flag auth=<true|false>` per the Auth answer, plus `--deploy <single|split>` with a
+frontend; a frontend: `--frontend <dir>=frontend/<id>` (`Frontends` row); a flag:
+`--flag <name>=true`; a capability: `--capability <kind>=<id>`); else `none`. Stack ids: the
+catalog's `index.yaml`.
 
 The driver promotes the draft to `.plan/NNN-YYYY-MM-DD-<slug>.md`, with the next free number,
 and writes `Base:` when it cuts the task's branch.
@@ -89,9 +90,9 @@ In this order, with these exact headings:
 
 - Repository-relative paths only.
 - Name files to create or change per package, following the layout in `AGENTS.md`,
-  `backend/AGENTS.md` and `frontend/AGENTS.md › Where does X go`
+  `backend/AGENTS.md` and `<frontend>/AGENTS.md › Where does X go`
   (`backend/src/api/<name>/…`, `backend/src/models/<name>/…`,
-  `frontend/src/…` layer paths from `frontend/AGENTS.md`). A plan that puts logic in the
+  `<frontend>/src/…` layer paths from `<frontend>/AGENTS.md`). A plan that puts logic in the
   routing layer, a fetch call in a UI component, or a query in a route handler is wrong.
 - Every `Validation` item has the form `- V01 — <statement> (AC<n>) — proof: <test name | command>`.
   QA runs the list as its checklist; "the code looks right" is not a proof.

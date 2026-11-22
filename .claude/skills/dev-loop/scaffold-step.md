@@ -27,7 +27,7 @@ The bootstrap's section 5 and every later scaffold use this table, for the parts
 
 | Row in `.doc/architecture.md` | Text |
 | --- | --- |
-| `Stack`, components table | From `.fullstack/catalog.yaml`: the stack id; per package its directory, template and version; for a frontend, the reason (the Search and sharing answer). |
+| `Stack`, components table | From `.fullstack/catalog.yaml`: the stack id; per package its directory, template and version; for a frontend, the reason (its `Frontends` row). |
 | Auth › Client model marker | A lone frontend: `n/a: no server yet`. Server-rendered (Next): the frontend's server is the backend's client; CORS is off unless `CORS_ORIGINS` is set; rate limits key on the client address, and without the opt-in `CLIENT_IP_HEADER` (`deployment`, section 6) all visitors share one bucket (about 30 active signed-in visitors per 15 minutes). Single-page app: the browser calls `/api` on the page's own origin (the server in `single`, the frontend image's proxy in `split`): no CORS, no API URL in the bundle; `TRUST_PROXY` is the hop count in front of the server (`false` in `single` locally, `1` in `split`). Serverless: as a single-page app, without `TRUST_PROXY`. |
 | Operational Concerns › Deployment | Lone frontend: `n/a: no server yet`. Serverless: its `AGENTS.md › Deployment`, no mode. Else the deploy mode (`deploy:` in `.fullstack/catalog.yaml`) and the local `TRUST_PROXY` default (`false` in `single`, `1` in `split`). |
 | Auth section, glossary | Auth on (`--flag auth=true`): rewrite the Auth section and add the glossary rows `session`, `caller`, `OTP`, `target` from the server package's `AGENTS.md › Authentication`. Off: leave "Auth: none". |

@@ -13,23 +13,45 @@ import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
 const argv = process.argv.slice(2)
-const o: any = { flags: [], caps: [] }
+const o: any = { flags: [], caps: [], fronts: [] }
 for (let i = 0; i < argv.length; i += 1) {
   const a = argv[i]
   if (a === '--flag') o.flags.push(argv[++i])
   else if (a === '--capability') o.caps.push(argv[++i])
+  else if (a === '--frontend') o.fronts.push(argv[++i])
   else if (a.startsWith('--')) o[a.slice(2)] = argv[++i]
+}
+if (process.env.FAKE_OLD_GENERATOR && o.fronts.length) {
+  console.error('generate: unknown argument "--frontend"')
+  process.exit(1)
 }
 const SERVER = { template: 'server/fake-server', dir: 'backend' }
 const FRONTEND = { template: 'frontend/fake', dir: o.dir ?? 'frontend' }
 const SERVERLESS = { template: 'serverless/cloudflare', dir: 'serverless/cloudflare' }
 const FE = { ...FRONTEND, dir: 'frontend' }
-const members = o.stack === 'astro-cf' ? [SERVERLESS, FE] : o.stack ? [SERVER, FE] : [FRONTEND]
+const listed = o.fronts.map((f: string) => {
+  const [dir, template] = f.split('=')
+  return { template, dir }
+})
+const stackApi = o.stack === 'astro-cf' ? [SERVERLESS] : o.stack ? [SERVER] : []
+// With a stack the listed frontends replace the stack's own frontend, in order.
+const members = o.stack
+  ? [...stackApi, ...(listed.length ? listed : [FE])]
+  : listed.length ? listed : [FRONTEND]
+if (!o.stack && listed.length > 1) throw new Error('several frontends need a stack')
+if (listed.length > 1 && stackApi[0] === SERVER) {
+  throw new Error('a second frontend beside a server: single serves one build')
+}
 if (o.stack === 'astro-cf' && o.deploy) throw new Error('a serverless stack has no deploy mode')
 const answers = o.answers ? JSON.parse(readFileSync(o.answers, 'utf8')) : {}
 const defaults: any = { auth: true, pwa: false, jobs: false }
 const flagOwner: any = { auth: 'server', pwa: 'frontend', jobs: 'serverless' }
 const pkgs: any = {}
+for (const dir of Object.keys(answers.packages ?? {})) {
+  if (!members.some((m) => m.dir === dir)) {
+    throw new Error('answers name package ' + dir + ', which is not in the plan')
+  }
+}
 for (const m of members) {
   const kind = m.template.split('/')[0]
   const flags: any = {}
@@ -39,7 +61,9 @@ for (const m of members) {
 }
 for (const f of o.flags) {
   const [k, v] = f.split('=')
-  const owner = Object.values(pkgs).find((p: any) => k in p.flags) as any
+  const owners = Object.values(pkgs).filter((p: any) => k in p.flags) as any[]
+  if (owners.length > 1) throw new Error('flag ' + k + ' is ambiguous: set it in an answers file')
+  const owner = owners[0]
   if (!owner) throw new Error('unknown flag: ' + k)
   owner.flags[k] = v === 'true'
 }
@@ -97,7 +121,9 @@ y += 'generatedAt: ' + new Date().toISOString() + '\\n'
 y += 'stack: ' + (o.stack ?? 'null') + '\\n'
 if (deploy) y += 'deploy: ' + deploy + '\\n'
 y += 'packages:\\n'
+let fronts = 0
 for (const p of Object.values(pkgs) as any[]) {
+  const port = p.kind === 'server' ? 3000 : p.kind === 'frontend' ? 5173 + fronts++ : 5173
   y += '  ' + p.dir + ':\\n    template: ' + p.template + '\\n    version: 1.0.0\\n'
   const f = Object.entries(p.flags)
   const row = ([k, v]: any) => '      ' + k + ': ' + v + '\\n'
@@ -108,7 +134,7 @@ for (const p of Object.values(pkgs) as any[]) {
   y += lines('capabilities', c)
   const names = ['install', 'contract', 'format', 'check']
   y += '    commands:\\n' + names.map((n) => step(p.dir, n)).join('')
-  y += '    http:\\n      port: ' + (p.kind === 'server' ? 3000 : 5173) + '\\n'
+  y += '    http:\\n      port: ' + port + '\\n'
 }
 y += 'answers:\\n  projectName: ' + o.name + '\\n'
 put('.fullstack/catalog.yaml', y)

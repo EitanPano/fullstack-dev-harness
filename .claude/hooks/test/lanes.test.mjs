@@ -97,6 +97,36 @@ for (const [name, catalog] of Object.entries(SHAPES)) {
   })
 }
 
+// Plan 030: a frontend's directory is its type, and a project may record several.
+test('typed frontend directories: each recorded frontend is a lane, qa gets its tests', () => {
+  const catalog = [
+    'stack: astro-cloudflare',
+    'packages:',
+    '  serverless/cloudflare:',
+    '    template: serverless/cloudflare',
+    '  site:',
+    '    template: frontend/astro',
+    '  admin:',
+    '    template: frontend/astro',
+    '  app-billing:',
+    '    template: frontend/astro',
+    ''
+  ].join('\n')
+  expect(catalog, [
+    ['frontend', 'site/src/pages/index.astro', true],
+    ['frontend', 'admin/src/pages/index.astro', true],
+    ['frontend', 'app-billing/src/x.ts', true],
+    ['frontend', 'app-other/src/x.ts', false],
+    ['frontend', 'serverless/cloudflare/server/api/admin/lead/routes.ts', false],
+    ['backend', 'admin/src/x.ts', false],
+    ['backend', 'serverless/cloudflare/server/api/admin/lead/routes.ts', true],
+    ['qa', 'site/tests/e2e/x.spec.ts', true],
+    ['qa', 'admin/tests/unit/x.test.ts', true],
+    ['qa', 'app-billing/tests/x.test.ts', true],
+    ['qa', 'admin/src/x.ts', false]
+  ])
+})
+
 test('a renamed standard package derives backend from its template', () => {
   const catalog = 'packages:\n  api:\n    template: server/bun-express\n'
   expect(catalog, [
