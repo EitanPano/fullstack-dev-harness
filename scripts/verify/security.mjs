@@ -24,6 +24,9 @@ const GLOBS = [
   '**/nginx/**',
   '**/.dockerignore',
   '**/next.config.*',
+  // A Cloudflare Worker's two entry files: what is mounted, and in which order (plan 030).
+  '**/serverless/*/server/index.ts',
+  '**/serverless/*/server/server.ts',
   // Cloudflare Pages: bindings, response headers and the middleware every request meets.
   '**/wrangler.jsonc',
   '**/wrangler.json',
