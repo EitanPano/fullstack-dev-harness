@@ -4,6 +4,11 @@ import { readFileSync } from 'node:fs'
 // the slash; the scripts name a package's kind by it, never by which commands it happens to have.
 export const kindOf = (template) => template.split('/')[0]
 
+// The directory names a frontend package may take; the one place the type names live in code.
+export const FRONTEND_DIRS = 'site, platform, app, app-<tool>, admin'
+export const isFrontendDir = (dir) =>
+  /^(site|platform|admin|app(-[a-z0-9]+(-[a-z0-9]+)*)?)$/.test(dir)
+
 // The generator writes the provenance file in a fixed shape, so a line scan for the facts needed
 // (deploy, and per package its template, http.port and commands) replaces a YAML dependency.
 // `http` reads in both the block and the inline (`{ port: 1 }`) form.

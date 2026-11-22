@@ -76,23 +76,34 @@ test('a --root that does not exist is reported as missing', () => {
 
 // A fake catalog whose generator records its argv and writes a provenance file, so the test
 // sees exactly what bootstrap forwards without a real scaffold or the network.
-function runWithFakeGenerator(extraArgs, primary = ['--stack', 'x'], provenance = 'packages:\n') {
+function runWithFakeGenerator(
+  extraArgs,
+  primary = ['--stack', 'x'],
+  provenance = 'packages:\n',
+  stackYaml,
+) {
   const catalog = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-catalog-'))
   const root = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-root-'))
   try {
     mkdirSync(path.join(catalog, 'tools'))
     writeFileSync(path.join(catalog, 'tools', 'package.json'), '{}\n')
     writeFileSync(path.join(catalog, 'index.yaml'), 'schemaVersion: 1\nstacks: []\n')
+    if (stackYaml !== undefined) {
+      mkdirSync(path.join(catalog, 'stacks', 'x'), { recursive: true })
+      writeFileSync(path.join(catalog, 'stacks', 'x', 'stack.yaml'), stackYaml)
+    }
     writeFileSync(
       path.join(catalog, 'tools', 'generate.ts'),
       [
-        "import { mkdirSync, writeFileSync } from 'node:fs'",
+        "import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'",
         "import path from 'node:path'",
         'const argv = process.argv.slice(2)',
         "const out = argv[argv.indexOf('--out') + 1]",
         "mkdirSync(path.join(out, '.fullstack'), { recursive: true })",
         `writeFileSync(path.join(out, '.fullstack', 'catalog.yaml'), ${JSON.stringify(provenance)})`,
         "writeFileSync(path.join(out, 'argv.json'), JSON.stringify(argv))",
+        "const seen = argv.indexOf('--answers')",
+        "if (seen !== -1) writeFileSync(path.join(out, 'answers-seen.json'), readFileSync(argv[seen + 1]))",
         '',
       ].join('\n'),
     )
@@ -117,7 +128,13 @@ function runWithFakeGenerator(extraArgs, primary = ['--stack', 'x'], provenance 
     } catch {
       readme = undefined
     }
-    return { result, forwarded, readme }
+    let answers
+    try {
+      answers = JSON.parse(readFileSync(path.join(root, 'answers-seen.json'), 'utf8'))
+    } catch {
+      answers = undefined
+    }
+    return { result, forwarded, readme, answers }
   } finally {
     rmSync(catalog, { recursive: true, force: true })
     rmSync(root, { recursive: true, force: true })
@@ -195,12 +212,12 @@ test('the main run replaces the README with the project one, no token left', () 
   assert.doesNotMatch(readme, /{{/)
 })
 
-const TEMPLATE = ['--template', 'frontend/react']
+const TEMPLATE = ['--template', 'server/bun-express']
 
 test('--template is forwarded to the generator instead of --stack', () => {
   const { result, forwarded } = runWithFakeGenerator([], TEMPLATE)
   assert.equal(result.status, 0, result.stderr)
-  assert.equal(forwarded[forwarded.indexOf('--template') + 1], 'frontend/react')
+  assert.equal(forwarded[forwarded.indexOf('--template') + 1], 'server/bun-express')
   assert.equal(forwarded.includes('--stack'), false)
 })
 
@@ -324,5 +341,127 @@ test('an undetached tree is refused before anything is fetched; --fetch and --he
     assert.match(fetched.stdout, /--- index\.yaml ---/)
   } finally {
     for (const dir of [root, cache, catalog]) rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+const STACK_FE = 'packages:\n  - template: server/fake\n    dir: backend\n  - template: frontend/fake\n    dir: frontend\n'
+const STACK_API = 'packages:\n  - template: server/fake\n    dir: backend\n'
+const TWO = [
+  'packages:',
+  '  site:',
+  '    template: frontend/fake',
+  '    http: { port: 5173 }',
+  '  admin:',
+  '    template: frontend/fake',
+  '    http: { port: 5174 }',
+  '',
+].join('\n')
+
+test('a new frontend needs a typed directory', () => {
+  const untyped = runWithFakeGenerator([], ['--template', 'frontend/fake'])
+  assert.equal(untyped.result.status, 1)
+  assert.match(untyped.result.stderr, /--frontend <dir>=frontend\/fake/)
+  assert.match(untyped.result.stderr, /site, platform, app, app-<tool>, admin/)
+  assert.equal(untyped.forwarded, undefined)
+
+  const missing = runWithFakeGenerator([], ['--stack', 'x'], 'packages:\n', STACK_FE)
+  assert.equal(missing.result.status, 1)
+  assert.match(missing.result.stderr, /frontend\/fake/)
+  assert.match(missing.result.stderr, /--frontend/)
+  assert.equal(missing.forwarded, undefined)
+
+  const badDir = runWithFakeGenerator(['--frontend', 'web=frontend/fake'], [])
+  assert.equal(badDir.result.status, 1)
+  assert.match(badDir.result.stderr, /site, platform, app/)
+
+  const alone = runWithFakeGenerator(['--frontend', 'site=frontend/fake'], [])
+  assert.equal(alone.result.status, 0, alone.result.stderr)
+  const at = alone.forwarded.indexOf('--template')
+  assert.deepEqual(alone.forwarded.slice(at, at + 4), [
+    '--template',
+    'frontend/fake',
+    '--dir',
+    'site',
+  ])
+  assert.equal(alone.forwarded.includes('--frontend'), false)
+
+  const record = 'stack: x\npackages:\n  backend:\n    template: server/fake\n  site:\n    template: frontend/fake\n    http: { port: 5173 }\n'
+  const stacked = runWithFakeGenerator(['--frontend', 'site=frontend/fake'], ['--stack', 'x'], record, STACK_FE)
+  assert.equal(stacked.result.status, 0, stacked.result.stderr)
+  const from = stacked.forwarded.indexOf('--stack')
+  assert.deepEqual(stacked.forwarded.slice(from, from + 4), [
+    '--stack',
+    'x',
+    '--frontend',
+    'site=frontend/fake',
+  ])
+  assert.match(stacked.result.stdout, /localhost:5173/)
+})
+
+test('a stack without a frontend takes none; one frontend only without a stack', () => {
+  const none = runWithFakeGenerator(['--frontend', 'site=frontend/fake'], ['--stack', 'x'], 'packages:\n', STACK_API)
+  assert.equal(none.result.status, 1)
+  assert.match(none.result.stderr, /no frontend/)
+  const api = runWithFakeGenerator([], ['--stack', 'x'], 'packages:\n', STACK_API)
+  assert.equal(api.result.status, 0, api.result.stderr)
+  const many = runWithFakeGenerator(
+    ['--frontend', 'site=frontend/fake', '--frontend', 'admin=frontend/fake'],
+    [],
+  )
+  assert.equal(many.result.status, 1)
+  assert.match(many.result.stderr, /--stack/)
+  const twice = runWithFakeGenerator(['--frontend', 'site=frontend/fake', '--frontend', 'site=frontend/fake'], [])
+  assert.equal(twice.result.status, 1)
+  assert.match(twice.result.stderr, /twice/)
+  const both = runWithFakeGenerator(['--frontend', 'site=frontend/fake'], ['--template', 'server/fake'])
+  assert.equal(both.result.status, 1)
+})
+
+test('several frontends are each listed with their port', () => {
+  const { result } = runWithFakeGenerator(
+    ['--frontend', 'site=frontend/fake', '--frontend', 'admin=frontend/fake'],
+    ['--stack', 'x'],
+    TWO,
+    STACK_FE,
+  )
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /site.*http:\/\/localhost:5173/)
+  assert.match(result.stdout, /admin.*http:\/\/localhost:5174/)
+})
+
+test('a per-package flag goes in the answers file, not on the command line', () => {
+  const { result, forwarded, answers } = runWithFakeGenerator(
+    ['--frontend', 'site=frontend/fake', '--flag', 'site:pwa=true', '--flag', 'auth=false'],
+    ['--stack', 'x'],
+    'packages:\n',
+    STACK_FE,
+  )
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(
+    forwarded.filter((_, i) => forwarded[i - 1] === '--flag'),
+    ['auth=false'],
+  )
+  assert.deepEqual(answers.packages.site.flags, { pwa: true })
+})
+
+test('a per-package flag merges into a copy of the given answers file', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-answers-'))
+  try {
+    const file = path.join(dir, 'answers.json')
+    const original = JSON.stringify({ projectName: 'keep', packages: { site: { flags: { x: 1 } } } })
+    writeFileSync(file, original)
+    const { result, forwarded, answers } = runWithFakeGenerator(
+      ['--frontend', 'site=frontend/fake', '--flag', 'site:pwa=true', '--answers', file],
+      ['--stack', 'x'],
+      'packages:\n',
+      STACK_FE,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(readFileSync(file, 'utf8'), original)
+    assert.notEqual(forwarded[forwarded.indexOf('--answers') + 1], file)
+    assert.equal(answers.projectName, 'keep')
+    assert.deepEqual(answers.packages.site.flags, { x: 1, pwa: true })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 })

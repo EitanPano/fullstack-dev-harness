@@ -296,6 +296,22 @@ test('securityPaths matches the Cloudflare deploy files and the Pages middleware
   assert.deepEqual(securityPaths([...hit, ...miss]), hit)
 })
 
+test('securityPaths matches the admin namespace in every server layout', () => {
+  const hit = [
+    'backend/src/api/admin/lead/routes.ts',
+    'backend/src/app/api/admin/lead/service.py',
+    'serverless/cloudflare/server/api/admin/lead/controller.ts',
+    'serverless/cloudflare/tests/api/admin/lead.test.ts',
+  ]
+  const miss = [
+    'backend/src/api/lead/routes.ts',
+    'admin/src/pages/index.astro',
+    'site/src/services/admin.ts',
+    'backend/src/api/administrator/routes.ts',
+  ]
+  assert.deepEqual(securityPaths([...hit, ...miss]), hit)
+})
+
 test('securityPaths joins the files the line trigger names', () => {
   const files = ['backend/src/api/user/routes.ts', 'frontend/src/feature/auth/ui/login-form.tsx', 'x.ts']
   assert.deepEqual(securityPaths(files), [])

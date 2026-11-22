@@ -357,6 +357,28 @@ test('a lone serverless package prints its own port and one dev command', () => 
   assert.doesNotMatch(blocks.usage, /own terminal/)
 })
 
+test('several frontends: the usage notes name each with its port', () => {
+  const yaml =
+    NESTED_YAML.replace('  frontend:', '  site:') +
+    [
+      '  admin:',
+      '    template: frontend/astro',
+      '    commands:',
+      '      install: bun install',
+      '      dev: bun run dev',
+      '      check: bun run check',
+      '    http: { port: 4322, health: / }',
+      '',
+    ].join('\n')
+  const root = repo({ '.fullstack/catalog.yaml': yaml })
+  const blocks = renderPackageBlocks(root, nestedCatalog(), { name: 'demo' })
+  assert.equal(
+    blocks['usage-notes'].split('\n')[1],
+    'Open http://localhost:4321 (site) and http://localhost:4322 (admin) once the dev servers are up.',
+  )
+  assert.match(blocks.usage, /# admin\ncd admin\nbun run dev\ncd \.\.\n/)
+})
+
 test('--configuration finds the example file of a nested package', () => {
   const root = repo({
     '.fullstack/catalog.yaml': NESTED_YAML,

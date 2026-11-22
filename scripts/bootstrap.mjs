@@ -7,7 +7,8 @@
 //
 //   node scripts/bootstrap.mjs --fetch [--templates <path>]
 //   node scripts/bootstrap.mjs (--stack <id> | --template <kind>/<id>) --name <name>
-//     [--flag k=v]… [--capability k=v]… [--answers <file>] [--templates <path>]
+//     [--frontend <dir>=<template>]… [--flag [<dir>:]k=v]… [--capability k=v]…
+//     [--answers <file>] [--templates <path>]
 //     [--root <dir>] [--skip-install] [--deploy single|split (with --stack only)]
 //     [--display-name <text>] [--brand-primary <hex>]
 //     [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]
@@ -20,12 +21,14 @@
 // the index and stops) → refuse a second run → generate → verify `.fullstack/catalog.yaml` →
 // resolve the auth text → write the project README. `--finish` is the last step before the
 // commit: it records the harness version and removes the harness-development files.
-// `--template <kind>/<id>` generates one package alone, where a stack is several.
+// `--template <kind>/<id>` generates one package alone, where a stack is several. A frontend is
+// always typed by its directory: `--frontend site=frontend/astro`, alone or beside a stack.
 // `--skip-install` maps to the generator's `--skip-post-generate`. Environment:
 // FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE
 // (cache root, default ~/.cache/fullstack-templates).
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -48,7 +51,8 @@ import {
   resolveAuthText,
   writeProjectReadme,
 } from './history.mjs'
-import { readProvenance } from './provenance.mjs'
+import { FRONTEND_DIRS, readProvenance } from './provenance.mjs'
+import { ScaffoldError, parseFlag, parseFrontend, readYaml } from './scaffold/request.mjs'
 
 const README_TEMPLATE = ['.claude', 'skills', 'bootstrap-project', 'readme-template.md']
 
@@ -66,7 +70,11 @@ const BRAND_FLAGS = [
 const USAGE =
   'usage: node scripts/bootstrap.mjs --fetch [--templates <path>]\n' +
   '       node scripts/bootstrap.mjs (--stack <id> | --template <kind>/<id>) --name <name>\n' +
-  '         [--flag k=v]… [--capability k=v]… [--answers <file>] [--templates <path>]\n' +
+  '         (a frontend takes --frontend <dir>=<template>, dir: ' +
+  FRONTEND_DIRS +
+  '; alone, it replaces --stack and --template)\n' +
+  '         [--frontend <dir>=<template>]… [--flag [<dir>:]k=v]… [--capability k=v]…\n' +
+  '         [--answers <file>] [--templates <path>]\n' +
   '         [--root <dir>] [--skip-install] [--deploy single|split (with --stack only)]\n' +
   '         [--display-name <text>] [--brand-primary <hex>]\n' +
   '         [--brand-neutral <hex>] [--radius sm|md|lg] [--font system|inter]\n' +
@@ -128,13 +136,24 @@ function main() {
     )
   }
 
-  const what = args.stack === undefined ? `"${args.template}" template` : `"${args.stack}" stack`
+  checkStackFrontends(catalog)
+  const what =
+    args.stack !== undefined
+      ? `"${args.stack}" stack`
+      : `"${args.template ?? args.frontends[0].template}" template`
   step(`Generating the ${what} as "${args.name}"`)
-  const generated = runSpawn(
-    'bun',
-    generatorArguments(fromCache ? lock.version : undefined),
-    catalog,
-  )
+  const scratch =
+    args.scopedFlags.length > 0 ? mkdtempSync(path.join(os.tmpdir(), 'bootstrap-')) : ''
+  let generated
+  try {
+    generated = runSpawn(
+      'bun',
+      generatorArguments(fromCache ? lock.version : undefined, scratch),
+      catalog,
+    )
+  } finally {
+    if (scratch !== '') rmSync(scratch, { recursive: true, force: true })
+  }
   if (generated.status !== 0) {
     fail(`the generator failed${generated.reason}; nothing was moved into place`)
   }
@@ -243,14 +262,18 @@ function checkGitWorkTree() {
 
 // The generator resolves --out against its own cwd (the catalog), so every path is absolute.
 // A local override records its own identity, so only the cache path passes the version.
-function generatorArguments(catalogVersion) {
+function generatorArguments(catalogVersion, scratch) {
   const list = ['tools/generate.ts']
-  if (args.stack !== undefined) list.push('--stack', args.stack)
-  else list.push('--template', args.template)
+  if (args.stack !== undefined) {
+    list.push('--stack', args.stack)
+    for (const { dir, template } of args.frontends) list.push('--frontend', `${dir}=${template}`)
+  } else if (args.template !== undefined) list.push('--template', args.template)
+  else list.push('--template', args.frontends[0].template, '--dir', args.frontends[0].dir)
   list.push('--out', root, '--name', args.name)
   for (const flag of args.flags) list.push('--flag', flag)
   for (const capability of args.capabilities) list.push('--capability', capability)
-  if (args.answers !== undefined) list.push('--answers', path.resolve(args.answers))
+  const answers = answersFile(scratch)
+  if (answers !== undefined) list.push('--answers', answers)
   if (catalogVersion !== undefined) list.push('--catalog-version', catalogVersion)
   if (args.deploy !== undefined) list.push('--deploy', args.deploy)
   for (const name of BRAND_FLAGS) {
@@ -258,6 +281,54 @@ function generatorArguments(catalogVersion) {
   }
   if (args.skipInstall) list.push('--skip-post-generate')
   return list
+}
+
+// A per-package flag goes in the answers file, in a copy when the user gave one.
+function answersFile(scratch) {
+  if (args.scopedFlags.length === 0) {
+    return args.answers === undefined ? undefined : path.resolve(args.answers)
+  }
+  let answers = {}
+  if (args.answers !== undefined) {
+    try {
+      answers = JSON.parse(readFileSync(path.resolve(args.answers), 'utf8'))
+    } catch (error) {
+      fail(`cannot read --answers ${args.answers}: ${error.message}`)
+    }
+  }
+  answers.packages ??= {}
+  for (const { dir, name, value } of args.scopedFlags) {
+    const pkg = (answers.packages[dir] ??= {})
+    pkg.flags = { ...pkg.flags, [name]: value }
+  }
+  const file = path.join(scratch, 'answers.json')
+  writeFileSync(file, JSON.stringify(answers, null, 2))
+  return file
+}
+
+// A stack with a frontend member needs the frontend's directory from the request; one without
+// takes none. A catalog or stack file this check cannot read is left to the generator.
+function checkStackFrontends(catalog) {
+  if (args.stack === undefined) return
+  const file = path.join(catalog, 'stacks', args.stack, 'stack.yaml')
+  if (!existsSync(file)) return
+  let members
+  try {
+    members = readYaml(file).packages ?? []
+  } catch (error) {
+    if (error instanceof ScaffoldError) return
+    throw error
+  }
+  const member = members.find((m) => m.template.startsWith('frontend/'))
+  if (member !== undefined && args.frontends.length === 0) {
+    fail(
+      `stack ${args.stack} has a frontend: pass --frontend <dir>=${member.template} ` +
+        `(dir: ${FRONTEND_DIRS})`,
+    )
+  }
+  if (member === undefined && args.frontends.length > 0) {
+    fail(`stack ${args.stack} has no frontend; remove --frontend`)
+  }
 }
 
 function printNextSteps() {
@@ -301,9 +372,15 @@ function printNextSteps() {
 }
 
 function printDeploySteps({ deploy, packages }, withProvider, hasCompose) {
-  const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
+  const frontends = packages.filter((pkg) => pkg.template.startsWith('frontend/'))
+  const frontend = frontends[0]
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
-  if (frontend?.port !== undefined) {
+  if (frontends.length > 1) {
+    console.log('  Once started, the frontend dev servers are at:')
+    for (const pkg of frontends) {
+      if (pkg.port !== undefined) console.log(`    ${pkg.dir}: http://localhost:${pkg.port}`)
+    }
+  } else if (frontend?.port !== undefined) {
     console.log(`  Once started, the frontend dev server is at http://localhost:${frontend.port}.`)
   }
   if (!hasCompose) return
@@ -342,6 +419,8 @@ function parseArgs(argv) {
     finish: false,
     skipInstall: false,
     flags: [],
+    scopedFlags: [],
+    frontends: [],
     capabilities: [],
     brand: {},
   }
@@ -361,7 +440,18 @@ function parseArgs(argv) {
     else if (arg === '--stack') parsed.stack = value(arg, ++i)
     else if (arg === '--template') parsed.template = value(arg, ++i)
     else if (arg === '--name') parsed.name = value(arg, ++i)
-    else if (arg === '--flag') parsed.flags.push(value(arg, ++i))
+    else if (arg === '--flag') {
+      const text = value(arg, ++i)
+      // The per-package form goes in the answers file; a plain flag is the generator's to judge.
+      if (text.split('=')[0].includes(':')) parsed.scopedFlags.push(parsedBy(parseFlag, text))
+      else parsed.flags.push(text)
+    } else if (arg === '--frontend') {
+      const frontend = parsedBy(parseFrontend, value(arg, ++i))
+      if (parsed.frontends.some((f) => f.dir === frontend.dir)) {
+        die(`--frontend names ${frontend.dir} twice`)
+      }
+      parsed.frontends.push(frontend)
+    }
     else if (arg === '--capability') parsed.capabilities.push(value(arg, ++i))
     else if (arg === '--deploy') parsed.deploy = value(arg, ++i)
     else if (arg === '--answers') parsed.answers = value(arg, ++i)
@@ -372,36 +462,78 @@ function parseArgs(argv) {
     else die(`unknown argument ${arg}`)
   }
   if (parsed.fetch) {
+    // The list-valued keys are counted below; an empty list is not an argument.
+    const lists = ['flags', 'scopedFlags', 'frontends', 'capabilities', 'brand']
     const others = Object.keys(parsed).filter(
       (key) =>
-        !['fetch', 'templates', 'flags', 'capabilities', 'brand'].includes(key) &&
+        !['fetch', 'templates', ...lists].includes(key) &&
         parsed[key] !== false &&
         parsed[key] !== undefined,
     )
     if (
       others.length > 0 ||
-      parsed.flags.length > 0 ||
+      parsed.flags.length + parsed.scopedFlags.length + parsed.frontends.length > 0 ||
       parsed.capabilities.length > 0 ||
       Object.keys(parsed.brand).length > 0
     ) {
       die('--fetch accepts only --templates')
     }
   } else if (parsed.finish) {
-    const allowed = ['finish', 'root', 'flags', 'capabilities', 'brand']
+    const allowed = ['finish', 'root', 'flags', 'scopedFlags', 'frontends', 'capabilities', 'brand']
     const others = Object.keys(parsed).filter(
       (key) => !allowed.includes(key) && parsed[key] !== false && parsed[key] !== undefined,
     )
     const extra =
-      parsed.flags.length + parsed.capabilities.length + Object.keys(parsed.brand).length
+      parsed.flags.length +
+      parsed.scopedFlags.length +
+      parsed.frontends.length +
+      parsed.capabilities.length +
+      Object.keys(parsed.brand).length
     if (others.length > 0 || extra > 0) die('--finish accepts only --root')
-  } else if ((parsed.stack === undefined) === (parsed.template === undefined)) {
-    die(`exactly one of --stack and --template is required\n${USAGE}`)
-  } else if (parsed.name === undefined) {
-    die(`--name is required\n${USAGE}`)
-  } else if (parsed.template !== undefined && parsed.deploy !== undefined) {
-    die('--deploy applies to a stack; a --template package has no deploy mode')
+  } else {
+    checkNewProject(parsed)
   }
   return parsed
+}
+
+// The request-parsing helpers of the scaffold throw; the bootstrap dies with the same message.
+function parsedBy(parse, text) {
+  try {
+    return parse(text)
+  } catch (error) {
+    if (error instanceof ScaffoldError) return die(error.message)
+    throw error
+  }
+}
+
+// What a new project needs: a stack, a lone template, or one typed frontend; a frontend never
+// comes from a bare template, because its directory carries its type.
+function checkNewProject(parsed) {
+  const alone = parsed.stack === undefined && parsed.template === undefined
+  if (alone && parsed.frontends.length > 0) {
+    if (parsed.frontends.length > 1) {
+      die('several frontends need --stack; --frontend alone takes one')
+    }
+  } else if ((parsed.stack === undefined) === (parsed.template === undefined)) {
+    die(`exactly one of --stack and --template is required\n${USAGE}`)
+  }
+  if (parsed.name === undefined) die(`--name is required\n${USAGE}`)
+  if (parsed.template !== undefined && parsed.frontends.length > 0) {
+    die('--frontend replaces --template for a frontend; pass one of them')
+  }
+  if (parsed.stack === undefined && parsed.deploy !== undefined) {
+    die('--deploy applies to a stack; a --template or --frontend package has no deploy mode')
+  }
+  if (parsed.template?.startsWith('frontend/')) {
+    die(
+      `a new frontend needs a typed directory: pass --frontend <dir>=${parsed.template} ` +
+        `(dir: ${FRONTEND_DIRS})`,
+    )
+  }
+  for (const { dir } of parsed.scopedFlags) {
+    const known = parsed.frontends.some((f) => f.dir === dir)
+    if (!known && parsed.stack === undefined) die(`--flag ${dir}:…: ${dir} is not a --frontend`)
+  }
 }
 
 function step(message) {

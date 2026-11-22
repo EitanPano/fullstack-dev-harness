@@ -188,11 +188,18 @@ function repositoryUrl(root) {
 // A project with only a serverless API opens that API's own port.
 function usageNotes(root, { deploy, packages }) {
   const server = packages.find((pkg) => pkg.template.startsWith('server/'))
-  const frontend = packages.find((pkg) => pkg.template.startsWith('frontend/'))
+  const frontends = packages.filter((pkg) => pkg.template.startsWith('frontend/'))
+  const frontend = frontends[0]
   const serverless = packages.find((pkg) => kindOf(pkg.template) === 'serverless')
   const port = (frontend ?? server ?? serverless)?.port
   const notes = []
-  if (port !== undefined) {
+  // Several frontends each have a dev server, so each is named with its own port.
+  const named = frontends.filter((pkg) => pkg.port !== undefined)
+  if (named.length > 1) {
+    const urls = named.map((pkg) => `http://localhost:${pkg.port} (${pkg.dir})`)
+    const list = `${urls.slice(0, -1).join(', ')} and ${urls.at(-1)}`
+    notes.push(`Open ${list} once the dev servers are up.`)
+  } else if (port !== undefined) {
     const servers = packages.length === 1 ? 'server is' : 'servers are'
     notes.push(`Open http://localhost:${port} once the dev ${servers} up.`)
   }

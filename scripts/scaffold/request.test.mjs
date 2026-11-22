@@ -4,6 +4,7 @@ import {
   ScaffoldError,
   answersFor,
   baseArguments,
+  catalogHint,
   checkRequest,
   compareProvenance,
   nextArguments,
@@ -313,5 +314,242 @@ describe('compareProvenance and partsOf', () => {
   })
   it('refuses a dropped package', () => {
     refuses(() => compareProvenance(stacked(), lone()), /package backend/)
+  })
+})
+
+const site = { ...astroFrontend, flags: { islands: false } }
+const astroSite = () => ({
+  stack: null,
+  packages: { site },
+  answers: { projectName: 'demo' },
+})
+const cfSite = () => ({
+  stack: 'astro-cloudflare',
+  packages: { 'serverless/cloudflare': cloudflare, site },
+  answers: { projectName: 'demo' },
+})
+const cfTwo = () => ({
+  stack: 'astro-cloudflare',
+  packages: { 'serverless/cloudflare': cloudflare, site, admin: astroFrontend },
+  answers: { projectName: 'demo' },
+})
+const ioAll = { out: '/o', answers: '/a.json' }
+
+describe('parseArgs: frontends and per-package flags', () => {
+  it('reads repeated --frontend pairs in order', () => {
+    const o = parseArgs([
+      '--frontend',
+      'admin=frontend/astro',
+      '--frontend',
+      'app-billing=frontend/vue',
+    ])
+    assert.deepEqual(o.frontends, [
+      { dir: 'admin', template: 'frontend/astro' },
+      { dir: 'app-billing', template: 'frontend/vue' },
+    ])
+    assert.deepEqual(parseArgs([]).frontends, [])
+  })
+  it('refuses a malformed, untyped, non-frontend or repeated --frontend', () => {
+    refuses(() => parseArgs(['--frontend', 'admin']), /dir>=<template/)
+    refuses(() => parseArgs(['--frontend', '=frontend/astro']), /dir>=<template/)
+    refuses(() => parseArgs(['--frontend', 'a=b=c']), /dir>=<template/)
+    refuses(() => parseArgs(['--frontend', 'admin=server/bun-express']), /frontend template/)
+    refuses(() => parseArgs(['--frontend', 'web=frontend/astro']), /site, platform, app/)
+    refuses(() => parseArgs(['--frontend', 'frontend=frontend/astro']), /site, platform, app/)
+    refuses(
+      () => parseArgs(['--frontend', 'admin=frontend/astro', '--frontend', 'admin=frontend/vue']),
+      /twice/,
+    )
+  })
+  it('reads the plain and the per-package flag form', () => {
+    const o = parseArgs([
+      '--flag',
+      'auth=true',
+      '--flag',
+      'admin:pwa=true',
+      '--flag',
+      'serverless/cloudflare:jobs=false',
+    ])
+    assert.deepEqual(o.flags, [
+      { name: 'auth', value: true },
+      { dir: 'admin', name: 'pwa', value: true },
+      { dir: 'serverless/cloudflare', name: 'jobs', value: false },
+    ])
+    refuses(() => parseArgs(['--flag', 'admin:pwa=yes']), /true or false/)
+    refuses(() => parseArgs(['--flag', ':pwa=true']), /name=/)
+    refuses(() => parseArgs(['--flag', 'admin:=true']), /name=/)
+  })
+  it('refuses --complete with --frontend', () => {
+    refuses(() => parseArgs(['--complete', '--frontend', 'admin=frontend/astro']), /--complete/)
+  })
+})
+
+describe('checkRequest: several frontends', () => {
+  const ok = (provenance, argv, stack) => checkRequest(provenance, parseArgs(argv), stack)
+  const ADMIN = ['--frontend', 'admin=frontend/astro']
+  it('accepts a second frontend beside a serverless API, and app-<tool>', () => {
+    ok(astroBoth(), ADMIN)
+    ok(cfSite(), ['--frontend', 'app-billing=frontend/astro'])
+  })
+  it('refuses --frontend with no stack', () => {
+    refuses(() => ok(astroLone(), ADMIN), /--stack/)
+    refuses(() => ok(lone(), ['--frontend', 'admin=frontend/vue']), /--stack/)
+  })
+  it('refuses a taken, nested or enclosing directory', () => {
+    refuses(() => ok(cfSite(), ['--frontend', 'site=frontend/astro']), /already a package/)
+    const inner = { ...cfSite(), packages: { ...cfSite().packages, 'admin/api': cloudflare } }
+    refuses(() => ok(inner, ADMIN), /nested/)
+    const outer = { ...cfSite(), packages: { ...cfSite().packages, 'app/x': cloudflare } }
+    refuses(() => ok(outer, ['--frontend', 'app=frontend/astro']), /nested/)
+  })
+  it('refuses a second frontend beside a server, with the reason', () => {
+    refuses(() => ok(stacked(), ['--frontend', 'admin=frontend/vue']), /single.*one build/)
+    const two = ['--stack', 'x', '--frontend', 'site=frontend/vue', '--frontend', 'admin=frontend/vue']
+    refuses(() => ok(lone(), two, stackPackages), /single.*one build/)
+    const api = { stack: null, packages: { backend: server }, answers: { projectName: 'demo' } }
+    ok(api, ['--stack', 'x', '--frontend', 'site=frontend/vue'], stackPackages)
+  })
+  it('lets a stack join a lone frontend at a typed directory', () => {
+    ok(astroSite(), ['--stack', 'astro-cloudflare'], astroStack)
+    refuses(
+      () => ok(astroLone(), ['--stack', 'x'], [{ template: 'frontend/react', dir: 'frontend' }]),
+      /does not carry frontend\/astro at frontend/,
+    )
+    const web = { stack: null, packages: { web: astroFrontend }, answers: { projectName: 'demo' } }
+    refuses(() => ok(web, ['--stack', 'astro-cloudflare'], astroStack), /does not carry/)
+  })
+  it('takes only frontend templates the stack lists', () => {
+    const request = ['--stack', 'astro-cloudflare', '--frontend', 'site=frontend/astro']
+    ok(astroLone(), request, astroStack)
+    refuses(
+      () => ok(astroLone(), request.slice(0, 2).concat('--frontend', 'site=frontend/vue'), astroStack),
+      /stack astro-cloudflare lists no frontend\/vue/,
+    )
+  })
+  it('limits a per-package flag to a package the request holds', () => {
+    ok(cfSite(), ['--flag', 'site:islands=true'])
+    ok(cfSite(), [...ADMIN, '--flag', 'admin:islands=true'])
+    const jobs = ['--stack', 'astro-cloudflare', '--flag', 'serverless/cloudflare:jobs=true']
+    ok(astroLone(), jobs, astroStack)
+    refuses(() => ok(cfSite(), ['--flag', 'admin:islands=true']), /admin.*not a package/)
+  })
+  it('refuses turning off a per-package flag the package has on, for that dir only', () => {
+    const p = cfTwo()
+    p.packages.admin = { ...astroFrontend, flags: { islands: true } }
+    refuses(() => ok(p, ['--flag', 'admin:islands=false']), /removes what admin has on/)
+    ok(p, ['--flag', 'site:islands=false'])
+  })
+})
+
+describe('generator requests for several frontends', () => {
+  it("a project recorded at frontend/ keeps today's BASE and NEXT arguments", () => {
+    assert.equal(baseArguments(astroBoth(), ioAll).includes('--frontend'), false)
+    const o = parseArgs(['--flag', 'jobs=true'])
+    assert.equal(nextArguments(astroBoth(), o, ioAll).includes('--frontend'), false)
+    const s = parseArgs(['--stack', 'astro-cloudflare'])
+    const next = nextArguments(astroLone(), s, ioAll)
+    assert.deepEqual(next.slice(1, 3), ['--stack', 'astro-cloudflare'])
+    assert.equal(next.includes('--frontend'), false)
+  })
+  it('BASE lists every recorded frontend, in order, right after the stack', () => {
+    assert.deepEqual(baseArguments(cfTwo(), ioAll).slice(1, 7), [
+      '--stack',
+      'astro-cloudflare',
+      '--frontend',
+      'site=frontend/astro',
+      '--frontend',
+      'admin=frontend/astro',
+    ])
+    assert.deepEqual(baseArguments(cfSite(), ioAll).slice(1, 5), [
+      '--stack',
+      'astro-cloudflare',
+      '--frontend',
+      'site=frontend/astro',
+    ])
+  })
+  it('a lone frontend at a typed directory stays --template and --dir', () => {
+    assert.deepEqual(baseArguments(astroSite(), ioAll).slice(1, 5), [
+      '--template',
+      'frontend/astro',
+      '--dir',
+      'site',
+    ])
+  })
+  it('a stack joining a lone frontend at site passes it through', () => {
+    const o = parseArgs(['--stack', 'astro-cloudflare'])
+    assert.deepEqual(nextArguments(astroSite(), o, ioAll).slice(1, 5), [
+      '--stack',
+      'astro-cloudflare',
+      '--frontend',
+      'site=frontend/astro',
+    ])
+  })
+  it('NEXT adds the new frontend after the recorded ones', () => {
+    const o = parseArgs(['--frontend', 'admin=frontend/astro'])
+    assert.deepEqual(nextArguments(cfSite(), o, ioAll).slice(1, 7), [
+      '--stack',
+      'astro-cloudflare',
+      '--frontend',
+      'site=frontend/astro',
+      '--frontend',
+      'admin=frontend/astro',
+    ])
+    assert.deepEqual(nextArguments(astroBoth(), o, ioAll).slice(3, 7), [
+      '--frontend',
+      'frontend=frontend/astro',
+      '--frontend',
+      'admin=frontend/astro',
+    ])
+  })
+  it('per-package flags stay off the command line and go in the NEXT answers only', () => {
+    const o = parseArgs([
+      '--frontend',
+      'admin=frontend/astro',
+      '--flag',
+      'admin:islands=true',
+      '--flag',
+      'jobs=true',
+    ])
+    const args = nextArguments(cfSite(), o, ioAll)
+    assert.deepEqual(
+      args.filter((_, i) => args[i - 1] === '--flag'),
+      ['jobs=true'],
+    )
+    assert.equal(args.some((a) => /islands/.test(a)), false)
+    assert.deepEqual(answersFor(cfSite(), o).packages.admin, {
+      flags: { islands: true },
+      capabilities: {},
+    })
+    assert.equal('admin' in answersFor(cfSite()).packages, false)
+    const on = parseArgs(['--flag', 'site:islands=true'])
+    assert.deepEqual(answersFor(cfSite(), on).packages.site.flags, { islands: true })
+  })
+})
+
+describe('partsOf, compareProvenance and ownerOf with a new frontend', () => {
+  it('names the new directory and a per-package flag turned on', () => {
+    const o = parseArgs([
+      '--frontend',
+      'admin=frontend/astro',
+      '--flag',
+      'admin:islands=true',
+      '--flag',
+      'site:islands=false',
+    ])
+    assert.deepEqual(partsOf(cfSite(), cfTwo(), o), ['admin', 'admin:islands'])
+  })
+  it("accepts a NEXT that adds a frontend; the new directory is the frontend's", () => {
+    compareProvenance(cfSite(), cfTwo())
+    assert.equal(ownerOf(cfTwo(), 'admin'), 'frontend')
+    assert.equal(ownerOf(cfTwo(), 'site'), 'frontend')
+  })
+})
+
+describe('catalogHint', () => {
+  it('names v1.15.0 when the generator did not know --frontend', () => {
+    const args = ['tools/generate.ts', '--stack', 's', '--frontend', 'admin=frontend/astro']
+    assert.match(catalogHint(args, 'generate: unknown argument "--frontend"'), /v1\.15\.0/)
+    assert.equal(catalogHint(args, 'some other failure'), '')
+    assert.equal(catalogHint(['tools/generate.ts'], 'unknown argument "--frontend"'), '')
   })
 })
