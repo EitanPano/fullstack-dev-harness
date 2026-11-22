@@ -335,6 +335,66 @@ proof, as today.
   at the `dev` → `main` merge) and commits on the harness branch. The two wrangler tests follow
   his settings (26 and 762 pass). Harness commits f8e8487, c1b1a22, a39c412. Not read as
   approval to push, to open a pull request or to commit in the catalog: each is asked.
+- 2026-11-22 — Catalog build started, three Sonnet sub-agents at once, uncommitted: C1 in the
+  catalog checkout (`tools/`, `schemas/` only); C5 and C2 with C2b each in a detached worktree
+  (`../fullstack-templates-c5`, `../fullstack-templates-c2`), their changes to come back as
+  patches. C1 keeps `FRONTEND_PATH` and `FRONTEND_OUT` (the first frontend) beside the new
+  `FRONTENDS` until C3 moves the template off them. C3, C4, C6 and C7 follow once those land.
+- 2026-11-22 — C1, C5, C2 with C2b, C3, C4, C6 and C7 built in the catalog checkout,
+  uncommitted (the two worktrees' changes came back as patches). As built, beyond the tasks:
+  - the generator adds `FRONTEND_HOSTS` (the local host map) and gives the `frontends` selection
+    to frontend packages too; a directory with a slash is refused when a plan holds several;
+  - `serverless/cloudflare` types with `wrangler types --check --strict-vars=false`
+    (`ENVIRONMENT` is typed `string`), because the strict hash differs per project;
+  - `assemble` and `start` take `--only <dir>`, so a frontend's e2e builds only itself;
+  - the Astro dev proxy sends `<dir>.localhost` as the host, so the admin frontend reaches
+    `/api/admin/*` in development;
+  - `python-fastapi` needed a fallback route in the namespace so an unknown admin path stays
+    behind the gate.
+- 2026-11-22 — The session's own additions after reading the diffs and probing a kept
+  two-frontend project (30 traversal and host requests, none crossed a folder): a page path with
+  an encoded slash, backslash or dot is refused before the assets are asked; one API test no
+  longer fails when `start` left a built `dist/`; the `start` test's cleanup tolerates a process
+  tree that already ended. Step 5 gains the Worker's two entry files in the security globs.
 - 2026-11-22 — Step 2 made exact: `baseArguments` passes no `--frontend` when the record holds
   the stack's one frontend at its default directory, and every recorded frontend in order
   otherwise; a lone frontend keeps `--template` and `--dir`.
+- 2026-11-22 — P1 run before the release, in a disposable clone of this branch against a
+  committed copy of the catalog's working tree (the pinned v1.14.0 does not know `--frontend`;
+  `scaffold` refuses a catalog checkout with uncommitted changes). After `detach.mjs`:
+  - `bootstrap.mjs --stack astro-cloudflare --frontend site=frontend/astro --name p1-proof
+    --templates <copy>`: exit 0, 67 s, `site` on 4321;
+  - `scaffold.mjs --frontend admin=frontend/astro --flag admin:islands=true --slug add-admin
+    --templates <copy>`: exit 0, 242 s, `admin` on 4322, the Worker and `site` merged into their
+    several-frontends variants, no conflict;
+  - `verify.mjs --out .orchestrate/p1`: PASS, exit 0, 88 s: `check` 411 (Worker), 185 (`site`),
+    185 (`admin`); `testDb` 118; `testE2e` 36 and 36; contract, readme and tree checks ok.
+  The README names both frontends with their ports; `FRONTEND_HOSTS` is set for dev and empty in
+  preview and production. P1 runs again on the released tag with H10.
+- 2026-11-23 — Reviews (C8 and the harness branch), three Sonnet reviewers, no P0:
+  - harness (`.orchestrate/frontend-type/review.md`): no P1. Fixed in 6e7647b: `--frontend`
+    takes a template id of letters, digits and hyphens only; the bootstrap checks a per-package
+    flag against the stack's packages; an answers file that holds no object is refused. Left for
+    Eitan: his settings change dropped the `wrangler tail` ask rule (production logs stream
+    unasked in the main session; sub-agents are still refused by the hook);
+  - catalog, general: one P1, fixed — a `--frontend` directory equal to another package's was
+    accepted and merged the two (`memberProblems` now refuses it). P2s fixed: several frontends
+    with no API refused on the stack path too; a case's `packages:` key that its own `flags:`
+    would overwrite is a validation problem; placeholder texts corrected; Pages wording removed;
+    `assemble --frontend` refuses a value that is no pair or names no frontend; four guide
+    sentences (a second frontend regenerates the package, the empty host map answers 500,
+    `static/` files beside several frontends, the encoded-path 404);
+  - catalog, security: no P1. Tests added for the admin namespace's spellings on the three
+    servers and the host rule. Known limit, in ADR 0015 ▲: `bun-express` and `python-fastapi`
+    decode a JSON body before the gate, so an anonymous caller with malformed JSON gets the 400
+    envelope, not 401 or 403; no handler runs. Kept as built: a trailing-dot host is refused;
+    the encoded-separator guard also refuses an encoded dot.
+- 2026-11-23 — Gates after the fix wave. Catalog working tree: `validate` ok; tools check 852
+  pass; cases `serverless/cloudflare/default`, `frontend/astro/default`, `server/bun-express/
+  default` (434) and `server/python-fastapi/default` (957) pass; `frontend/astro/two` and
+  `serverless/cloudflare/jobs` pass with their e2e. Harness: `scripts/` 20 files, 492 pass; the
+  hooks suite last ran before the review (17 files pass) and no hook file changed since. P1 was
+  not rerun after the fix wave. The catalog is uncommitted on `feat/frontend-type` (98 changed,
+  21 new files): G3 waits for Eitan's word.
+- 2026-11-23 — Not proven by any run: a deployment (no account); the assets service's own path
+  decoding beyond the 30 local probes; "can move out later".
