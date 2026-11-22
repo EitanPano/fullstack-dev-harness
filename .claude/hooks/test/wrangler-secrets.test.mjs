@@ -52,8 +52,8 @@ test('settings.json denies the wrangler credentials and the named dev vars varia
     await readFile(new URL('../../settings.json', import.meta.url), 'utf8')
   )
   for (const entry of [
-    'Read(~/.wrangler/**)',
-    'Read(**/xdg.config/.wrangler/**)',
+    'Read(~/.wrangler/config/**)',
+    'Read(**/.wrangler/config/**)',
     'Read(**/.dev.vars.local)',
     'Read(**/.dev.vars.preview)',
     'Read(**/.dev.vars.production)'

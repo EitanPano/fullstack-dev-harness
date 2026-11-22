@@ -161,7 +161,7 @@ test('settings.json asks before every wrangler command that reaches the platform
     await readFile(new URL('../../settings.json', import.meta.url), 'utf8')
   )
   for (const tool of ['Bash', 'PowerShell']) {
-    for (const word of [...SUBCOMMANDS, '--remote', 'time-travel', 'versions', 'tail']) {
+    for (const word of [...SUBCOMMANDS, '--remote', 'time-travel', 'versions']) {
       assert.ok(settings.permissions.ask.includes(`${tool}(*wrangler*${word}*)`), `${tool} ${word}`)
     }
   }

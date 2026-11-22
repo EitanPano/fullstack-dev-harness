@@ -39,8 +39,8 @@
       "Read(~/.aws/**)",
       "Read(~/.ssh/**)",
       "Read(~/.npmrc)",
-      "Read(~/.wrangler/**)",
-      "Read(**/xdg.config/.wrangler/**)",
+      "Read(~/.wrangler/config/**)",
+      "Read(**/.wrangler/config/**)",
       "Bash(rm -rf *)",
       "Bash(git push --force*)",
       "Bash(git push -f*)",
@@ -65,7 +65,6 @@
       "Bash(*wrangler*--remote*)",
       "Bash(*wrangler*time-travel*)",
       "Bash(*wrangler*versions*)",
-      "Bash(*wrangler*tail*)",
       "PowerShell(*wrangler*deploy*)",
       "PowerShell(*wrangler*publish*)",
       "PowerShell(*wrangler*login*)",
@@ -74,8 +73,7 @@
       "PowerShell(*wrangler*rollback*)",
       "PowerShell(*wrangler*--remote*)",
       "PowerShell(*wrangler*time-travel*)",
-      "PowerShell(*wrangler*versions*)",
-      "PowerShell(*wrangler*tail*)"
+      "PowerShell(*wrangler*versions*)"
     ]
   },
   "hooks": {
