@@ -39,8 +39,7 @@ model, glossary, stack, flags, deploy mode, tracker, backlog lines.
    deploy-mode and brand answer to its scaffold flag (sections 2 and 3).
 2. Collect every gap: a marker the brief does not answer, a value the catalog cannot take, a
    clash with the glossary. Ask them all in one message, each with the skill's default or
-   recommendation; do not walk the sections. Infer the Search and sharing answer (must public
-   pages be found by search engines or show a rich preview when shared?) and the `Server:`
+   recommendation; do not walk the sections. Infer the `Frontends` row and the `Server:`
    answer from the brief; ask either in the gap message only when the brief is silent. Write
    both into the product definition; they decide the frontend and the server (section 2).
 3. Compare the brief with the template gaps below.
@@ -67,11 +66,11 @@ Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in orde
 at a time and replace the marker with the answer, in the user's words. Suggest a default only
 when they ask.
 
-- Ask the Search and sharing and `Server:` lines (Non-functional Requirements) with the form;
-  they decide the frontend and the server (section 2).
+- Ask the `Frontends` row and the `Server:` line with the form; they decide the frontend and
+  the server (section 2). Propose the row's directory: Search and sharing "yes" is `site`, or
+  `platform` with sign-in; "no" is `app`.
 - Walk the `Design` section too; its brand fields become scaffold flags (section 3). A product
-  with no frontend answers it "n/a", and Search and sharing "n/a" too (which resolves that FILL
-  marker).
+  with no frontend answers it "n/a" and writes "none" under `Frontends`.
 - Do the same for `.doc/glossary.md` (one row per entity named in the scope) and
   `.doc/architecture.md`: other components, other data flows, Data store, Data Model, Data
   migrations, API versioning, Auth, External Dependencies, Deployment. Leave to section 5, which
@@ -105,7 +104,7 @@ each) and each package's `<catalog>/<template path>/template.yaml`. Read nothing
 catalog path: never Glob, Grep, list or explore the catalog cache, and never dispatch an Explore
 agent into it. It is outside the working tree on purpose.
 
-Narrow by the Search and sharing answer, deciding by the `static` declaration, never by a stack
+Narrow by the row's Search and sharing answer, deciding by the `static` declaration, never by a stack
 id:
 
 - "yes": keep the stacks whose frontend does not declare `static` (server-rendered, Next today),
@@ -115,7 +114,7 @@ id:
 - A `serverless/` server (`astro-cloudflare`) has no deploy mode, Compose file or `auth` flag
   (pass no `--flag auth`); its Data store is the platform's.
 
-With `Server: later`, keep the frontend template alone (`--template frontend/<id>` from a kept
+With `Server: later`, keep the frontend template alone (`--frontend <dir>=frontend/<id>` from a kept
 stack, chosen by the same rule), skip the server, capability and deploy-mode questions, and pass
 `--flag <name>=false` for each frontend flag the scope does not use. Auth is `none` and the Data
 store "decide later".
@@ -153,11 +152,11 @@ missing or old tool, the version found and the minimum, then stop; do not scaffo
 ## 3. Scaffold
 
 ```bash
-node scripts/bootstrap.mjs --stack <id> --name <project-name> \
+node scripts/bootstrap.mjs --stack <id> --frontend <dir>=frontend/<id> --name <project-name> \
   [--flag k=v]… [--capability k=v]… [--deploy single|split] [brand flags]…
 ```
 
-A lone frontend passes `--template frontend/<id>` in place of `--stack <id>`. Take the brand
+`<dir>` is the row's directory; a lone frontend passes no `--stack`. Take the brand
 flags from the `Design` form; pass only the fields that hold a value:
 
 | Design field | Flag |

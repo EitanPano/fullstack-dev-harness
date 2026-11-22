@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
-import { readProvenance } from './provenance.mjs'
+import { FRONTEND_DIRS, isFrontendDir, readProvenance } from './provenance.mjs'
 
 // Shaped like the generator's `yaml` stringify output, including a folded long command.
 const single = [
@@ -209,4 +209,14 @@ test('answers.brand and the v1.4.0 start and e2eDb commands: brand stays out of 
     start: 'bun run start',
     e2eDb: 'docker compose up -d --wait database && bun run db:e2e',
   })
+})
+
+test('isFrontendDir takes the four types and app-<tool> only', () => {
+  for (const ok of ['site', 'platform', 'admin', 'app', 'app-billing', 'app-time-sheet']) {
+    assert.equal(isFrontendDir(ok), true, ok)
+  }
+  for (const bad of ['frontend', 'web', 'app-', 'App', 'site/x', 'admin2', 'apps', 'app--x', '']) {
+    assert.equal(isFrontendDir(bad), false, bad)
+  }
+  assert.match(FRONTEND_DIRS, /site.*platform.*app-<tool>.*admin/)
 })

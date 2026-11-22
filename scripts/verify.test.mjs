@@ -94,16 +94,19 @@ async function fixture({
   plan = true,
   compose = false,
   nested = false,
+  frontends = ['frontend'],
 } = {}) {
   const base = mkdtempSync(path.join(tmpdir(), 'verify-'))
   bases.push(base)
   const root = path.join(base, 'repo')
-  for (const dir of nested ? ['serverless/cloudflare', 'frontend'] : ['backend', 'frontend']) {
+  const api = nested ? 'serverless/cloudflare' : 'backend'
+  for (const dir of [api, ...frontends]) {
     mkdirSync(path.join(root, dir), { recursive: true })
   }
   mkdirSync(path.join(root, '.fullstack'))
   mkdirSync(path.join(root, '.plan'))
-  const [backendPort, frontendPort] = ports ?? [await freePort(), await freePort()]
+  const [backendPort, ...frontendPorts] = ports ?? [await freePort()]
+  while (frontendPorts.length < frontends.length) frontendPorts.push(await freePort())
   // The stub sits at the repository root: a package two segments deep reaches it one level up more.
   const up = (dir) => '../'.repeat(dir.split('/').length)
   const defaultsFor = (dir) => {
@@ -130,15 +133,11 @@ async function fixture({
   // The two-package Astro and Cloudflare shape: a serverless API in a nested directory and a
   // frontend, no Compose file, no deploy mode.
   const lines = nested ? ['packages:'] : ['deploy: split', 'packages:']
-  const members = nested
-    ? [
-        ['frontend', 'frontend/astro', frontendPort],
-        ['serverless/cloudflare', 'serverless/cloudflare', backendPort],
-      ]
-    : [
-        ['frontend', 'frontend/react', frontendPort],
-        ['backend', 'server/python-fastapi', backendPort],
-      ]
+  const frontendTemplate = nested ? 'frontend/astro' : 'frontend/react'
+  const members = [
+    ...frontends.map((dir, i) => [dir, frontendTemplate, frontendPorts[i]]),
+    [api, nested ? 'serverless/cloudflare' : 'server/python-fastapi', backendPort],
+  ]
   for (const [dir, template, port] of members) {
     lines.push(`  ${dir}:`, `    template: ${template}`, '    http:', `      port: ${port}`)
     lines.push('    commands:')
@@ -161,10 +160,11 @@ async function fixture({
     '<!-- configuration:end -->',
   ].join('\n')
   writeFileSync(path.join(root, 'README.md'), `# Fixture\n\n${none}\n`)
-  const api = nested ? 'serverless/cloudflare' : 'backend'
   writeFileSync(path.join(root, api, 'contract.json'), 'v1')
   writeFileSync(path.join(root, api, 'app.ts'), 'export const a = 1\n')
-  writeFileSync(path.join(root, 'frontend', 'app.ts'), 'export const b = 1\n')
+  for (const dir of frontends) {
+    writeFileSync(path.join(root, dir, 'app.ts'), 'export const b = 1\n')
+  }
   if (noDb) writeFileSync(path.join(base, 'no-db'), '')
   if (compose) writeFileSync(path.join(root, 'docker-compose.yml'), 'services: {}\n')
   git(root, 'init', '-q')
@@ -1336,6 +1336,27 @@ test('a serverless package with e2eDb leaves migrate to its e2e chain', async ()
   const { exit } = await runVerify(opts(fx, { docker: 'no-such-docker-binary-xyz' }).options)
   assert.equal(exit, 0)
   assert.equal(runs(fx).includes('marker'), false)
+})
+
+test('two frontends: each e2e runs in turn, and --package selects one', async () => {
+  const fx = await fixture({ nested: true, frontends: ['site', 'admin'] })
+  const run = await runVerify(opts(fx, { docker: 'no-such-docker-binary-xyz' }).options)
+  assert.equal(run.exit, 0, JSON.stringify(run.result.packages))
+  const result = read(fx)
+  assert.deepEqual(Object.keys(result.packages).sort(), ['admin', API, 'site'].sort())
+  assert.equal(result.packages.site.testE2e.exit, 0)
+  assert.equal(result.packages.admin.testE2e.exit, 0)
+  assert.equal(result.packages.site.check.exit, 0)
+  assert.equal(result.packages.admin.check.exit, 0)
+  // The API's contract, check and testDb; a contract and a check per frontend; two e2e runs.
+  assert.equal(runs(fx).length, 9)
+  const one = await fixture({ nested: true, frontends: ['site', 'admin'] })
+  const partial = await runVerify(opts(one, { packages: ['admin'] }).options)
+  assert.equal(partial.exit, 0, JSON.stringify(partial.result))
+  const only = read(one, 'verify-partial.json')
+  assert.equal(only.packages.admin.testE2e.exit, 0)
+  assert.equal(only.packages.site, undefined)
+  assert.equal(runs(one).length, 3)
 })
 
 test('--package with a two-segment value selects that package and scopes its changes', async () => {

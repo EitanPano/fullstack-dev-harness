@@ -397,3 +397,61 @@ describe('fix wave', () => {
     }
   })
 })
+
+describe('several frontends', () => {
+  const serverless = () => {
+    rmSync(logFile, { force: true })
+    return makeProject(catalog, top, ['--stack', 'astro-cf'])
+  }
+  const ADMIN = ['--frontend', 'admin=frontend/fake']
+  it('adds a frontend at a typed directory', () => {
+    const project = serverless()
+    const before = read(project, 'frontend/src/app.txt')
+    const result = scaffold(project, ADMIN)
+    assert.equal(result.status, 0, result.err + result.out)
+    assert.match(result.out, /chore\(scaffold\): add admin/)
+    const record = read(project, '.fullstack/catalog.yaml')
+    assert.match(record, /\n {2}frontend:\n {4}template: frontend\/fake/)
+    assert.match(record, /\n {2}admin:\n {4}template: frontend\/fake/)
+    assert.match(record, /\n {2}serverless\/cloudflare:/)
+    assert.match(read(project, 'admin/src/app.txt'), /api: yes\npwa: false/)
+    assert.equal(read(project, 'frontend/src/app.txt'), before)
+    assert.equal(read(project, 'serverless/cloudflare/functions/api.txt'), 'jobs: false\n')
+    assert.match(read(project, '.gitignore'), /fullstack-templates: admin/)
+    assert.ok(log().includes('admin install'), log().join('|'))
+    assert.deepEqual(readdirSync(scratch), [], 'temp folders are removed')
+  })
+  it('sets a per-package flag on the named frontend only', () => {
+    const project = serverless()
+    const result = scaffold(project, [...ADMIN, '--flag', 'admin:pwa=true'])
+    assert.equal(result.status, 0, result.err + result.out)
+    assert.match(result.out, /add admin, admin:pwa/)
+    assert.match(read(project, 'admin/src/app.txt'), /pwa: true/)
+    assert.match(read(project, 'frontend/src/app.txt'), /pwa: false/)
+  })
+  it('refuses a plain flag two frontends declare: it is ambiguous', () => {
+    const project = serverless()
+    const result = scaffold(project, [...ADMIN, '--flag', 'pwa=true'])
+    assert.equal(result.status, 3, result.err + result.out)
+    assert.match(result.err, /ambiguous/)
+    assert.equal(git(project, ['status', '--porcelain']), '')
+  })
+  it('refuses an untyped directory and a second frontend beside a server', () => {
+    const project = serverless()
+    const untyped = scaffold(project, ['--frontend', 'web=frontend/fake'])
+    assert.equal(untyped.status, 2, untyped.err)
+    assert.match(untyped.err, /site, platform, app/)
+    const beside = makeProject(catalog, top, STACK)
+    const refused = scaffold(beside, ADMIN)
+    assert.equal(refused.status, 2, refused.err)
+    assert.match(refused.err, /single.*one build/)
+  })
+  it('names the catalog version an older generator needs', () => {
+    const project = serverless()
+    const result = scaffold(project, ADMIN, { env: { FAKE_OLD_GENERATOR: '1' } })
+    assert.equal(result.status, 3, result.err + result.out)
+    assert.match(result.err, /unknown argument "--frontend"/)
+    assert.match(result.err, /catalog must be v1\.15\.0 or later/)
+    assert.equal(git(project, ['status', '--porcelain']), '')
+  })
+})

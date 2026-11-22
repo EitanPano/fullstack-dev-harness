@@ -18,7 +18,7 @@ bootstrap (`--deploy`) and moved later only through this skill, as a planned cha
 | Frontend Compose service | build-only: `target: dist`, `scale: 0`, no ports, no profile | a container: the `serve` target, ports, the `app` profile |
 
 The exact lines for each mode, comments included, are in each package's `AGENTS.md ›
-Deployment`, under "The lines of each mode" (`frontend/AGENTS.md`, `backend/AGENTS.md`; the
+Deployment`, under "The lines of each mode" (`<frontend>/AGENTS.md`, `backend/AGENTS.md`; the
 directories are in `.fullstack/catalog.yaml`). They are fenced blocks, one per mode, copied from
 the template's own `compose.yaml` and `Dockerfile`, with the project's directories and ports
 filled in (the server's block spells the frontend's directory `<frontend dir>`). A generated
@@ -50,7 +50,7 @@ Every `docker compose` command below that inspects or stops the stack (`config`,
 
 1. Plan it (`writing-plans`). A deploy-only plan has no `Contract` and no source change.
    `Stages: backend, qa`: the root `docker-compose.yml` (both services) and
-   `backend/Dockerfile` are in the backend agent's lane, and no file under `frontend/`
+   `backend/Dockerfile` are in the backend agent's lane, and no file under `<frontend>/`
    changes, so there is no frontend stage. `Validation` is steps 5 to 8 below; `Rollback` is
    reverting those two files. A driver session that makes the change itself still writes the
    plan and edits the same files. The backend stage runs steps 5 to 8 itself, including the

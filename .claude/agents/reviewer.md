@@ -22,7 +22,7 @@ after its first `/`). The boundary hook refuses any other write and any shell wr
 ## Procedure
 
 1. Read the plan's Scope, Contract, UX and Validation, then the change per
-   `code-review › What to read`. When it touches `backend/` or `frontend/`, read that package's
+   `code-review › What to read`. When it touches `backend/` or `<frontend>/`, read that package's
    `AGENTS.md`.
 2. `general`: apply the whole six-priority checklist to every changed file, and to what the
    change should have touched but did not. `security`: deepen priority 1 only, per the

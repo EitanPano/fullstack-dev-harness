@@ -6,7 +6,7 @@ description: Turn a brief into page decisions and judge a screen against a rubri
 # UI design
 
 Composition only. Tokens, sizing, primitives, status badges and the pattern components'
-props are in the package's `frontend/AGENTS.md › Styling`; read it, do not restate it here.
+props are in the package's `<frontend>/AGENTS.md › Styling`; read it, do not restate it here.
 `figma:<url>` on a backlog line overrides the brief.
 
 ## Inputs
@@ -22,7 +22,7 @@ props are in the package's `frontend/AGENTS.md › Styling`; read it, do not res
 A plan whose `UX` names a route opens it with the `shell` line: the last plan's, changed
 only when the task changes the chrome. The first writes it, from the chrome the app has or,
 with none, from a Reference app's regions for the same job (top bar, side nav, footer, each
-with its contents and the place of each ready-to-place control in `frontend/AGENTS.md`; with
+with its contents and the place of each ready-to-place control in `<frontend>/AGENTS.md`; with
 "none", the least the scope needs), and gives `/` its screen. Build nothing the line does
 not name; a top-level screen adds a nav-table entry, not a region.
 
@@ -89,7 +89,7 @@ control or its behaviour.
 
 ## Rubric
 
-Ten checks applied to three screenshots per route: `frontend/test-results/screens/<route>-phone-light.png`,
+Ten checks applied to three screenshots per route: `<frontend>/test-results/screens/<route>-phone-light.png`,
 `<route>-phone-dark.png` and `<route>-desktop-light.png` (`home` for `/`; a nested route is
 slugged, `/staff/class` is `staff-class`). Machine-checked ones are enforced by the screens spec
 and `verify`; the passes judge only the judged ones.

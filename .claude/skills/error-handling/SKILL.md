@@ -6,7 +6,7 @@ description: Design or review how errors are detected, classified, logged, and r
 # Error Handling
 
 The error type, the envelope builder, the logger and the frontend result type are the
-package's; their names and files are in `backend/AGENTS.md › Errors` and `frontend/AGENTS.md
+package's; their names and files are in `backend/AGENTS.md › Errors` and `<frontend>/AGENTS.md
 › Errors`. This skill holds the rules.
 
 ## Principles

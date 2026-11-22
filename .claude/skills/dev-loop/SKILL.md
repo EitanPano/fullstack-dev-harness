@@ -131,7 +131,7 @@ id and (frontend) the figma URL if any.
    as it arrives, before the next `verify`.
 3. The frontend stops after `check` with `E2E: pending backend` in its report when a backend
    stage exists. Its e2e runs the production build and starts the API itself. Once the backend
-   reports, SendMessage it "backend ready: run `verify --package frontend --reuse` (with
+   reports, SendMessage it "backend ready: run `verify --package <frontend> --reuse` (with
    `testE2e`), then the UI pass, fix, update your report". Without a backend stage the frontend
    runs the UI pass in its own dispatch.
 4. Once the implementers are dispatched, start the lookahead (below).
@@ -193,7 +193,7 @@ the Compose services the repository defines; it never starts a separate Compose 
 whose volumes only a human could remove. A QA finding with `owner: driver` is a file the
 formatter rewrote outside QA's lane: keep a formatting-only change (re-run `verify`), and send
 anything else to the owning implementer as a finding. Apply QA's `Delete:` lines by the section 3 rule,
-for paths inside QA's lane (`frontend/tests/`, `backend/tests/`) only: `git rm -f` a tracked
+for paths inside QA's lane (`<frontend>/tests/`, `backend/tests/`) only: `git rm -f` a tracked
 file, remove an untracked one yourself. Collect every P0 and P1 finding and QA's FAIL items. QA's P2 and `UX:` lines go to the section 6 summary as open P2s.
 
 ## 5. Fix rounds (at most two per task)

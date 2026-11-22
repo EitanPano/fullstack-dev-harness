@@ -118,7 +118,13 @@ describe('scope', () => {
     const manifest = loadManifest(repoRoot)
     const owned = instructionFiles.filter((f) => groupsOf(manifest, f).includes('project'))
     assert.deepEqual(owned, [])
-    const projectFiles = ['.doc/glossary.md', 'frontend/AGENTS.md', 'serverless/x/AGENTS.md']
+    const projectFiles = [
+      '.doc/glossary.md',
+      'frontend/AGENTS.md',
+      'site/AGENTS.md',
+      'app-billing/AGENTS.md',
+      'serverless/x/AGENTS.md',
+    ]
     assert.deepEqual(projectFiles.filter(isInstructionFile), [])
   })
 })

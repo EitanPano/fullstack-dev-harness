@@ -13,7 +13,7 @@ You are called for one job at a time by the session that runs the `dev-loop` ski
 answer that job only. You do not launch agents, do not poll, and do not run or simulate the
 approval gate; a human approves a plan by editing its `Status:` line.
 
-`AGENTS.md` and `.claude/rules/` load for you; `backend/AGENTS.md` and `frontend/AGENTS.md`
+`AGENTS.md` and `.claude/rules/` load for you; `backend/AGENTS.md` and `<frontend>/AGENTS.md`
 do not, because you write only `.orchestrate/*/plan.md` and `.orchestrate/*/ticket.md`. Read the package files
 you need. A plan that puts logic in the routing layer, a fetch in a UI component, or a query
 in a route handler is wrong.
@@ -29,7 +29,7 @@ Contract and `Retired:` strings had landed.
 1. Read `.doc/product-definition.md` (its `Design` section when the task has a frontend
    stage), `.doc/glossary.md`, the change log of `.doc/architecture.md` and the plans it
    cites for the areas the task touches, not every plan; `backend/AGENTS.md` and
-   `frontend/AGENTS.md`; for the data-layer task, `.claude/skills/database/data-layer-task.md`.
+   `<frontend>/AGENTS.md`; for the data-layer task, `.claude/skills/database/data-layer-task.md`.
 2. If a `.doc/` section you depend on still holds a `<!-- FILL: … -->` marker, write a plan
    with `Status: blocked` naming the marker, save it as `.orchestrate/<slug>/plan.md`, print its
    path, and stop.
@@ -62,5 +62,5 @@ plan path. Print that path on the last line.
 
 ## Rules
 
-- Never write application code or touch `frontend/`, `backend/`, `.doc/` or `.claude/`.
+- Never write application code or touch `<frontend>/`, `backend/`, `.doc/` or `.claude/`.
 - Never invent scope the product definition and the plan template do not support.

@@ -34,13 +34,23 @@ holds a marker. Delete a marker only by replacing it with a decision.
 - Authorization: <!-- FILL: roles and what each may do, or "every signed-in user is equal" -->
 - Tenancy: <!-- FILL: single tenant | multi-tenant (which entity owns data, e.g. `org`) -->
 
+## Frontends
+
+One row per frontend package; a later frontend adds a row. The directory is its type: `site`
+(public pages, no sign-in), `platform` (a public product with optional sign-in), `app` (the
+signed-in product; `app-<tool>` each when there are several) or `admin` (the staff back-office,
+on `/api/admin/*`). A product with no frontend writes "none".
+
+| Directory | Host | Audience | Search and sharing | Sign-in | Offline |
+| --- | --- | --- | --- | --- | --- |
+| <!-- FILL: the type --> | <!-- FILL: the host it answers on, or "one host" --> | <!-- FILL: who uses it --> | <!-- FILL: yes or no. Must its pages be found by search engines or show a rich preview when shared? --> | <!-- FILL: none, optional or required --> | <!-- FILL: no, installable or works offline --> |
+
 ## Non-functional Requirements
 
 - Accessibility: WCAG 2.2 AA <!-- FILL: confirm or change -->
 - Browsers: last two versions of Chrome, Firefox, Safari, Edge <!-- FILL: confirm or change -->
 - Performance: <!-- FILL: e.g. first page under 2 s on a 4G connection -->
 - Locale: <!-- FILL: single language (which) | multiple (which) -->
-- Search and sharing: <!-- FILL: yes | no. Do any public pages need to be found by search engines or show a rich preview when shared? -->
 - Server: <!-- FILL: now | later. "now" when v1 has accounts, data that must outlive this browser or reach another person, a secret, or a schedule -->
 - Data retention and privacy: <!-- FILL: anything the product must or must not keep -->
 
@@ -73,7 +83,7 @@ reports against it.
 
 ## Ready to plan
 
-- [ ] No `FILL` marker remains in Purpose, Target Users, Product Scope, Auth and Tenancy, Design or
-      Acceptance Criteria, nor in the Search and sharing line.
+- [ ] No `FILL` marker remains in Purpose, Target Users, Product Scope, Auth and Tenancy,
+      Frontends, Design or Acceptance Criteria.
 - [ ] `.doc/architecture.md` has its data model and API sections filled.
 - [ ] `.doc/glossary.md` names every entity used above.

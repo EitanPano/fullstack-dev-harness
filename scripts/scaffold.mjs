@@ -5,8 +5,9 @@
 // three ways. A conflict leaves markers and a list for the driver (exit 1); `--complete` finishes
 // once they are resolved.
 //
-//   node scripts/scaffold.mjs [--stack <id>] [--flag <name>=<bool>]…
-//     [--capability <kind>=<id>]… [--deploy single|split] [--slug <slug>] [--templates <path>]
+//   node scripts/scaffold.mjs [--stack <id>] [--frontend <dir>=<template>]…
+//     [--flag [<dir>:]<name>=<bool>]… [--capability <kind>=<id>]… [--deploy single|split]
+//     [--slug <slug>] [--templates <path>]
 //     [--root <dir>] [--dry-run]
 //   node scripts/scaffold.mjs --complete [--slug <slug>] [--templates <path>] [--root <dir>]
 //
@@ -25,6 +26,7 @@ import {
   locateCatalog,
   onDiskPath,
   readLock,
+  resolveCommand,
   runSpawn,
 } from './catalog.mjs'
 import { applyTrees } from './scaffold/apply.mjs'
@@ -43,6 +45,7 @@ import {
   USAGE,
   answersFor,
   baseArguments,
+  catalogHint,
   checkRequest,
   compareProvenance,
   nextArguments,
@@ -113,10 +116,19 @@ function locate(root, recorded, override) {
   return { catalog, lock: located.lock, fromCache: located.fromCache }
 }
 
+// stderr is piped and echoed, so a generator that does not know --frontend can be named.
 function generate(catalog, args, label) {
-  const result = runSpawn('bun', args, catalog)
-  if (result.status !== 0) {
-    throw new ScaffoldError(`the generator failed for ${label}${result.reason}`, 3)
+  const bun = resolveCommand('bun')
+  const run = spawnSync(bun.file, [...bun.prefix, ...args], {
+    cwd: catalog,
+    stdio: ['inherit', 'inherit', 'pipe'],
+    encoding: 'utf8',
+  })
+  if (run.stderr) process.stderr.write(run.stderr)
+  if ((run.status ?? 1) !== 0) {
+    const reason = run.error === undefined ? '' : ` (${run.error.message})`
+    const hint = catalogHint(args, run.stderr ?? '')
+    throw new ScaffoldError(`the generator failed for ${label}${reason}${hint && `; ${hint}`}`, 3)
   }
 }
 
@@ -150,9 +162,12 @@ function add(root, options, override) {
     for (const dir of Object.values(dirs)) mkdirSync(dir)
     const answers = path.join(tmp, 'answers.json')
     writeFileSync(answers, JSON.stringify(answersFor(base), null, 2))
+    // NEXT's answers also carry the per-package flags, which BASE's packages do not all have.
+    const nextAnswers = path.join(tmp, 'answers-next.json')
+    writeFileSync(nextAnswers, JSON.stringify(answersFor(base, options), null, 2))
     const catalogVersion = fromCache ? lock.version : undefined
     generate(catalog, baseArguments(base, { out: dirs.base, answers, catalogVersion }), 'BASE')
-    const nextIo = { out: dirs.next, answers, catalogVersion }
+    const nextIo = { out: dirs.next, answers: nextAnswers, catalogVersion }
     generate(catalog, nextArguments(base, options, nextIo), 'NEXT')
 
     const next = readYaml(path.join(dirs.next, '.fullstack', 'catalog.yaml'))
