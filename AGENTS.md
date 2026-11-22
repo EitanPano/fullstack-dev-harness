@@ -34,7 +34,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 
 | Path | What it is | Who writes it |
 | --- | --- | --- |
-| `README.md` | The product's README, generated at setup, kept current by the loop | Setup, loop |
+| `README.md` | The product's README | Setup, loop |
 | `AGENTS.md`, `CLAUDE.md` | These rules, and their loader | Harness |
 | `.claude/README.md` | The harness manual | Harness |
 | `.doc/` | Product definition, architecture, glossary, conventions | Humans, bootstrap, driver |
@@ -44,7 +44,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 | `catalog.lock` | The pinned catalog version; frozen in a project | Humans |
 | `.fullstack/` | `catalog.yaml` (stack, flags, commands, ports); `harness.json`, the harness version | The bootstrap |
 | `scripts/` | `verify.mjs`, `readme.mjs`, `guidance.mjs`, `harness-update.mjs`, `scaffold.mjs`, `catalog.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
-| `frontend/`, `backend/` or `serverless/<provider>/` | Generated packages | Frontend, backend agent |
+| `<frontend>/`, `backend/` or `serverless/<provider>/` | Generated packages | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | Compose stack, database init | Backend agent |
 | `.orchestrate/<slug>/` | Loop output per task: draft `plan.md`, reports, `ticket.md`, verify results, review diffs | The loop |
 
@@ -75,12 +75,13 @@ Never run a scaffolder inside an existing package, except one the package's `AGE
 ## Architecture
 
 A package exists when the product needs it: the bootstrap creates the first, `scripts/scaffold.mjs`
-adds later ones; layer maps: its `AGENTS.md`.
+adds later ones.
 
 - Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
   `middleware/`, `services/`, `infra/`. Modules meet only through controllers; never import
   another module's service.
-- Frontend: layers, import direction and where an addition goes are the package's
+- Frontend: `<frontend>/` names its type: `site`, `platform`, `app` (`app-<tool>` when several)
+  or `admin`; older: `frontend`. Layers, import direction and where an addition goes: its
   `AGENTS.md`; lint enforces the direction.
 - The typed client comes from the contract into the agents file's directory; only the data
   layer it names imports the runtime; a model may import its types and `zod.gen` schemas.
@@ -94,7 +95,7 @@ adds later ones; layer maps: its `AGENTS.md`.
 ## Rules
 
 In `.claude/rules/`: `code-style.md` (`scripts/`, hooks), `naming.md`, `ui-and-styling.md`
-(`frontend/`), `git-workflow.md` (approval before commit, merge, push or tag; Conventional Commits).
+(frontends), `git-workflow.md` (approval before commit, merge, push or tag; Conventional Commits).
 
 ## Definition of done
 

@@ -37,6 +37,9 @@ project); this skill is the procedure.
   limit is hashed into the store key, never stored in clear.
 - Every endpoint's errors are declared in its OpenAPI registration, so the frontend's
   generated types know them.
+- Admin endpoints live only under `/api/admin/`, in `api/admin/<module>/`: a namespace, so the
+  entity keeps its name (`/api/admin/lead`). One elevated gate on the mount, first in its chain,
+  the same in every environment, guards them; other frontends never call them.
 
 ## Module shape
 
@@ -44,9 +47,8 @@ A module is a directory under the server package's `api/`, singular name, mounte
 `/api/<name>`. It has the files it needs:
 
 - `routes`: the router. The gates (rate limit, auth, roles; middleware in Express,
-  dependencies in FastAPI) are declared here and nowhere else, and so is Express's
-  `validate` middleware (FastAPI validates from the handler's typed parameters); each
-  endpoint is one line naming its handler. No logic.
+  dependencies in FastAPI) are declared here and nowhere else; each endpoint is one line
+  naming its handler. No logic.
 - `controller`: the handlers and the exported rules that are the module's only public API.
   A handler reads typed input, applies the rules, maps records to response shapes and
   sends the status. A rule is a typed function with no request or response in it.
@@ -60,9 +62,7 @@ copying the shipped reference module and its `models/` directory and renaming `m
 `<name>`; drop the files the module does not need.
 
 The file names, the helpers and the worked example are in `backend/AGENTS.md › Adding a
-module`. Logic in a `routes` file beyond declaring gates, validating and naming the
-handler is a review finding; business logic belongs in the controller, queries in the
-service.
+module`.
 
 ## Crossing a module boundary
 
@@ -126,8 +126,8 @@ helper names are in `backend/AGENTS.md › Adding a module`.
    test fails when it is stale).
 3. The frontend runs its `contract` command, which regenerates its types from that
    document. A read goes in the entity's data layer and a mutation in the feature's, at the
-   paths `frontend/AGENTS.md › Adding a feature` names; both call the typed client through the
-   helper `frontend/AGENTS.md › Errors` names, so the result is typed, including the error
+   paths `<frontend>/AGENTS.md › Adding a feature` names; both call the typed client through the
+   helper `<frontend>/AGENTS.md › Errors` names, so the result is typed, including the error
    envelope. A form schema extends the generated zod schema (`zod.gen`); a limit is never
    copied from the backend. The frontend never hand-writes an API type.
 4. Both generated files are committed in the same task. A breaking change to a response

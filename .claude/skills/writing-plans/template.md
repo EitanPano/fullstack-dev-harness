@@ -57,14 +57,14 @@ One line per module or feature; no copy strings, no code.
    contract registration.
 3. `backend/tests/` — <entity> tests, store-backed ones in the database block.
 
-### Frontend
+### Frontend: `<frontend>/`, one block each
 
-1. One line per step of the package's `frontend/AGENTS.md › Adding a feature`, in its order,
+1. One line per step of `<frontend>/AGENTS.md › Adding a feature`, in its order,
    each naming its path. React: model, service endpoints, feature (routes, page, components),
    the page's stylesheet, nav entry. Angular and Vue: models, service, store, feature, route and nav,
    the page's stylesheet, copy keys. A top-level screen gets its nav entry; a route needs its own
    loading and error copy only when its group's do not fit.
-2. `frontend/tests/` — the unit test and the e2e test.
+2. `<frontend>/tests/` — the unit and e2e tests.
 
 ## Validation
 
