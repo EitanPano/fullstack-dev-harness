@@ -51,7 +51,8 @@ export function parseFrontend(text) {
   if (!dir || !template || rest.length > 0) {
     throw new ScaffoldError('--frontend needs <dir>=<template>, e.g. site=frontend/astro')
   }
-  if (kindOf(template) !== 'frontend' || !template.includes('/')) {
+  // The value reaches the generator's command line: only a template id's letters pass.
+  if (!/^frontend\/[a-z0-9]+(-[a-z0-9]+)*$/.test(template)) {
     throw new ScaffoldError(`--frontend ${dir}: ${template} is not a frontend template`)
   }
   if (!isFrontendDir(dir)) {

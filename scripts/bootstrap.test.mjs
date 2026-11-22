@@ -444,6 +444,48 @@ test('a per-package flag goes in the answers file, not on the command line', () 
   assert.deepEqual(answers.packages.site.flags, { pwa: true })
 })
 
+test('a per-package flag names a package of the request', () => {
+  const unknown = runWithFakeGenerator(
+    ['--frontend', 'site=frontend/fake', '--flag', 'admin:pwa=true'],
+    ['--stack', 'x'],
+    'packages:\n',
+    STACK_FE,
+  )
+  assert.equal(unknown.result.status, 1)
+  assert.match(unknown.result.stderr, /admin is not a package of stack x or a --frontend/)
+  const member = runWithFakeGenerator(
+    ['--frontend', 'site=frontend/fake', '--flag', 'backend:auth=true'],
+    ['--stack', 'x'],
+    'packages:\n',
+    STACK_FE,
+  )
+  assert.equal(member.result.status, 0, member.result.stderr)
+  assert.deepEqual(member.answers.packages.backend.flags, { auth: true })
+  const lone = runWithFakeGenerator(['--flag', 'backend:auth=true'], ['--template', 'server/fake'])
+  assert.equal(lone.result.status, 1)
+  assert.match(lone.result.stderr, /--flag auth=<bool>/)
+})
+
+test('an answers file that holds no object is refused', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-answers-'))
+  try {
+    const file = path.join(dir, 'answers.json')
+    for (const text of ['null', '[]', '"x"']) {
+      writeFileSync(file, text)
+      const { result } = runWithFakeGenerator(
+        ['--frontend', 'site=frontend/fake', '--flag', 'site:pwa=true', '--answers', file],
+        ['--stack', 'x'],
+        'packages:\n',
+        STACK_FE,
+      )
+      assert.equal(result.status, 1, text)
+      assert.match(result.stderr, /--answers .* must hold a JSON object/)
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('a per-package flag merges into a copy of the given answers file', () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-answers-'))
   try {

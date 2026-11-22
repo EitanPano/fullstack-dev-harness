@@ -354,6 +354,8 @@ describe('parseArgs: frontends and per-package flags', () => {
     refuses(() => parseArgs(['--frontend', '=frontend/astro']), /dir>=<template/)
     refuses(() => parseArgs(['--frontend', 'a=b=c']), /dir>=<template/)
     refuses(() => parseArgs(['--frontend', 'admin=server/bun-express']), /frontend template/)
+    refuses(() => parseArgs(['--frontend', 'admin=frontend/../x']), /frontend template/)
+    refuses(() => parseArgs(['--frontend', 'admin=frontend/a&b']), /frontend template/)
     refuses(() => parseArgs(['--frontend', 'web=frontend/astro']), /site, platform, app/)
     refuses(() => parseArgs(['--frontend', 'frontend=frontend/astro']), /site, platform, app/)
     refuses(

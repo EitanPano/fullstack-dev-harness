@@ -295,6 +295,9 @@ function answersFile(scratch) {
     } catch (error) {
       fail(`cannot read --answers ${args.answers}: ${error.message}`)
     }
+    if (answers === null || typeof answers !== 'object' || Array.isArray(answers)) {
+      fail(`--answers ${args.answers} must hold a JSON object`)
+    }
   }
   answers.packages ??= {}
   for (const { dir, name, value } of args.scopedFlags) {
@@ -328,6 +331,15 @@ function checkStackFrontends(catalog) {
   }
   if (member === undefined && args.frontends.length > 0) {
     fail(`stack ${args.stack} has no frontend; remove --frontend`)
+  }
+  const known = new Set([
+    ...args.frontends.map((f) => f.dir),
+    ...members.filter((m) => !m.template.startsWith('frontend/')).map((m) => m.dir),
+  ])
+  for (const { dir, name } of args.scopedFlags) {
+    if (!known.has(dir)) {
+      fail(`--flag ${dir}:${name}: ${dir} is not a package of stack ${args.stack} or a --frontend`)
+    }
   }
 }
 
@@ -530,9 +542,13 @@ function checkNewProject(parsed) {
         `(dir: ${FRONTEND_DIRS})`,
     )
   }
-  for (const { dir } of parsed.scopedFlags) {
-    const known = parsed.frontends.some((f) => f.dir === dir)
-    if (!known && parsed.stack === undefined) die(`--flag ${dir}:…: ${dir} is not a --frontend`)
+  // With a stack the catalog names the packages: `checkStackFrontends` judges the flag there.
+  for (const { dir, name } of parsed.scopedFlags) {
+    if (parsed.stack !== undefined || parsed.frontends.some((f) => f.dir === dir)) continue
+    if (parsed.template !== undefined) {
+      die(`--flag ${dir}:${name}: a lone package takes --flag ${name}=<bool>`)
+    }
+    die(`--flag ${dir}:${name}: ${dir} is not a --frontend`)
   }
 }
 
