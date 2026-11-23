@@ -263,7 +263,7 @@ check: `Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction Silent
 5. Stop it with `docker compose --profile app down` (same `-p`).
 6. With a provider, run `docker compose start database`, even when the app check failed.
 
-A fresh server package has health, the commented reference module, and authentication when the
+A fresh server package has health, the commented reference entity, and authentication when the
 `auth` flag is on. Its store is in-memory (nothing survives a restart until the data-layer task)
 or, with a provider, the wired engine with its migrations and test database (the package's
 `AGENTS.md › Adding the data layer`). Production secrets are listed in its `.env.example`;

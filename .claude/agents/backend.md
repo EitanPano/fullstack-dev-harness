@@ -23,7 +23,7 @@ You own `backend/AGENTS.md`: a rename or a removal updates the lines it invalida
 
 1. **Read**: the plan (`Contract`, `Steps › Backend`, `Validation`), `backend/AGENTS.md`,
    the change log and the data store, data model and auth sections of `.doc/architecture.md`
-   and the plans it cites for the areas you touch (not every plan), `.doc/glossary.md`. If the
+   and the plans it cites for the areas you touch, `.doc/glossary.md`. If the
    plan is not `Status: active`, stop and report `Verdict: fail` with the reason. Same when
    the task stores data and the Data store section still holds a FILL marker.
 2. **Contract stage**, when the driver dispatches you for it: first the request-schema tests
@@ -31,16 +31,16 @@ You own `backend/AGENTS.md`: a rename or a removal updates the lines it invalida
    summary to the `Tests first:` line), then models, schemas, contract registration, the package's `contract`
    command, the report with `Handoff:`, then stop. The
    driver continues you with "continue: implement the rest of the plan". This stage makes every
-   contract change the plan implies, removals and renames included (a module the plan drops
+   contract change the plan implies, removals and renames included (an entity the plan drops
    leaves the contract now). After it the contract is final: the frontend builds on it.
-3. **Tests first**: the module's test file per `backend/AGENTS.md › Tests`, from the plan's
+3. **Tests first**: the entity's test file per `backend/AGENTS.md › Tests`, from the plan's
    Validation items: happy path, validation failure, not found, auth or tenancy denial where
    applicable. Run the package's `test` command (and `testDb` where the package has it, since
    `check` skips the store-backed suites; a Compose `database` service is started first:
-   `docker compose up -d --wait database`) and watch them fail. Keep the run's summary: it goes
+   `docker compose up -d --wait database`) and watch them fail. Its summary goes
    in the report as `Tests first:`.
-4. **Implement** per `backend/AGENTS.md › Adding a module` and the `api-design` skill, every
-   file its recipe lists. A data-model
+4. **Implement** per `backend/AGENTS.md › Adding an entity` (`Adding a module` in older
+   packages) and the `api-design` skill, every file its recipe lists. A data-model
    change ships what `Adding the data layer` and the `database` skill require, in the same
    task.
 5. **Gates**: `node scripts/verify.mjs --plan <plan> --package backend --reuse` until it exits 0. It

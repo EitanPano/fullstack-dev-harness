@@ -56,7 +56,7 @@ assumes of the store" and "Every engine" for the rules that keep binding.
 
 ### What the shipped code assumes of the store
 
-The auth and user modules were written against the in-memory store; the rewrite keeps these
+The auth and user entities were written against the in-memory store; the rewrite keeps these
 properties, or a race the memory store hides reaches production:
 
 - **Sessions.** Rotating a session is a conditional update (matching the id, the token
@@ -66,7 +66,7 @@ properties, or a race the memory store hides reaches production:
 - **User uniqueness.** Unique indexes on email and on **verified** phone only (a partial
   or sparse index limited to verified rows). An unverified claim does not block others, so
   a plain unique index on phone is wrong.
-- **Seed.** The first admin is made by the seed script through the user module's public API.
+- **Seed.** The first admin is made by the seed script through the user entity's public API.
 - **Counters.** An atomic increment sets the TTL on the **first** increment only; an
   increment plus expire on every call makes the window slide, and a non-atomic pair can
   leave a key without a TTL, a permanent lockout.
@@ -76,12 +76,12 @@ properties, or a race the memory store hides reaches production:
 ## Every engine
 
 - **One data-model source.** The entity's stored-record type in `models/<name>/` is the
-  declaration. Engines that define models in code keep the storage mapping in the module,
+  declaration. Engines that define models in code keep the storage mapping in the entity,
   written so the type checker holds it to that type; engines whose model is the migration
   history keep one schema file and map rows to the type in the data-access file.
   `.doc/architecture.md` Data Model lists the same entities in prose; the code wins on
   conflict.
-- **Store access in one place.** The db and cache seams are imported only by a module's
+- **Store access in one place.** The db and cache seams are imported only by an entity's
   data-access and storage-mapping files, by shared capabilities and by `infra/`; lint
   enforces it. A script may import storage mappings (index definitions).
 - **A store is a Resource.** Every store client exports one and is listed in the
@@ -93,14 +93,14 @@ properties, or a race the memory store hides reaches production:
   is one attempt; the ping is the cheapest round trip, with a driver-level timeout.
   Reconnecting after a drop is the driver's job. An unreachable store surfaces as
   `upstream_unavailable`.
-- **One data-access file per module (the module's `service`).** It holds every query for
-  the module, takes and returns plain records, never maps to HTTP or response shapes; the
+- **One data-access file per entity (the entity's `service`).** It holds every query for
+  the entity, takes and returns plain records, never maps to HTTP or response shapes; the
   controller does the mapping and the domain errors. The collection or table handle is
-  obtained per call, never at module scope. It is private to the module: a module that
-  needs another module's data calls that module's controller, and each such call is its
+  obtained per call, never at module scope. It is private to the entity: an entity that
+  needs another entity's data calls that entity's controller, and each such call is its
   own unit of work.
 - **Cache-aside stays in the data-access file.** It may use the cache seam and the logger
-  for exactly that; no other module file may.
+  for exactly that; no other entity file may.
 - **Shape of every record.** A string `id` the controller generates, `createdAt` and
   `updatedAt` set by the controller on every write. Tenanted products store the owner id on
   every record and every query filters by it. Soft delete is a nullable `deletedAt` that
@@ -115,8 +115,8 @@ properties, or a race the memory store hides reaches production:
 - **Destructive operations are a human's job.** Dropping, truncating or resetting a
   database, or flushing a cache, is never done by an agent; the guardrails refuse the
   commands. Say so in the plan's Rollback section.
-- **Transactions.** A transaction belongs to one module's controller, which calls its
-  `service` inside it; it never spans modules.
+- **Transactions.** A transaction belongs to one entity's controller, which calls its
+  `service` inside it; it never spans entities.
 - **Seed data**, when needed, is an idempotent script, never run in production; a script
   may call controllers, never a `service`.
 
@@ -149,5 +149,5 @@ deploy pipeline runs `migrate` before the new image serves traffic; record who i
   needs one (more than one instance, a hot read path, an expensive computed list,
   idempotency keys): a `cache` Compose service and its URL variable; typed get, set with
   a TTL, del, atomic incr with the TTL set on the first write. Keys are prefixed with the
-  module name. A miss is never an error; a failure degrades to the database, logged once
+  entity name. A miss is never an error; a failure degrades to the database, logged once
   at `warn`; a write deletes the entry's key.

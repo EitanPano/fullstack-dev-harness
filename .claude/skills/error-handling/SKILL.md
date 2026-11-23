@@ -21,7 +21,7 @@ package's; their names and files are in `backend/AGENTS.md › Errors` and `<fro
 ## Backend
 
 Controllers (and the service) raise the package's error type with a code, a message and
-optional details. Validation, declared from the module's schema (the router's `validate`
+optional details. Validation, declared from the entity's schema (the router's `validate`
 middleware in Express, the handler's typed parameters in FastAPI), raises
 `validation_failed` with the failing fields; a controller propagates a callee's error
 unchanged and may raise one for a composition rule; nothing but the error handler builds

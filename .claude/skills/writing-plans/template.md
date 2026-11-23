@@ -48,7 +48,7 @@ the `shell` line.>
 
 ## Steps
 
-One line per module or feature; no copy strings, no code.
+One line per entity or feature; no copy strings, no code.
 
 ### Backend
 

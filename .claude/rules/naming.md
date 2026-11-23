@@ -1,6 +1,6 @@
 # Naming
 
-Applies to routes, modules, layers, features, files, tables, collections, fields and environment
+Applies to routes, entities, layers, features, files, tables, collections, fields and environment
 variables.
 
 - Singular entity names everywhere: `post` not `posts`, `/api/post`, `api/post/`,
@@ -11,11 +11,11 @@ variables.
   TypeScript, snake_case module names in Python); a package's `AGENTS.md` may state it.
   UI components are PascalCase exports. SQL tables and columns are snake_case; MongoDB collections are
   singular and their fields camelCase. Environment variables are SCREAMING_SNAKE_CASE.
-- Route, module, feature and file names match the domain term they serve.
+- Route, entity, feature and file names match the domain term they serve.
 - Frontend layer names follow the package's `AGENTS.md`; a slice is named for the glossary
   term it serves.
 - `models/` (plural, top-level) holds an entity's types; `api/<name>/model`
-  (singular, in the module) is the engine's storage mapping.
+  (singular, in the entity) is the engine's storage mapping.
 - The word "service" has two homes and one meaning each: `api/<name>/service` is a
-  module's private queries; `services/` is the shared-capability folder (sessions, cache,
+  entity's private queries; `services/` is the shared-capability folder (sessions, cache,
   events, logging, security, communication, pure utils).
