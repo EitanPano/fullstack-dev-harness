@@ -1,8 +1,8 @@
 # Instruction-file guidance: a standard, a gate and a review
 
-Status: active
+Status: done
 Owner: Eitan
-Last updated: 2026-11-17
+Last updated: 2026-11-23
 Input: Eitan's request of 2026-11-17: a guidance file for LLM-facing Markdown, a hook that shows
 it before the first edit of such a file, and a review of the harness's files against it.
 Branch: feat/instruction-guidance (cut from `dev` ef5afc1; PR into `dev`)
@@ -313,6 +313,9 @@ Same set-up with Bash on, 20 runs per arm against the old text, judged on the ol
 Breaks per run: 1.7 vs 2.3 (p = 0.013). Every description edit fits 480 characters; for the old
 text, none did. With a shell, the agents write a new file through a heredoc as often as with
 Write (4/20 runs in both arms), and those writes skip the gate. Not fixed: the gate is a reminder.
+
+2026-11-23 — Closed: shipped in harness `v1.1.0`. Left open: V06, and R1 with the effort pin
+(**Open** above).
 
 ## Appendix A: scope
 

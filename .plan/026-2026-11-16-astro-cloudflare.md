@@ -1,8 +1,8 @@
 # Serverless stack: Astro and Cloudflare Pages Functions in one package
 
-Status: active
+Status: done
 Owner: Eitan
-Last updated: 2026-11-17
+Last updated: 2026-11-23
 Approval: delegated (2026-11-16, "set the astro-cloudflare to active, do the commits, pushes and
 prs to dev on your own. after you complete, create a dev->main pr for me to merge manually.")
 Input: Eitan's request of 2026-11-16 ("a new serverless stack: Astro + cloudflare pages
@@ -430,6 +430,8 @@ Eitan's review at the `dev` → `main` merge.
   passed alone.
 - **Pushes.** The active `gh` account could not push to these repositories; each push and PR
   command used the other logged-in account for that command only.
+- 2026-11-23 — Closed: shipped in catalog `v1.14.0`. Left open: P1 with V10, and the "Not
+  proven" list under As built.
 
 ## As built (2026-11-17)
 
