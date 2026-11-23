@@ -4,7 +4,7 @@ The harness fixes the shape: the packages of the stack chosen at the bootstrap (
 `.fullstack/catalog.yaml`) and a contract generated from the server's request schemas
 (`AGENTS.md` Stack and Architecture; each package's `AGENTS.md` for its layer map). The
 database is this product's choice. This document records what is specific to this product,
-and the auth model a product starts from.
+and the auth model it starts from.
 Fill every `<!-- FILL: … -->` marker before the first plan that touches the section.
 
 ## Primary Components
@@ -23,19 +23,19 @@ Fill every `<!-- FILL: … -->` marker before the first plan that touches the se
 1. A browser request reaches a route in the frontend's routing layer.
 2. The page calls the package's data layer (`services/`), which calls the API through the typed
    API client.
-3. The module's router declares the endpoint's gates and names the handler; validation is
-   declared once, from the module's request schema (a `validate` middleware in Express, the
-   handler's typed parameters in FastAPI; see `backend/AGENTS.md › Adding a module`). The
-   controller's handler reads the validated input, applies the rules, reads and writes
-   through the module's service (and, across a module boundary, another module's
-   controller), publishes events and sends the response in the schema's shape; failures
-   leave as the error envelope.
+3. The entity's router declares the endpoint's gates and names the handler; validation is
+   declared once, from the entity's request schema (a `validate` middleware in Express, the
+   handler's typed parameters in FastAPI; see `backend/AGENTS.md › Adding an entity`
+   (`Adding a module` in older packages)). The controller's handler reads the validated input,
+   applies the rules, uses the entity's service (and, across entities, another entity's
+   controller), publishes events and sends the response in the schema's shape; failures leave
+   as the error envelope.
 4. Mutations go through the same data layer (the frontend's actions) and refresh the
    affected route.
 5. Events: a controller publishes through the server's event service; a subscriber in
    `infra/subscribers/` reacts and may call controllers.
 6. Jobs: files in `infra/jobs/`, run by the scheduler; set `JOBS_ENABLED` on one
-   replica only.
+   replica.
 
 <!-- FILL: describe any flow that differs from the above (webhooks, external callbacks). -->
 

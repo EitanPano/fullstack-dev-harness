@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: Add or change an API endpoint, its request schemas, or the generated OpenAPI contract. Use when a plan has a Contract section, when adding a server module, when choosing a path, method, status code or response shape, when a list needs pagination, when an endpoint needs the caller, or when the frontend needs new types. Covers REST conventions, the module shape, validation and gates in the router, and crossing a module boundary.
+description: Add or change an API endpoint, its request schemas, or the generated OpenAPI contract. Use when a plan has a Contract section, when adding an entity, when choosing a path, method, status code or response shape, when a list needs pagination, when an endpoint needs the caller, or when the frontend needs new types. Covers REST conventions, the entity shape, validation and gates in the router, and crossing an entity boundary.
 ---
 
 # API Design
@@ -26,68 +26,68 @@ project); this skill is the procedure.
   decision: the sort key and the id, fetched as `limit + 1` rows after the cursor so the
   extra row proves there is a next page. A bad cursor is a validation failure. The index
   behind it is in the `database` skill.
-- Validation is declared once, from the module's schema: a `validate` middleware in the
+- Validation is declared once, from the entity's schema: a `validate` middleware in the
   router (Express) or the handler's typed parameters (FastAPI). It parses the request parts
-  the endpoint reads, and the handler reads them typed. A failure is always the same 400
-  envelope, naming the part (`invalid body`) and the fields. `backend/AGENTS.md › Adding a
-  module` shows the spelling.
+  the endpoint reads, and the handler reads them typed. A failure is the same 400
+  envelope, naming the part (`invalid body`) and the fields. `backend/AGENTS.md › Adding an
+  entity` (`Adding a module` in older packages) shows the spelling.
 - Rate limits are declared in the router, ahead of validation, so a 429 does not wait for
   parsing. Each endpoint has its own entry in the package's policy constants (never
   literals in a router) and so never shares another endpoint's bucket. The subject of the
   limit is hashed into the store key, never stored in clear.
 - Every endpoint's errors are declared in its OpenAPI registration, so the frontend's
   generated types know them.
-- Admin endpoints live only under `/api/admin/`, in `api/admin/<module>/`: a namespace, so the
+- Admin endpoints live only under `/api/admin/`, in `api/admin/<entity>/`: a namespace, so the
   entity keeps its name (`/api/admin/lead`). One elevated gate on the mount, first in its chain,
   the same in every environment, guards them; other frontends never call them.
 
-## Module shape
+## Entity shape
 
-A module is a directory under the server package's `api/`, singular name, mounted at
+An entity is a directory under the server package's `api/`, singular name, mounted at
 `/api/<name>`. It has the files it needs:
 
 - `routes`: the router. The gates (rate limit, auth, roles; middleware in Express,
   dependencies in FastAPI) are declared here and nowhere else; each endpoint is one line
   naming its handler. No logic.
-- `controller`: the handlers and the exported rules that are the module's only public API.
+- `controller`: the handlers and the exported rules that are the entity's only public API.
   A handler reads typed input, applies the rules, maps records to response shapes and
   sends the status. A rule is a typed function with no request or response in it.
 - `schema`: the leaf. It validates requests, types responses and registers the contract.
   A schema for a shape declared in `models/` is held to that type by the type checker.
-- `service`: the private queries, only when the module has data of its own.
+- `service`: the private queries, only when the entity has data of its own.
 
 Order of work: types in `models/<name>/` → `schema` → test, red → `service` → `controller`
-→ `routes` → the mount line and the registration line → `contract` → `check`. Start by
-copying the shipped reference module and its `models/` directory and renaming `module` →
-`<name>`; drop the files the module does not need.
+→ `routes` → the mount line and the registration line → `contract` → `check`. Copy
+the shipped reference entity and its `models/` directory and rename `entity` →
+`<name>`; drop the files the entity does not need.
 
-The file names, the helpers and the worked example are in `backend/AGENTS.md › Adding a
-module`.
+The file names, helpers and worked example are in `backend/AGENTS.md › Adding an
+entity`.
 
-## Crossing a module boundary
+## Crossing an entity boundary
 
-A module's public API is the rules its controller exports. Another module, a job, a
-subscriber or a script calls those and nothing else of the module: never its service,
-router or storage mapping. The language's tool refuses the import; a flow that spans modules
+An entity's public API is the rules its controller exports. Another entity, a job, a
+subscriber or a script calls those and nothing else of the entity: never its service,
+router or storage mapping. The language's tool refuses the import; a flow that spans entities
 composes controllers.
 
 - Signatures: a scalar identifier is positional (`getPost(id)`); anything else is one
   object with named parts (`listPost({ query })`, `createPost({ input, caller })`), so
   adding a part never changes an operation's shape.
-- Types cross everywhere, behaviour only through controllers: any module file may import
-  another module's schema as a type; only a controller or a schema imports it as a value.
+- Types cross everywhere, behaviour only through controllers: any entity file may import
+  another entity's schema as a type; only a controller or a schema imports it as a value.
 - A rule forwards the caller it received to every rule it calls; each callee authorizes. A
-  public operation simply takes no caller. An operation that skips the authorization a
+  public operation takes no caller. An operation that skips the authorization a
   caller would get (a job; a webhook after its adapter verified the signature) is a
   separate, named system operation, never a fallback for a missing caller.
-- Each rule call is its own unit of work, so a cross-module flow is not atomic. A flow that
-  must be atomic lives inside one module: a transaction belongs to that module's
+- Each rule call is its own unit of work, so a cross-entity flow is not atomic. A flow that
+  must be atomic lives inside one entity: a transaction belongs to that entity's
   controller, which calls its service inside it.
 - No cycles: `auth → user → auth` is forbidden. Lift the shared operation into one of the
-  two modules or a third. A module calling two or more other modules' controllers is a
+  two entities or a third. An entity calling two or more other entities' controllers is a
   prompt to look.
 - A controller propagates a callee's error unchanged and may raise its own for a
-  composition rule (a `conflict` between two modules' answers). Neither a controller nor a
+  composition rule (a `conflict` between two entities' answers). Neither a controller nor a
   router builds an error body: the error handler does.
 - Events are published from a controller; handlers run detached, so a test that observes a
   reaction waits for them to drain (`writing-tests` skill).
@@ -98,7 +98,7 @@ A server template ships authentication behind its `auth` flag; a product starts 
 `.doc/architecture.md` (Auth) states the model and `backend/AGENTS.md` (Authentication)
 says where its rules live. When that section says Auth: none, every endpoint is public, no
 caller or role exists, and the rules below apply once a plan adds accounts. The gate and
-helper names are in `backend/AGENTS.md › Adding a module`.
+helper names are in `backend/AGENTS.md › Adding an entity`.
 
 - The route gate is declarative and fails fast: no valid credentials is 401, a wrong role
   is 403 (a role gate authenticates first). An optional-auth endpoint mounts the resolver
@@ -107,7 +107,7 @@ helper names are in `backend/AGENTS.md › Adding a module`.
   closed. A rule that takes a caller acts only on that caller's own data; authorization
   failures are `forbidden`, and ownership compares the caller with the record.
 - An operation without a caller is a system operation and is named so. Only other
-  modules, jobs and scripts call it; no router does.
+  entities, jobs and scripts call it; no router does.
 - Access tokens are short-lived and stateless, valid until expiry even after logout.
   Refresh tokens are kept as a hash in a session record and rotated on every use; the
   replay of the previous token within a short grace window is a concurrent retry and
@@ -121,7 +121,7 @@ helper names are in `backend/AGENTS.md › Adding a module`.
 ## Contract flow
 
 1. The plan's Contract table is the agreement.
-2. The backend implements it, mounts and registers the module in the one place the package
+2. The backend implements it, mounts and registers the entity in the one place the package
    names, and runs the server's `contract` command, which produces the OpenAPI document (a
    test fails when it is stale).
 3. The frontend runs its `contract` command, which regenerates its types from that

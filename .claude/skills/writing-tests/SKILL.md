@@ -43,7 +43,7 @@ report says why (`Tests first: after the fact — <reason>`); QA judges the reas
 - Every rule and state transition.
 - Every endpoint: happy path returning the schema's shape and status, validation failure
   (400 envelope with `details`), not found (404), and auth or tenancy denial when the
-  endpoint has one. A module test asserts its own codes and does not repeat the shared
+  endpoint has one. An entity test asserts its own codes and does not repeat the shared
   error-mapping test.
 - Every user journey the task adds, as one e2e test.
 - Every bug fix, with a regression test that fails before the fix.
@@ -57,7 +57,7 @@ otherwise the data-layer task's scaffold records it. `verify` runs `testDb` wher
 it.
 
 - Server: HTTP tests import the app builder and never start infrastructure or the
-  entry file. A module's tests live in one file; gates, shared capabilities and
+  entry file. An entity's tests live in one file; gates, shared capabilities and
   infrastructure units get a file each, with no HTTP. Messages (mail, sms) are observed
   through a capturing provider registered at its boundary, never a module mock. An event
   reaction is observed after the action by waiting for the detached handlers to drain; the

@@ -77,9 +77,9 @@ Never run a scaffolder inside an existing package, except one the package's `AGE
 A package exists when the product needs it: the bootstrap creates the first, `scripts/scaffold.mjs`
 adds later ones.
 
-- Server: `config/`, `api/<module>/` (`routes`, `controller`, `schema`, `service`), `models/`,
-  `middleware/`, `services/`, `infra/`. Modules meet only through controllers; never import
-  another module's service.
+- Server: `config/`, `api/<entity>/` (`routes`, `controller`, `schema`, `service`), `models/`,
+  `middleware/`, `services/`, `infra/`. Entities meet only through controllers; never import
+  another entity's service.
 - Frontend: `<frontend>/` names its type: `site`, `platform`, `app` (`app-<tool>` when several)
   or `admin`; older: `frontend`. Layers, import direction and where an addition goes: its
   `AGENTS.md`; lint enforces the direction.

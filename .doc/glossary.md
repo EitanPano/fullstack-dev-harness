@@ -9,15 +9,15 @@ docs use these words and no synonyms. Add a term here before using it anywhere e
 | --- | --- | --- |
 | session | A refresh-token record: hashed token, rotation state, expiry | table `session`, model `session` <!-- auth --> |
 | caller | The authenticated principal on a request: `{ id, role, sessionId }` | the resolved caller <!-- auth --> |
-| OTP | A six-digit one-time code sent to a target; valid 10 min, 5 attempts | module `auth` <!-- auth --> |
+| OTP | A six-digit one-time code sent to a target; valid 10 min, 5 attempts | entity `auth` <!-- auth --> |
 | target | An email or phone a message or OTP is sent to: `{ type, value }` | OTP endpoints, the user entity's public type (`ContactTarget`); the communicate layer calls the address `to` <!-- auth --> |
-| module (reference) | The shipped CRUD module `api/module/` that a developer copies | `api/module/`, `models/module/` |
-| <!-- FILL: term --> | <!-- FILL: one-line definition --> | <!-- FILL: table `x`, route `/api/x`, module `x` --> |
+| entity (reference) | The shipped CRUD entity `api/entity/` that a developer copies | `api/entity/`, `models/entity/` |
+| <!-- FILL: term --> | <!-- FILL: one-line definition --> | <!-- FILL: table `x`, route `/api/x`, entity `x` --> |
 
 ## Actions
 
-A frontend module is named as its package's `AGENTS.md` says: it mirrors a server module or a
-screen group (`pages/<noun>`; Next: `app/(site)/<noun>`), so it shares the server module's noun.
+A frontend page folder is named as its package's `AGENTS.md` says: it mirrors an entity or a
+screen group (`pages/<noun>`; Next: `app/(site)/<noun>`), so it shares the entity's noun.
 The glossary still lists each action beside the nouns, in the same table.
 
 ## Rules

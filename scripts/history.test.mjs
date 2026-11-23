@@ -26,7 +26,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const mixed = [
   '# Doc',
   '| session | A record | table `session` <!-- auth --> |',
-  '| module | Reference | `api/module/` |',
+  '| entity | Reference | `api/entity/` |',
   '<!-- auth-start -->',
   '- Default: JWT',
   '<!-- auth-end -->',
@@ -103,7 +103,7 @@ function seed(root) {
   }
   writeFileSync(
     path.join(root, '.doc', 'glossary.md'),
-    '| Term |\n| session | s <!-- auth --> |\n| module | m |\n',
+    '| Term |\n| session | s <!-- auth --> |\n| entity | m |\n',
   )
   writeFileSync(path.join(root, '.doc', 'architecture.md'), mixed.replace(/\n/g, '\r\n'))
 }
@@ -122,7 +122,7 @@ test('resolveAuthText touches only the .doc files', () => {
   ])
   const glossary = readFileSync(path.join(root, '.doc', 'glossary.md'), 'utf8')
   assert.ok(!glossary.includes('session'))
-  assert.ok(glossary.includes('| module | m |'))
+  assert.ok(glossary.includes('| entity | m |'))
   const arch = readFileSync(path.join(root, '.doc', 'architecture.md'), 'utf8')
   assert.ok(!/(?<!\r)\n/.test(arch))
   assert.ok(arch.includes('- Auth: none. No accounts.'))
