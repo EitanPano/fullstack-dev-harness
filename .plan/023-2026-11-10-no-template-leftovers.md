@@ -1,8 +1,8 @@
 # No template leftovers: a brief-driven shell, no example screen
 
-Status: active
+Status: done
 Owner: Eitan
-Last updated: 2026-11-11
+Last updated: 2026-11-23
 Input: ADR 0010 at the catalog's `docs/adr/0010-no-chrome-no-example-screen.md` on `feat/no-chrome`
 (accepted by Eitan on 2026-11-10: "accept the ADR"): D1 the skeleton, D2 the components the product places, D3 no example
 screen, D4 sign out, D5 tests, D6 documents, D7 release, D8 the harness, spike S0.
@@ -320,3 +320,5 @@ Waves: C0 → C1 → (C2 ∥ C3 ∥ C4) → C5 → C6. H1 runs from G1 in parall
   changelog entries 2026-11-11; #31 → `main` 28d557c, tagged `v1.10.0` from the ledger's release
   notes (release run 42958874812). R18 to R28 reached `main` on that word, not on a separate
   ratification. H3: this `catalog.lock` bump to v1.10.0 / 28d557c; `minCatalog` stays v1.5.0.
+- 2026-11-23 — Closed: shipped in catalog `v1.10.0`. Left open: V10 (P1) and H2, this plan's
+  "As built".
