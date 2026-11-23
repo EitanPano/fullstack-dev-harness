@@ -31,6 +31,6 @@ Applies to every frontend package.
   footer and the place of each ready-to-place control are product code, built only as the
   plan's `shell` line says (`ui-design › Shell`). A page renders inside `main`; a top-level
   one adds a nav-table entry, never a landmark set.
-- The brief is `.doc/product-definition.md › Design`; a `figma:<url>` backlog marker overrides
-  it for that task. The generator applies the brand values at the bootstrap; changing them
+- The brief is `.doc/product-definition.md › Design` plus `<frontend>/.doc/design.md`; a `figma:<url>` backlog marker overrides
+  it. The generator applies the brand values at the bootstrap; changing them
   later edits the tokens, by plan only.

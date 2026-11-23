@@ -56,19 +56,19 @@ on `/api/admin/*`). A product with no frontend writes "none".
 
 ## Design
 
-The brief every frontend task follows (`.claude/rules/ui-and-styling.md`); a `figma:<url>`
-backlog marker overrides it for one task. The bootstrap passes the display name, colours,
-radius, type, density and default theme to the frontend generator as flags.
+The brand every frontend shares; each frontend's look is in `<frontend>/.doc/design.md`, and
+the two are the brief a frontend task follows (`.claude/rules/ui-and-styling.md`). A
+`figma:<url>` backlog marker overrides it for one task. The bootstrap passes the display name,
+colours, radius, type, density and default theme to the frontend generator as flags; density
+and default theme are the product's defaults, and a frontend's `design.md` may state its own.
 
 - Tone: <!-- FILL: two or three adjectives, e.g. calm, dense, playful -->
-- Reference apps: <!-- FILL: one to three products whose layout and look are the target (the shell follows them), or "none" -->
 - Display name: <!-- FILL: the product name shown in the page title and where the design puts it -->
 - Primary colour: <!-- FILL: one hex value, e.g. #1d4ed8 -->
 - Neutral colour: <!-- FILL: one hex value, e.g. #64748b -->
 - Radius: <!-- FILL: sm | md | lg -->
 - Type: <!-- FILL: system | inter -->
 - Density: <!-- FILL: comfortable | compact -->
-- Primary viewport: <!-- FILL: phone first | desktop first; the breakpoints that matter -->
 - Default theme: <!-- FILL: system | light | dark; the theme toggle always ships -->
 
 ## Acceptance Criteria
@@ -85,5 +85,6 @@ reports against it.
 
 - [ ] No `FILL` marker remains in Purpose, Target Users, Product Scope, Auth and Tenancy,
       Frontends, Design or Acceptance Criteria.
-- [ ] `.doc/architecture.md` has its data model and API sections filled.
+- [ ] `<server package>/.doc/architecture.md` has its Data Model and API sections filled (no
+      server: n/a).
 - [ ] `.doc/glossary.md` names every entity used above.

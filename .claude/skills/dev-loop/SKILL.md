@@ -139,9 +139,9 @@ id and (frontend) the figma URL if any.
    idempotently regenerates the README's Configuration block. In `README.md`'s
    Features, remove the ` (planned)` suffix from the line the plan's Goal delivers; add a line
    only when the Goal adds or changes a user-visible capability and no line matches
-   (infrastructure-only tasks add none). Write `.doc/architecture.md`'s change-log entry from the
-   plan's Contract, data model and routes, and apply the reports' `Glossary:` and `Docs:` lines
-   (only the driver writes `.doc/`): terms to `.doc/glossary.md`, a `Deploy mode` line to
+   (infrastructure-only tasks add none). Apply the reports' `Glossary:` and `Docs:` lines
+   (here the driver writes root `.doc/` only; a package's agent wrote its own): terms to
+   `.doc/glossary.md`, a `Deploy mode` line to
    Operational Concerns › Deployment. Then run
    `node scripts/verify.mjs --plan <plan> --reuse`. Red goes back to the owner by file as a
    SendMessage continuation and counts as a fix round. A `retired-terms` hit on a legitimate
@@ -217,7 +217,7 @@ file, remove an untracked one yourself. Collect every P0 and P1 finding and QA's
 
 ## 6. Finish
 
-1. Bring the section 3 `.doc/` entries in line with the fix rounds.
+1. Check the package change-log lines and the section 3 root `.doc/` entries still match the fix rounds.
 2. Set the plan to `Status: done` and move the backlog line under `## DONE` with the date.
 3. Run `verify --reuse` last; it re-runs on the changed tree and must pass on the tree that
    will be committed.

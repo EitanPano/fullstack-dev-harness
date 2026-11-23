@@ -7,7 +7,7 @@ description: Choose, add or change the data layer or the cache store. Use when c
 
 The server template ships an in-memory store behind two file seams, one for the database
 and one for the cache; nothing survives a restart. The engine is chosen once, in the
-bootstrap, and recorded in `.doc/architecture.md` under Data store. Everything under "Every
+bootstrap, and recorded in `backend/.doc/architecture.md › Data Store` (the root file where a package has none). Everything under "Every
 engine" holds whatever was chosen. The client library, the files and the scripts are the
 package's: `backend/AGENTS.md › Adding the data layer`. A `serverless/` package's engine is
 its platform's: its `AGENTS.md` is the rule.
@@ -31,9 +31,9 @@ Ask the user one question: Postgres, MongoDB, or decide later.
 - Decide later when the first tasks need no persistence; the orchestrator refuses to plan a
   task that stores data until the section is filled. The in-memory store serves meanwhile.
 
-The Data store answer in `.doc/architecture.md` records the engine the user names (or "decide
-later") and the client library (for example "Postgres 17 with an ORM"). Whether the server
-template lists a provider is a separate fact. When it lists one for the engine, the bootstrap
+The Data Store answer records the engine the user names (or "decide
+later") and the client library. When the server
+template lists a provider for the engine, the bootstrap
 generates it wired (`--capability database=<id>`): that is the data-layer task already done, and
 no such task is written. The package's `AGENTS.md › Adding the data layer` describes what exists,
 and the rules under "Every engine" and "What the shipped code assumes of the store" still bind
@@ -79,7 +79,7 @@ properties, or a race the memory store hides reaches production:
   declaration. Engines that define models in code keep the storage mapping in the entity,
   written so the type checker holds it to that type; engines whose model is the migration
   history keep one schema file and map rows to the type in the data-access file.
-  `.doc/architecture.md` Data Model lists the same entities in prose; the code wins on
+  That file's Data Model lists the same entities in prose; the code wins on
   conflict.
 - **Store access in one place.** The db and cache seams are imported only by an entity's
   data-access and storage-mapping files, by shared capabilities and by `infra/`; lint
@@ -132,7 +132,7 @@ database and flushes only that. A test opts in through the database block the
 package's `AGENTS.md › Tests` names, which resets the test database before each test. Never
 fake a data-access file with a process-global module mock. In production a human or the
 deploy pipeline runs `migrate` before the new image serves traffic; record who in
-`.doc/architecture.md`.
+root `.doc/architecture.md`.
 
 ## Engines
 

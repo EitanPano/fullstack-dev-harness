@@ -9,8 +9,8 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 ## Security
 
 - Never commit or expose secrets (tokens, keys, passwords, connection strings).
-- Real secrets live in the shell environment or a secret manager, never in the working
-  tree. `.env.example` files hold placeholders only.
+- Real secrets live in the shell environment or a secret manager, never the working
+  tree. `.env.example` holds placeholders only.
 
 ## Guardrails
 
@@ -37,7 +37,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 | `README.md` | The product's README | Setup, loop |
 | `AGENTS.md`, `CLAUDE.md` | These rules, and their loader | Harness |
 | `.claude/README.md` | The harness manual | Harness |
-| `.doc/` | Product definition, architecture, glossary, conventions | Humans, bootstrap, driver |
+| `.doc/`, `<package>/.doc/` | Product-wide docs; a package's own | Humans, bootstrap, driver; package agent |
 | `.plan/000-backlog.md` | The task queue | Humans, loop |
 | `.plan/NNN-YYYY-MM-DD-*.md` | One plan per task | Driver |
 | `.claude/` | `agents/`, `skills/`, `rules/`, `hooks/`; `harness.json`, the file manifest | Harness |
@@ -46,7 +46,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 | `scripts/` | `verify.mjs`, `readme.mjs`, `guidance.mjs`, `harness-update.mjs`, `scaffold.mjs`, `catalog.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
 | `<frontend>/`, `backend/` or `serverless/<provider>/` | Generated packages | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | Compose stack, database init | Backend agent |
-| `.orchestrate/<slug>/` | Loop output per task: draft `plan.md`, reports, `ticket.md`, verify results, review diffs | The loop |
+| `.orchestrate/<slug>/` | Per task: draft `plan.md`, reports, `ticket.md`, verify results, review diffs | The loop |
 
 Never create a `docs/` directory. `.orchestrate/` is git-ignored except its README.
 
@@ -63,7 +63,7 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 | --- | --- |
 | `install` | Dependencies from the lockfile. |
 | `dev` | Development server with reload. |
-| `start` | Run the server once, no file watcher; a frontend's e2e starts the API with it. |
+| `start` | Run the server once, no watcher; a frontend's e2e starts the API with it. |
 | `check` | Every gate, no Docker; exit 0 is done. |
 | `typecheck`, `lint`, `format` | One gate; the layer-boundary lint; rewrite files. |
 | `test`, `testDb`, `e2eDb`, `testE2e` | Unit; suite on the test database; prepare the e2e database; e2e with accessibility scan. |
@@ -103,18 +103,18 @@ Done means every item holds, with evidence.
 
 1. `node scripts/verify.mjs --plan <plan> --reuse` exits 0: each touched package's `check`
    (and `testDb`, none skipped) and the e2e suite. Evidence: `.orchestrate/<slug>/verify.json`.
-   A run with `--package` or `--no-e2e` is partial and never stands in for it.
+   A run with `--package` or `--no-e2e` is partial, never a substitute.
 2. Every new behaviour has a happy-path unit test and a failure or empty one, with the red run
    in the report (`Tests first:`). Every new user journey has an e2e test (with a frontend).
-3. No test was deleted, skipped or focused. `verify` enforces the focus and skip spellings;
+3. No test was deleted, skipped or focused. `verify` enforces focus and skip spellings;
    QA checks deleted tests and filtered gate commands. Justify each in a report.
 4. Errors follow `error-handling`. No secrets, stack traces or query text leave the server.
 5. A schema or endpoint change ran both `contract` commands and committed both results; a
    data-model change ships what `database` requires and passes `testDb`.
 6. UI changes meet the frontend's `AGENTS.md › Styling`; the frontend reports `UI pass:`,
    QA `UX:` (open rubric findings are P2); the accessibility scan passes.
-7. `.doc/architecture.md` logs changes to routes, auth boundaries or the data model; new
-   domain terms are in `.doc/glossary.md`.
+7. `<package>/.doc/architecture.md` (the root file where a package has none) logs the
+   change, one line citing its plan; new domain terms are in `.doc/glossary.md`.
 8. Review reports no open P0 or P1 finding.
 9. Root `README.md` Features names each user-visible capability the change touches;
    `node scripts/readme.mjs --configuration` regenerates its Configuration block.
@@ -137,8 +137,8 @@ Done means every item holds, with evidence.
 
 ## Product and domain
 
-- Product and acceptance criteria: `.doc/product-definition.md`; architecture decisions and
-  change log: `.doc/architecture.md`; domain terms: `.doc/glossary.md`. A project's own agent
-  rules: `.doc/conventions.md`; harness updates never change it.
-- A section still holding a `<!-- FILL: … -->` marker is undecided. The orchestrator
-  asks first, never plans against it.
+- Product and acceptance criteria: `.doc/product-definition.md`; architecture:
+  `.doc/architecture.md`; domain terms: `.doc/glossary.md`; a package's own: `<package>/.doc/`.
+  Project agent rules: `.doc/conventions.md`, never changed by harness updates.
+- A section holding a `<!-- FILL: … -->` marker, in either folder, is undecided. The
+  orchestrator asks first, never plans against it.
