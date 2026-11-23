@@ -7,7 +7,7 @@ the Compose service, URL variable, `Resource` connection, db seam, migration scr
 database, and records `testDb`, `migrate` and `e2eDb` in `.fullstack/catalog.yaml`. The task
 delivers:
 
-1. Every module's data-access file rewritten against the seam, and any shared file that keeps
+1. Every entity's data-access file rewritten against the seam, and any shared file that keeps
    its own queries. Signatures stay; bodies change.
 2. The product's models on it: the first migration (or the index definitions) and one test
    proving the test database is the one in use.

@@ -83,7 +83,7 @@ In this order, with these exact headings:
 
   A plan whose `UX` names a route opens it with the template's `shell` line
   (`ui-design › Shell`).
-- `Steps`: per package, one line per module or feature.
+- `Steps`: per package, one line per entity or feature.
 - `Changes during the task` is empty at the start; the driver writes it.
 
 ## Content rules
