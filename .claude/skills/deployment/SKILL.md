@@ -152,19 +152,20 @@ Every `docker compose` command below that inspects or stops the stack (`config`,
 
 ## 5. Recording the change
 
-Three edits in `.doc/architecture.md`, none to `.fullstack/catalog.yaml`:
+Two edits in root `.doc/architecture.md`, one in `backend/.doc/architecture.md` (the root file
+where a package has none), none to `.fullstack/catalog.yaml`:
 
 1. Operational Concerns › Deployment › `Deploy mode`: the new mode.
 2. The same list's `TRUST_PROXY hop count` line: the local default becomes `false` in `single`
    and `1` in `split`. The production half is the user's answer (section 6).
-3. Change Log (newest first, so the new line goes at the top of the dated list): one line,
+3. `backend/.doc/architecture.md › Change Log` (newest first): one line,
    `- YYYY-MM-DD: deploy mode <old> to <new>; local TRUST_PROXY <old> to <new>; plan <NNN>.`
    Write `plan <NNN>` only when a plan exists; with none, write `no plan` (or the user's
    request in a few words).
 
-Who writes them: a driver session applies them itself, in the same change. A role agent
-cannot write `.doc/`: it lists the three lines in its report's `Docs:`, and the driver applies
-them before the review (`dev-loop` section 3).
+Who writes them: a driver session applies all three in the same change. The backend agent writes
+the third and lists the first two in its report's `Docs:`; the driver applies them before the
+review (`dev-loop` section 3).
 
 ## 6. TRUST_PROXY
 
@@ -253,5 +254,5 @@ stance.
 
 - Edit `deploy:` in `.fullstack/catalog.yaml`.
 - Switch a server-rendered frontend to `single`.
-- Leave the mode change without its `Deploy mode`, local `TRUST_PROXY` and change-log lines in
-  `.doc/architecture.md` (section 5).
+- Leave the mode change without its `Deploy mode`, local `TRUST_PROXY` and change-log lines
+  (section 5).

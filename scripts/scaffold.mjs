@@ -218,7 +218,7 @@ function removeTemp(tmp) {
 // The commands come from the project's own merged provenance, never from state.json.
 function conclude(root, options, catalog, parts) {
   const provenance = readYaml(path.join(root, '.fullstack', 'catalog.yaml'))
-  finish(root, provenance, catalog, completeCommand(options))
+  finish(root, provenance, catalog, completeCommand(options), parts)
   removeState(root, options.slug)
   console.log(`\nchore(scaffold): add ${parts.join(', ')}`)
   return 0

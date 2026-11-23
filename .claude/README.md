@@ -25,7 +25,7 @@ replaced on an update.
    run in parallel. P0 and P1 findings go back to the implementer, at most two fix rounds, each
    re-reviewed on its own diff. QA adds adversarial tests, runs a UX pass over the same
    screenshots, and checks each acceptance criterion with evidence.
-6. The driver writes the change log, updates the root `README.md` (Features, and the
+6. The driver updates the root `README.md` (Features, and the
    Configuration block with `node scripts/readme.mjs --configuration`), runs `verify` once more
    on the final tree, and checks that `git write-tree` equals the verified tree. Then you decide
    whether to commit. Role agents never commit, merge, push or rewrite history; the driver commits
@@ -111,15 +111,16 @@ permission before it runs (`permissions.ask`).
   - the release's `minCatalog` is newer than the project's `catalog.lock`; it names the newest
     release the project can take;
   - a harness file has local edits, unless `--overwrite` is given.
-- **Safety:** it sends each hook three benign calls (a Read, a `git status`, an Edit) after
+- **Safety:** it sends each hook three benign calls after
   writing, and restores the previous files if one fails. It also refuses a release or a record
   whose `format` it does not know.
 - **Leftovers:** the backup goes to the OS temp directory and release clones to the cache path
-  above. Neither is cleaned automatically; the backup path is printed on every run.
+  above. Neither is cleaned automatically; every run prints the backup path.
 - **Merges:** in `.claude/settings.json` it keeps the project's own `permissions.allow` and
   `permissions.deny` entries.
-- **Advice:** it prints the upstream diff of seeded project files (such as the product-definition
-  form) as advice, and never applies it.
+- **Advice:** it prints the upstream diff of seeded project files (such as the product
+  definition) and never applies it.
+- **Existing project:** run `node scripts/package-doc.mjs`, then move the sections by hand.
 - **Version record:** `.fullstack/harness.json` records the installed harness version.
 
 A lock bump changes only what the next bootstrap generates. A generated project keeps its packages

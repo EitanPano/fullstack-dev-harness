@@ -13,13 +13,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import {
-  authFlagFrom,
-  finishProject,
-  resolveAuthMarkers,
-  resolveAuthText,
-  writeProjectReadme,
-} from './history.mjs'
+import { resolveAuthMarkers } from './auth-markers.mjs'
+import { finishProject, resolveAuthText, writeProjectReadme } from './history.mjs'
+import { authFlagFrom } from './provenance.mjs'
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -669,4 +665,35 @@ test('finishProject warns about harness files modified against HEAD', () => {
   put(root, 'AGENTS.md', 'my rules\n')
   const { warnings } = finishProject(root)
   assert.match(warnings.join('\n'), /AGENTS\.md[^\n]*(modified|harness content)/)
+})
+
+function packageRoot(template, text) {
+  const root = tempRoot()
+  mkdirSync(path.join(root, '.fullstack'))
+  const web = 'web:\n    template: frontend/react\n'
+  const catalog = `packages:\n  api:\n    template: ${template}\n  ${web}`
+  writeFileSync(path.join(root, '.fullstack', 'catalog.yaml'), catalog)
+  for (const dir of ['api', 'web']) {
+    mkdirSync(path.join(root, dir, '.doc'), { recursive: true })
+    writeFileSync(path.join(root, dir, '.doc', 'architecture.md'), text)
+  }
+  return root
+}
+const packageDoc = (root, dir) =>
+  readFileSync(path.join(root, dir, '.doc', 'architecture.md'), 'utf8')
+
+test('resolveAuthText resolves a server package architecture file and not a frontend one', () => {
+  const root = packageRoot('server/bun-express', mixed)
+  const { docs } = resolveAuthText(root, { auth: false })
+  assert.deepEqual(docs, ['api/.doc/architecture.md'])
+  assert.ok(packageDoc(root, 'api').includes('- Auth: none. No accounts.'))
+  assert.ok(!/<!-- (no)?auth/.test(packageDoc(root, 'api')))
+  assert.ok(packageDoc(root, 'web').includes('<!-- auth'))
+})
+
+test('resolveAuthText keeps a serverless package auth block without its markers', () => {
+  const root = packageRoot('serverless/cloudflare', mixed)
+  resolveAuthText(root, { auth: true })
+  const text = packageDoc(root, 'api')
+  assert.ok(text.includes('- Default: JWT') && !text.includes('<!-- noauth'))
 })

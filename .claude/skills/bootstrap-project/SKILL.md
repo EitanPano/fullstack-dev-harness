@@ -33,15 +33,16 @@ tokens, and the last sections are the commit gate.
 A brief may answer the forms: purpose, scope, authentication and roles, design, data store, data
 model, glossary, stack, flags, deploy mode, tracker, backlog lines.
 
-1. Fill every form from it, in the user's words: `.doc/product-definition.md` (Design included),
-   `.doc/architecture.md` and `.doc/glossary.md`. Fill the markers the walk below asks about;
-   leave the ones section 5 writes. Map the `Server:` line and each stack, flag, capability,
+1. Fill the root forms from it, in the user's words: `.doc/product-definition.md` (Design
+   included), `.doc/architecture.md` and `.doc/glossary.md`. Fill the markers the walk below
+   asks about; leave the ones section 5 writes, the package forms among them (the scaffold
+   seeds their files). Map the `Server:` line and each stack, flag, capability,
    deploy-mode and brand answer to its scaffold flag (sections 2 and 3).
 2. Collect every gap: a marker the brief does not answer, a value the catalog cannot take, a
    clash with the glossary. Ask them all in one message, each with the skill's default or
    recommendation; do not walk the sections. Infer the `Frontends` row and the `Server:`
    answer from the brief; ask either in the gap message only when the brief is silent. Write
-   both into the product definition; they decide the frontend and the server (section 2).
+   both into the product definition (they decide the stack, section 2).
 3. Compare the brief with the template gaps below.
 4. Show one summary to confirm: the forms, the stack (or the lone frontend) and its flags, the
    database capability, the deploy mode, the brand (every flag with its value, display name
@@ -51,9 +52,9 @@ model, glossary, stack, flags, deploy mode, tracker, backlog lines.
 `user` and `admin`, a password of 8 to 128 characters. Each difference in the brief's entity
 names, roles or password rule is a gap:
 
-- Record it in the summary and in `.doc/architecture.md › Auth` as a decision for the first task
-  that needs it (e.g. "roles `member` and `staff` replace `user` and `admin`; decided in the task
-  that adds the first gate"). Change no template code.
+- Record it in the summary and, in section 5, in the server's `<package>/.doc/architecture.md ›
+  Auth` as a decision for the first task that needs it (e.g. "roles `member` and `staff` replace
+  `user` and `admin`; decided in the task that adds the first gate"). Change no template code.
 - That task's plan carries `Retired:` with the template's old terms (`writing-plans`), role
   values in literal form (`'admin'`, `UserRole.admin`), never a bare word like `user`.
 - After section 3, confirm the defaults in the generated package: entity and gates in its
@@ -66,31 +67,32 @@ Open `.doc/product-definition.md`. For each `<!-- FILL: … -->` marker, in orde
 at a time and replace the marker with the answer, in the user's words. Suggest a default only
 when they ask.
 
-- Ask the `Frontends` row and the `Server:` line with the form; they decide the frontend and
-  the server (section 2). Propose the row's directory: Search and sharing "yes" is `site`, or
+- Ask the `Frontends` row and the `Server:` line with the form (section 2 uses
+  them). Propose the row's directory: Search and sharing "yes" is `site`, or
   `platform` with sign-in; "no" is `app`.
 - Walk the `Design` section too; its brand fields become scaffold flags (section 3). A product
   with no frontend answers it "n/a" and writes "none" under `Frontends`.
 - Do the same for `.doc/glossary.md` (one row per entity named in the scope) and
-  `.doc/architecture.md`: other components, other data flows, Data store, Data Model, Data
-  migrations, API versioning, Auth, External Dependencies, Deployment. Leave to section 5, which
-  fills them once the stack is chosen: the Data store's `Local service` line, the `Deploy mode`
-  and `TRUST_PROXY` lines, and the Auth section's Client model marker.
+  `.doc/architecture.md`: other components, other data flows, Data migrations, External
+  Dependencies, Deployment. Leave to section 5, which fills them once the stack is chosen: the
+  `Deploy mode` and `TRUST_PROXY` lines and the Client model marker, and the package files'
+  markers.
 
 **Data store.** Skip with `Server: later`. Otherwise ask the `database` skill's question: engine,
 client library, or decide later. Record the answer as given (the named engine or "decide later",
-plus the client library). Whether the server template lists that engine as a provider is a separate
-fact, settled in section 2; when it does, the generator wires it and section 5 fills the Data store
-section from what was generated.
+plus the client library) for section 5. Whether the server template lists that engine as a
+provider is a separate fact, settled in section 2; when it does, the generator wires it and
+section 5 fills the package's Data Store section from what was generated.
 
 **Auth.** Scaffold a product with no accounts (Auth: none) with `--flag auth=false`; any other
 answer keeps the server template's authentication (`auth` on, the default). The scaffold resolves
-the `auth` markers in `.doc/architecture.md › Auth` (section 3): under `none` it keeps "Auth:
-none", so answer no FILL marker inside an `<!-- auth-start -->` block. Never edit the glossary's marked auth rows (`session`, `caller`,
+the `auth` markers in the server's `<package>/.doc/architecture.md › Auth` (section 3): under
+`none` it keeps "Auth: none". Never edit the glossary's marked auth rows (`session`, `caller`,
 `OTP`, `target`): the scaffold removes them under `none` and keeps them otherwise.
 
-Stop when the product definition's "Ready to plan" checklist is satisfied. Do not scaffold while
-a marker remains in a section the checklist names.
+Stop when the first and third boxes of the product definition's "Ready to plan" hold; the second
+needs the server package (section 5). Do not scaffold while a marker remains in a section they
+name.
 
 ## 2. Choose the stack
 
@@ -101,8 +103,8 @@ node scripts/bootstrap.mjs --fetch
 It prints `catalog: <path>`, then `index.yaml`. Do not present the whole `stacks:` list. Read each
 stack's `<catalog>/stacks/<id>/stack.yaml` (its `packages:` list: a `template` path and a `dir`
 each) and each package's `<catalog>/<template path>/template.yaml`. Read nothing else under the
-catalog path: never Glob, Grep, list or explore the catalog cache, and never dispatch an Explore
-agent into it. It is outside the working tree on purpose.
+catalog path (outside the working tree on purpose): never Glob, Grep, list or explore it, and
+never dispatch an Explore agent into it.
 
 Narrow by the row's Search and sharing answer, deciding by the `static` declaration, never by a stack
 id:
@@ -121,7 +123,7 @@ store "decide later".
 
 Ask each remaining choice in turn: the frontend framework when the kept stacks differ in it (name
 the options by template id: `frontend/react`, `frontend/angular`, `frontend/vue`), then the
-server. Show the chosen stack with its reason (e.g. "single-page app: no public page needs search")
+server. Show the chosen stack with its reason
 and accept an override. Ask every flag the templates declare (show its `summary` and
 `default`) and every capability that lists providers. Map the answers to
 `--flag <name>=<true|false>` and `--capability <kind>=<provider>`.
@@ -146,8 +148,8 @@ layer` names it): tell the user and confirm. On a yes, pass `--capability databa
 no data-layer line. On a no, pass no capability and write that line.
 
 **Tools.** Before scaffolding, check each chosen template's `tools` (name and minimum version, in
-its `template.yaml`) against the machine, e.g. `uv --version` for a Python backend. Name any
-missing or old tool, the version found and the minimum, then stop; do not scaffold.
+its `template.yaml`) against the machine. Name any
+missing or old tool, the version found and the minimum, and stop.
 
 ## 3. Scaffold
 
@@ -177,17 +179,16 @@ flags from the `Design` form; pass only the fields that hold a value:
 - Convert a named colour (e.g. "a cool neutral grey") to a hex and write it into the Design form.
   Map a free-text answer to an enumerated field to the nearest allowed value (Type "Roboto"
   becomes `system` or `inter`) and state the mapping to the user.
-- Show every brand value with the stack and deploy mode (section 2) before scaffolding, so an
-  unattended run does not stall.
+- Show every brand value with the stack and deploy mode (section 2) before scaffolding.
 - When the generator rejects a brand value (an invalid hex, enum or name, or a colour pair it
   cannot make pass contrast) it names the flag: report it, ask for another value, re-run.
-- `Tone`, `Reference apps` and `Primary viewport` have no flag; the plans' `UX` lines read
-  them.
+- `Tone` has no flag; the plans' `UX` lines read it.
 - `node scripts/bootstrap.mjs --help` prints the usage and every flag.
 
 The run:
 
-- Creates the packages the stack lists, under the directories it names; a merged
+- Creates the packages the stack lists, under the directories it names, and seeds each one's
+  `.doc/` (`node scripts/package-doc.mjs`); a merged
   `docker-compose.yml` (none for a lone frontend) and `.gitignore`; `.editorconfig` when absent; and
   `.fullstack/catalog.yaml`, the provenance file (per package: template, version, flags,
   capabilities, commands and ports; plus the top-level `providers` map, empty when none was
@@ -201,7 +202,7 @@ The run:
 - Refuses to run twice.
 
 A failure before the move leaves nothing to clean: the generator stages the output and moves it
-into place all or nothing (a failed move is rolled back). The auth-text step runs after the move:
+into place all or nothing. The auth-text step runs after the move:
 a failure there leaves the scaffold in place and the message names the recovery
 (`node scripts/history.mjs <root> [--auth=false]`).
 
@@ -223,8 +224,8 @@ node scripts/verify.mjs --out .orchestrate/bootstrap
   Playwright installs its own browser revision.
 - `verify` can outlive the Bash tool's timeout: run it with `run_in_background: true` and wait
   for the completion notification.
-- While `verify` runs, edit nothing in the working tree (no form edits, no file writes): it
-  hashes the tree, and a concurrent edit fails or invalidates the run.
+- While `verify` runs, edit nothing in the working tree: it
+  hashes the tree, and a concurrent edit invalidates the run.
 - `verify` runs the gates of every package in `.fullstack/catalog.yaml`, with no base because the
   scaffold is not committed yet, and must exit 0. On failure, fix the cause (not the gate),
   re-run, and tell the user what was wrong. A failing gate on a fresh scaffold is a catalog bug:
@@ -236,8 +237,8 @@ node scripts/verify.mjs --out .orchestrate/bootstrap
 `/api/health` answers on that port for an SPA (its dev proxy) and on the server's port for Next.
 
 Stop the dev servers by port. On Windows a `--reload` server leaves its child holding the port
-after the parent is stopped, and the port's owner is then the dead reloader, so stop the owner
-and its children (replace 8000 with the package's port):
+after the parent stops, so stop the port's owner and its children (replace 8000 with the
+package's port):
 
 ```powershell
 $o = (Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess | Select-Object -Unique; Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -in $o -or $_.ParentProcessId -in $o } | ForEach-Object { Stop-Process -Id $_.ProcessId }
@@ -264,8 +265,7 @@ check: `Get-NetTCPConnection -LocalPort <port> -State Listen -ErrorAction Silent
 6. With a provider, run `docker compose start database`, even when the app check failed.
 
 A fresh server package has health, the commented reference entity, and authentication when the
-`auth` flag is on. Its store is in-memory (nothing survives a restart until the data-layer task)
-or, with a provider, the wired engine with its migrations and test database (the package's
+`auth` flag is on. Its store is in-memory or, with a provider, the wired engine with its migrations and test database (the package's
 `AGENTS.md › Adding the data layer`). Production secrets are listed in its `.env.example`;
 development runs with defaults and warns.
 
@@ -279,20 +279,23 @@ Do each item; the dev loop refuses to start until the last one holds.
    `- [ ] add the data layer | stack:backend` for "decide later" (the `database` skill says what
    that task delivers). The first in-scope capability is the first line with a provider, the next line without one. Set `tracker:` in the backlog header to
    `linear` or `none` as the user prefers.
-2. **Architecture rows.** Fill `.doc/architecture.md` per the table in
-   `.claude/skills/dev-loop/scaffold-step.md`: all rows; a lone frontend only `Stack`, and
-   `n/a: no server yet` in the table's other places.
+2. **Architecture rows and package files.** Fill the root `.doc/architecture.md` and the
+   server's `<package>/.doc/architecture.md` per the table in `.claude/skills/dev-loop/scaffold-step.md`:
+   all rows; a lone frontend only `Stack`, and `n/a: no server yet` in the table's other places.
+   Then the server's Data Store (the section 1 answer or what the generator wired), Data Model,
+   API versioning and Auth roles line, and each frontend's `<frontend>/.doc/design.md`
+   (Reference apps, Primary viewport: ask per frontend) and `architecture.md` Roles line
+   ("none" without sign-in).
 3. **README.** In `README.md`, replace `<!-- readme:about -->` with About, written from Purpose
    and Problem Statement, and `<!-- readme:features -->` with Features: the in-scope capabilities
-   from Product Scope, one line each, written `- <capability> (planned)` (nothing is built yet);
+   from Product Scope, one line each, written `- <capability> (planned)`;
    the dev loop removes the ` (planned)` suffix when a task delivers the capability.
-4. **Change Log.** Replace its FILL line in `.doc/architecture.md` with
-   `- <YYYY-MM-DD>: initial architecture accepted; <stack id>, deploy <mode>, <engine or
-   in-memory store>.` (A lone frontend: its template id, no deploy, no store.)
-   Later entries go above it (newest first).
+4. **Change Log.** Replace its `None yet.` in each `<package>/.doc/architecture.md` with
+   `- <YYYY-MM-DD>: initial architecture accepted; <its template id>` (the server's adds
+   `, deploy <mode>, <engine or in-memory store>`). Later entries go above it (newest first).
 5. **Ready to plan.** Three markers may stay open, each until its own decision: the production
    `TRUST_PROXY` (the user's to decide, the `deployment` skill), the production target, and Data
-   migrations when no provider was chosen. Every other marker holds an answer. "Decide later" is
+   migrations when no provider was chosen. Every other marker, in either folder, holds an answer. "Decide later" is
    an answer for the Data store engine alone: a marker the user cannot answer stays, is named in
    the summary, and blocks the first plan that depends on it. Then tick the three boxes of
    `## Ready to plan` in `.doc/product-definition.md`, once each holds.
@@ -304,8 +307,8 @@ Do each item; the dev loop refuses to start until the last one holds.
 3. As the last step before asking to commit, run `node scripts/bootstrap.mjs --finish`. It
    refuses while a `<!-- readme:` placeholder remains (fill it and run again); writes
    `.fullstack/harness.json`, the harness version record; removes the `.gitignore` dev block and
-   the setup files (the bootstrap scripts, this skill). They are then gone: that is expected,
-   and the commit includes the removals.
+   the setup files (the bootstrap scripts, this skill). They are then gone, as expected;
+   the commit includes the removals.
 4. Ask whether to commit the scaffold as `chore(bootstrap): scaffold <project-name>`, including
    `.fullstack/catalog.yaml`; the dev loop starts only from a clean tree, so the first task waits
    for this commit. Commit only on a yes, then point the user to `/dev-loop` for the first task.
@@ -314,8 +317,8 @@ Do each item; the dev loop refuses to start until the last one holds.
 
 - Run any scaffolder inside an existing package.
 - Browse the catalog cache.
-- Edit `scripts/`, `.claude/`, `catalog.lock` or other harness files by hand. The one change
-  there is `--finish`, which removes this skill's files and the setup scripts, as designed.
+- Edit `scripts/`, `.claude/`, `catalog.lock` or other harness files by hand; only
+  `--finish` removes this skill's files and the setup scripts.
 - Create a real env file; secrets stay in the shell environment.
 - Install a database client or start a database service, except the Compose service of a provider
   chosen at generation (section 4).

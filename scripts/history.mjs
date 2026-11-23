@@ -2,10 +2,7 @@
 // bootstrap.mjs after the generator ran, or by hand:
 // `node scripts/history.mjs <root> [--auth=false]`.
 //
-// Markers in `.doc/` files:
-//   ... <!-- auth -->               a line (a table row's marker sits inside its last cell)
-//   <!-- auth-start --> ... <!-- auth-end -->   a block
-//   <!-- noauth: TEXT -->           TEXT replaces the line when the product has no auth
+// The markers it resolves are described in auth-markers.mjs.
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -19,88 +16,39 @@ import {
   trackedFiles,
   writeRecord,
 } from './manifest.mjs'
+import { resolveAuthMarkers } from './auth-markers.mjs'
+import { authFlagFrom, kindOf, readProvenance } from './provenance.mjs'
 import { renderConfiguration, renderPackageBlocks } from './readme.mjs'
 
 export const MIN_NODE = 24
 export const MIN_BUN = [1, 4]
 
-const DOC_FILES = ['glossary.md', 'architecture.md']
-// Only a marker at the end of the line's content (before a table row's closing `|`) is inline;
-// any other spelling stays in the text and the post-condition in resolveAuthMarkers rejects it.
-const INLINE = / ?<!-- auth\s*-->(?=\s*(?:\|\s*)?$)/
-const LEFTOVER = /<!--\s*(?:no)?auth|auth-(?:start|end)/
-const BLOCK_START = /^\s*<!-- auth-start -->\s*$/
-const BLOCK_END = /^\s*<!-- auth-end -->\s*$/
-const NOAUTH = /^(\s*)<!-- noauth: (.*) -->\s*$/
+const DOC_FILES = ['.doc/glossary.md', '.doc/architecture.md']
 
-export function resolveAuthMarkers(text, auth) {
-  const eol = text.match(/\r?\n/)?.[0] === '\r\n' ? '\r\n' : '\n'
-  const out = []
-  let inBlock = false
-  for (const line of text.split(/\r?\n/)) {
-    if (BLOCK_START.test(line)) {
-      if (inBlock) throw new Error('nested <!-- auth-start --> inside an open auth block')
-      inBlock = true
-    } else if (BLOCK_END.test(line)) {
-      if (!inBlock) throw new Error('stray <!-- auth-end --> with no open auth block')
-      inBlock = false
-    } else if (inBlock) {
-      if (auth) out.push(line)
-    } else if (NOAUTH.test(line)) {
-      const [, indent, body] = line.match(NOAUTH)
-      if (!auth) out.push(indent + body)
-    } else if (INLINE.test(line)) {
-      if (auth) out.push(line.replace(INLINE, ''))
-    } else {
-      out.push(line)
-    }
-  }
-  if (inBlock) throw new Error('unclosed <!-- auth-start --> block: no <!-- auth-end --> found')
-  const result = out.join(eol)
-  const left = LEFTOVER.exec(result)
-  if (left !== null) {
-    const shown = result.slice(left.index).split(/\r?\n/)[0].slice(0, 60)
-    throw new Error(`an auth marker is misspelled or not at the end of its line: ${shown}`)
-  }
-  return result
+// A server or serverless package's own architecture file, when it exists.
+function packageArchitectures(root) {
+  const catalog = path.join(root, '.fullstack', 'catalog.yaml')
+  return readProvenance(catalog)
+    .packages.filter(({ template }) => ['server', 'serverless'].includes(kindOf(template)))
+    .map(({ dir }) => `${dir}/.doc/architecture.md`)
 }
 
 export function resolveAuthText(root, { auth }) {
   const docs = []
   // Resolve every text before touching anything, so a malformed marker leaves the tree as is.
   const writes = []
-  for (const name of DOC_FILES) {
-    const file = path.join(root, '.doc', name)
+  for (const rel of [...DOC_FILES, ...packageArchitectures(root)]) {
+    const file = path.join(root, rel)
     if (!existsSync(file)) continue
     const before = readFileSync(file, 'utf8')
     const after = resolveAuthMarkers(before, auth)
-    if (after !== before) writes.push({ file, after, rel: `.doc/${name}` })
+    if (after !== before) writes.push({ file, after, rel })
   }
   for (const { file, after, rel } of writes) {
     writeFileSync(file, after)
     docs.push(rel)
   }
   return { docs }
-}
-
-// Auth is on only when a package's `flags` block says `auth: true`; a project without a server
-// (or an unreadable file) has no accounts, so its auth text is cleared.
-export function authFlagFrom(provenancePath) {
-  if (!existsSync(provenancePath)) return false
-  let flagsIndent
-  for (const line of readFileSync(provenancePath, 'utf8').split(/\r?\n/)) {
-    const indent = /^\s*/.exec(line)[0].length
-    if (/^\s+flags:\s*$/.test(line)) flagsIndent = indent
-    else if (line.trim() !== '' && flagsIndent !== undefined && indent <= flagsIndent) {
-      flagsIndent = undefined
-    }
-    if (/^\s+flags:\s*\{[^}]*\bauth:\s*true\b/.test(line)) return true
-    const authLine = /^\s+auth:\s*true\s*(#.*)?$/.test(line)
-    if (flagsIndent !== undefined && indent > flagsIndent && authLine) {
-      return true
-    }
-  }
-  return false
 }
 
 const gitIn = (root, args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' })

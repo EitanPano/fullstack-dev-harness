@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 // The template kind (`server`, `serverless`, `frontend`) is the part of the template id before
 // the slash; the scripts name a package's kind by it, never by which commands it happens to have.
@@ -83,4 +83,24 @@ export function readProvenance(file) {
     if (port !== null && inHttp && pkg !== undefined) pkg.port = Number(port[1])
   }
   return result
+}
+
+// Auth is on only when a package's `flags` block says `auth: true`; a project without a server
+// (or an unreadable file) has no accounts, so its auth text is cleared.
+export function authFlagFrom(provenancePath) {
+  if (!existsSync(provenancePath)) return false
+  let flagsIndent
+  for (const line of readFileSync(provenancePath, 'utf8').split(/\r?\n/)) {
+    const indent = /^\s*/.exec(line)[0].length
+    if (/^\s+flags:\s*$/.test(line)) flagsIndent = indent
+    else if (line.trim() !== '' && flagsIndent !== undefined && indent <= flagsIndent) {
+      flagsIndent = undefined
+    }
+    if (/^\s+flags:\s*\{[^}]*\bauth:\s*true\b/.test(line)) return true
+    const authLine = /^\s+auth:\s*true\s*(#.*)?$/.test(line)
+    if (flagsIndent !== undefined && indent > flagsIndent && authLine) {
+      return true
+    }
+  }
+  return false
 }

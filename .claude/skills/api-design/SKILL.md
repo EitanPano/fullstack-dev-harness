@@ -94,9 +94,9 @@ composes controllers.
 
 ## Auth and the caller
 
-A server template ships authentication behind its `auth` flag; a product starts from it.
-`.doc/architecture.md` (Auth) states the model and `backend/AGENTS.md` (Authentication)
-says where its rules live. When that section says Auth: none, every endpoint is public, no
+A server template ships authentication behind its `auth` flag.
+`backend/.doc/architecture.md › Auth` (the root file where a package has none) states the model, `backend/AGENTS.md` (Authentication)
+its rules. When it says Auth: none, every endpoint is public, no
 caller or role exists, and the rules below apply once a plan adds accounts. The gate and
 helper names are in `backend/AGENTS.md › Adding an entity`.
 
@@ -112,7 +112,7 @@ helper names are in `backend/AGENTS.md › Adding an entity`.
   Refresh tokens are kept as a hash in a session record and rotated on every use; the
   replay of the previous token within a short grace window is a concurrent retry and
   receives the token the first rotation issued; any other replay revokes every session of
-  the user. The model is recorded in `.doc/architecture.md`; it changes only by plan.
+  the user. The model is recorded there; it changes only by plan.
 - A new unauthenticated write endpoint gets its own rate-limit entry.
 - Every protected endpoint has a test that answers 401 without credentials and, for a role
   gate, 403 with the wrong role. In a multi-tenant product the controller passes the owner

@@ -102,6 +102,9 @@ function runWithFakeGenerator(
         "mkdirSync(path.join(out, '.fullstack'), { recursive: true })",
         `writeFileSync(path.join(out, '.fullstack', 'catalog.yaml'), ${JSON.stringify(provenance)})`,
         "writeFileSync(path.join(out, 'argv.json'), JSON.stringify(argv))",
+        ...['backend', 'frontend']
+          .filter((dir) => provenance.includes(`  ${dir}:`))
+          .map((dir) => `mkdirSync(path.join(out, ${JSON.stringify(dir)}), { recursive: true })`),
         "const seen = argv.indexOf('--answers')",
         "if (seen !== -1) writeFileSync(path.join(out, 'answers-seen.json'), readFileSync(argv[seen + 1]))",
         '',
@@ -134,7 +137,18 @@ function runWithFakeGenerator(
     } catch {
       answers = undefined
     }
-    return { result, forwarded, readme, answers }
+    const docOf = (rel) => {
+      try {
+        return readFileSync(path.join(root, rel), 'utf8')
+      } catch {
+        return undefined
+      }
+    }
+    const docs = {
+      server: docOf('backend/.doc/architecture.md'),
+      design: docOf('frontend/.doc/design.md'),
+    }
+    return { result, forwarded, readme, answers, docs }
   } finally {
     rmSync(catalog, { recursive: true, force: true })
     rmSync(root, { recursive: true, force: true })
@@ -210,6 +224,28 @@ test('the main run replaces the README with the project one, no token left', () 
   assert.match(readme, /<!-- readme:about -->/)
   assert.match(readme, /<!-- configuration:start -->/)
   assert.doesNotMatch(readme, /{{/)
+})
+
+const PACKAGES = (auth) =>
+  `packages:\n  backend:\n    template: server/bun-express\n    flags:\n      auth: ${auth}\n` +
+  '  frontend:\n    template: frontend/react\n'
+const MARKER = /<!--\s*(no)?auth|auth-(start|end)/
+
+test('the main run seeds each package .doc and leaves no auth marker', () => {
+  const on = runWithFakeGenerator([], ['--stack', 'x'], PACKAGES(true))
+  assert.equal(on.result.status, 0, on.result.stderr)
+  assert.match(on.docs.design, /<!-- FILL:/)
+  assert.match(on.docs.server, /JWT access token/)
+  assert.doesNotMatch(on.docs.server, MARKER)
+  const off = runWithFakeGenerator([], ['--stack', 'x'], PACKAGES(false))
+  assert.match(off.docs.server, /- Auth: none\./)
+  assert.doesNotMatch(off.docs.server, MARKER)
+})
+
+test('a project with no package seeds nothing and still succeeds', () => {
+  const { result, docs } = runWithFakeGenerator([])
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(docs.server, undefined)
 })
 
 const TEMPLATE = ['--template', 'server/bun-express']

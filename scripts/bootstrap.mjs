@@ -46,12 +46,12 @@ import {
 import {
   MIN_BUN,
   MIN_NODE,
-  authFlagFrom,
   finishProject,
   resolveAuthText,
   writeProjectReadme,
 } from './history.mjs'
-import { FRONTEND_DIRS, readProvenance } from './provenance.mjs'
+import { seedPackageDocs } from './package-doc.mjs'
+import { FRONTEND_DIRS, authFlagFrom, readProvenance } from './provenance.mjs'
 import { ScaffoldError, parseFlag, parseFrontend, readYaml } from './scaffold/request.mjs'
 
 const README_TEMPLATE = ['.claude', 'skills', 'bootstrap-project', 'readme-template.md']
@@ -183,6 +183,19 @@ function main() {
     fail(`writing README.md failed: ${error.message}`)
   }
   console.log('  wrote README.md (replace the readme: markers, then run --finish)')
+
+  // Last, so a failure leaves only this step to repeat; it resolves its own auth markers.
+  step('Writing the package .doc files')
+  try {
+    const seeded = seedPackageDocs(root)
+    for (const rel of seeded.written) console.log(`  wrote ${rel}`)
+    for (const dir of seeded.skipped) console.log(`  skipped ${dir}: no such directory`)
+  } catch (error) {
+    fail(
+      `seeding the package docs failed: ${error.message}. The rest of the setup is in place; ` +
+        'fix it, then run `node scripts/package-doc.mjs`',
+    )
+  }
 
   printNextSteps()
 }

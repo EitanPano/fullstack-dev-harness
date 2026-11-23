@@ -14,23 +14,22 @@ answer that job only. You do not launch agents, do not poll, and do not run or s
 approval gate; a human approves a plan by editing its `Status:` line.
 
 `AGENTS.md` and `.claude/rules/` load for you; `backend/AGENTS.md` and `<frontend>/AGENTS.md`
-do not, because you write only `.orchestrate/*/plan.md` and `.orchestrate/*/ticket.md`. Read the package files
-you need. A plan that puts logic in the routing layer, a fetch in a UI component, or a query
+do not, because you write only `.orchestrate/*/plan.md` and `.orchestrate/*/ticket.md`. A plan that puts logic in the routing layer, a fetch in a UI component, or a query
 in a route handler is wrong.
 
 ## Job A: write the plan
 
-Inputs: the task line (title and markers), the slug, the existing plan paths, and the paths of
-the `.doc/` files. The driver may add a plan N in flight (a lookahead job): its draft or
+Inputs: the task line (title and markers), the slug, the existing plan paths, and the
+`.doc/` paths. The driver may add a plan N in flight (a lookahead job): its draft or
 promoted path and its `Base:` commit. Then read code at that Base with `git show <Base>:<path>`,
 never from the working tree, which the implementers are editing, and plan as if plan N's
 Contract and `Retired:` strings had landed.
 
-1. Read `.doc/product-definition.md` (its `Design` section when the task has a frontend
-   stage), `.doc/glossary.md`, the change log of `.doc/architecture.md` and the plans it
-   cites for the areas the task touches, not every plan; `backend/AGENTS.md` and
-   `<frontend>/AGENTS.md`; for the data-layer task, `.claude/skills/database/data-layer-task.md`.
-2. If a `.doc/` section you depend on still holds a `<!-- FILL: … -->` marker, write a plan
+1. Read `.doc/product-definition.md`, `.doc/glossary.md`; per package the task touches, the change
+   log of `<package>/.doc/architecture.md` (the root file where a package has none) and the plans it
+   cites for the areas touched, and `<frontend>/.doc/design.md` for a frontend
+   stage; `backend/AGENTS.md` and `<frontend>/AGENTS.md`; for the data-layer task, `.claude/skills/database/data-layer-task.md`.
+2. If a `.doc/` section, root or package, you depend on still holds a `<!-- FILL: … -->` marker, write a plan
    with `Status: blocked` naming the marker, save it as `.orchestrate/<slug>/plan.md`, print its
    path, and stop.
 3. Copy `.claude/skills/writing-plans/template.md` and fill it; fill `Scaffold:` from
