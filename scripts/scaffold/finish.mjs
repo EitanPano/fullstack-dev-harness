@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { seedPackageDocs } from '../package-doc.mjs'
 import {
   cloneLinesFrom,
   renderConfiguration,
@@ -128,8 +129,14 @@ function run(root, dir, name, command, again) {
 }
 
 // install for every package, then contract, then format; NEXT's order puts producers first.
-export function finish(root, next, catalog, again) {
+export function finish(root, next, catalog, again, parts) {
   assertConfined(root, Object.keys(next.packages), 'package directory')
+  // Only the packages this scaffold added: an older package's missing files are the project's call.
+  // Before `format`, so a new package's files are formatted with its code.
+  const added = parts.filter((part) => next.packages[part] !== undefined)
+  const seeded = seedPackageDocs(root, { dirs: added })
+  for (const rel of seeded.written) console.log(`  wrote ${rel}`)
+  for (const dir of seeded.skipped) console.log(`  skipped ${dir}: no such directory`)
   for (const name of ['install', 'contract', 'format']) {
     for (const [dir, pkg] of Object.entries(next.packages)) {
       if (pkg.commands?.[name] !== undefined) run(root, dir, name, pkg.commands[name], again)

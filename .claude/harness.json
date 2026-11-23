@@ -32,6 +32,9 @@
       "scripts/harness-update.mjs",
       "scripts/catalog.mjs",
       "scripts/scaffold.mjs",
+      "scripts/package-doc.mjs",
+      "scripts/auth-markers.mjs",
+      "scripts/package-doc/*.md",
       "scripts/scaffold/*.mjs",
       "!scripts/scaffold/*.test.mjs",
       "!scripts/scaffold/fake-catalog.mjs"
