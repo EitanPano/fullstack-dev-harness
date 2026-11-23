@@ -11,16 +11,16 @@ props are in the package's `<frontend>/AGENTS.md › Styling`; read it, do not r
 
 ## Inputs
 
-- `.doc/product-definition.md › Design`: Tone, Reference apps (they decide the shell),
-  Primary viewport, Density.
+- `.doc/product-definition.md › Design`: Tone, Density; `<frontend>/.doc/design.md`: Reference
+  apps, Primary viewport.
 - The plan's `UX` section, one line per route:
   `- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>`
-- `.doc/glossary.md` for every noun and action on screen.
+- `.doc/glossary.md` for every noun and action.
 
 ## Shell
 
-A plan whose `UX` names a route opens it with the `shell` line: the last plan's, changed
-only when the task changes the chrome. The first writes it, from the chrome the app has or,
+A plan whose `UX` names a route opens it with the `shell` line: `<frontend>/.doc/design.md ›
+Shell`, or the last plan's, changed only when the task changes the chrome. The first writes it, from the chrome the app has or,
 with none, from a Reference app's regions for the same job (top bar, side nav, footer, each
 with its contents and the place of each ready-to-place control in `<frontend>/AGENTS.md`; with
 "none", the least the scope needs), and gives `/` its screen. Build nothing the line does

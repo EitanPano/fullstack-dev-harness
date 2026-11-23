@@ -49,7 +49,8 @@ const body = (text) => text.replace(/^---\n[\s\S]*?\n---\n/, '')
 const markdown = files.filter((f) => f.endsWith('.md'))
 const instructionFiles = markdown.filter(isInstructionFile)
 // The product's own context: agents read it, but the gate is for harness text only.
-const isProjectDoc = (f) => f.startsWith('.doc/')
+// A package-doc skeleton is the text of a project document a package gets at its creation.
+const isProjectDoc = (f) => f.startsWith('.doc/') || f.startsWith('scripts/package-doc/')
 const docs = markdown.filter((f) => isInstructionFile(f) || FOR_PEOPLE.has(f) || isProjectDoc(f))
 const skills = files.filter((f) => /^\.claude\/skills\/[^/]+\/SKILL\.md$/.test(f))
 const agents = files.filter((f) => /^\.claude\/agents\/[^/]+\.md$/.test(f))

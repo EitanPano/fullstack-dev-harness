@@ -145,6 +145,14 @@ test('the constant lanes still apply with a record', () => {
   ])
 })
 
+// Plan 032: a frontend agent writes its package's `.doc/`; the root `.doc/` stays closed.
+test('frontend writes its own package .doc/, never the root .doc/', () => {
+  expect(BARE, [
+    ['frontend', 'frontend/.doc/design.md', true],
+    ['frontend', '.doc/architecture.md', false]
+  ])
+})
+
 for (const [name, catalog] of [
   ['no file', null],
   ['an empty file', ''],

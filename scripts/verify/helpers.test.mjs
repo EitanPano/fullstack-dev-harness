@@ -296,7 +296,7 @@ test('securityPaths matches the Cloudflare deploy files and the Pages middleware
   assert.deepEqual(securityPaths([...hit, ...miss]), hit)
 })
 
-test('securityPaths matches the Worker entry files, not a module router', () => {
+test("securityPaths matches the Worker entry files, not an entity's router", () => {
   const hit = [
     'serverless/cloudflare/server/index.ts',
     'serverless/cloudflare/server/server.ts',

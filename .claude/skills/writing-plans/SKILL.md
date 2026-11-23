@@ -11,10 +11,10 @@ fill it; do not invent a different shape.
 
 ## Before writing anything
 
-1. Read the change log of `.doc/architecture.md` and the plans it cites for the areas the task
-   touches, not every plan. A new plan builds on decisions already made.
+1. Read the change log of each touched `<package>/.doc/architecture.md` (the root file where a
+   package has none) and the plans it cites for the areas touched.
 2. Read `.doc/product-definition.md` (acceptance criteria, scope, auth and tenancy),
-   `.doc/architecture.md` (data store, data model, API) and `.doc/glossary.md` (names).
+   `.doc/architecture.md`, `.doc/glossary.md` (names) and the touched packages' `.doc/` files.
 3. If any section you depend on still holds a `<!-- FILL: … -->` marker, do not plan.
    Write a one-line plan whose only content is `Status: blocked` plus the marker you need
    answered, to the draft path `.orchestrate/<slug>/plan.md`, and say so.
@@ -83,7 +83,7 @@ In this order, with these exact headings:
 
   A plan whose `UX` names a route opens it with the template's `shell` line
   (`ui-design › Shell`).
-- `Steps`: per package, one line per module or feature.
+- `Steps`: per package, one line per entity or feature.
 - `Changes during the task` is empty at the start; the driver writes it.
 
 ## Content rules

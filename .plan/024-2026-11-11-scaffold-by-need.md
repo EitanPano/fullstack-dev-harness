@@ -1,8 +1,8 @@
 # Scaffold by need: a frontend alone, parts added later by a three-way merge
 
-Status: active
+Status: done
 Owner: Eitan
-Last updated: 2026-11-11
+Last updated: 2026-11-23
 Input: ADR 0011 at the catalog's `docs/adr/0011-frontend-without-a-server.md` on
 `feat/scaffold-by-need`: D1 the `server` selection, D2 what a frontend keys on it, D3 the
 generator without a server, D4 generation as a function of the recorded selection, D5 tests,
@@ -278,3 +278,4 @@ Rulings (the ledger holds each with its cost if wrong):
   instant crash 0xC0000409 on the first try, green on the rerun).
 - Not exercised against the real catalog: the conflict path and `--complete` (neither proof hit a
   conflict; the unit tests cover both). V08 (P2) waits for G4 and H5.
+- 2026-11-23 — Closed: shipped in catalog `v1.11.0`. Left open: V08 (P2).

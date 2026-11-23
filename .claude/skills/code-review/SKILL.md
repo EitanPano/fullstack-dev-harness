@@ -44,9 +44,9 @@ failure-path test, an error state, a change-log line).
    `backend/AGENTS.md`, naming, duplication, a feature that reaches into another, logic in
    the routing layer or in a `routes` file beyond declaring gates, validating and
    naming the handler (business logic belongs in the controller, its handlers and exported
-   rules; queries in the service), a controller reaching another module's service, a
-   service imported from outside its module.
-   Is every new file in the home the `backend/AGENTS.md` table names for it (module file,
+   rules; queries in the service), a controller reaching another entity's service, a
+   service imported from outside its entity.
+   Is every new file in the home the `backend/AGENTS.md` table names for it (entity file,
    `models/`, `middleware/`, `services/`, `services/utils/`, `infra/jobs/`,
    `infra/subscribers/`)? A file in two defensible homes is a finding.
    Frontend: layer direction as the frontend's `AGENTS.md` states it (no sibling
@@ -58,7 +58,7 @@ failure-path test, an error state, a change-log line).
 4. **Error handling and validation**: validation at the edge with the envelope, correct
    status codes, no swallowed errors, user-safe failure UX, logs with request id.
 5. **Unnecessary complexity**: abstraction without a second caller (a controller function
-   that only forwards to its service is the module's public API, not an abstraction to
+   that only forwards to its service is the entity's public API, not an abstraction to
    remove), configuration no one reads, dead code, cleverness that a comment has to
    explain.
 6. **Deployment and operations**: data change shipped with its migration or index, env variable in

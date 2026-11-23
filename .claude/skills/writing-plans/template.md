@@ -21,7 +21,7 @@ acceptance criteria (AC numbers) it satisfies.>
 
 ## Assumptions
 
-- <one line, at most 6: a decision taken from .doc/ or an earlier plan, with the file>
+- <one line, at most 6: a decision from a `.doc/` or an earlier plan, with the file>
 
 ## Open Questions
 
@@ -48,7 +48,7 @@ the `shell` line.>
 
 ## Steps
 
-One line per module or feature; no copy strings, no code.
+One line per entity or feature; no copy strings, no code.
 
 ### Backend
 
