@@ -127,6 +127,33 @@ test('typed frontend directories: each recorded frontend is a lane, qa gets its 
   ])
 })
 
+// Plan 033: an SDK package is the frontend agent's, and a project without one keeps its lanes.
+test('an sdk package: the frontend writes it, qa its tests, the backend nothing', () => {
+  const catalog = [
+    'stack: react-bun-express',
+    'packages:',
+    '  backend:',
+    '    template: server/bun-express',
+    '  app:',
+    '    template: frontend/react',
+    '  sdk-widget:',
+    '    template: sdk/browser',
+    ''
+  ].join('\n')
+  expect(catalog, [
+    ['frontend', 'sdk-widget/src/core/init.ts', true],
+    ['frontend', 'sdk-widget/api-report.md', true],
+    ['frontend', 'sdk-other/src/x.ts', false],
+    ['frontend', 'app/src/x.ts', true],
+    ['frontend', 'backend/src/api/sdk/config/routes.ts', false],
+    ['backend', 'sdk-widget/src/core/init.ts', false],
+    ['backend', 'backend/src/api/sdk/config/routes.ts', true],
+    ['qa', 'sdk-widget/tests/e2e/host.spec.ts', true],
+    ['qa', 'sdk-widget/src/core/init.ts', false],
+    ['qa', 'sdk-widget/api-report.md', false]
+  ])
+})
+
 test('a renamed standard package derives backend from its template', () => {
   const catalog = 'packages:\n  api:\n    template: server/bun-express\n'
   expect(catalog, [

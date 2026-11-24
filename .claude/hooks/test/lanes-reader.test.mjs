@@ -111,6 +111,17 @@ test('lanesFor derives by kind', () => {
   ])
 })
 
+test('lanesFor gives an sdk package to the frontend and its tests to qa', () => {
+  const packages = [
+    { dir: 'backend', kind: 'server' },
+    { dir: 'app', kind: 'frontend' },
+    { dir: 'sdk-widget', kind: 'sdk' }
+  ]
+  assert.deepEqual(lanesFor(packages, 'backend'), ['backend/'])
+  assert.deepEqual(lanesFor(packages, 'frontend'), ['app/', 'sdk-widget/'])
+  assert.deepEqual(lanesFor(packages, 'qa'), ['backend/tests/', 'app/tests/', 'sdk-widget/tests/'])
+})
+
 test('only backend, frontend and qa gain lanes', () => {
   const packages = [{ dir: 'api', kind: 'server' }]
   for (const role of ['reviewer', 'orchestrator', 'general-purpose', 'other', '__proto__']) {
