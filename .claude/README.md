@@ -89,7 +89,8 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 React, Angular and Vue are the single-page frontends. Next is for products whose public pages
 must be found by search engines or show a rich preview when shared. Astro is for content sites:
 prerendered pages, alone or on a Cloudflare Worker in `serverless/cloudflare/`, which serves
-several frontends, each in a directory named for its type; one of them may be Angular. Report any gap you meet.
+several frontends, each in a directory named for its type; one of them may be Angular. A product
+may add an SDK other sites embed, at `sdk-<name>/`. Report any gap you meet.
 
 ## Updating the harness
 

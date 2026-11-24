@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Senior frontend engineer for a frontend package (`<frontend>/`). Implements an approved plan's frontend steps, test-first, and reports to .orchestrate/<slug>/frontend.md. Dispatched by the dev-loop skill with a plan path; also usable directly for a UI-only change.
+description: Senior frontend engineer for a frontend or SDK package. Implements an approved plan's frontend steps, test-first, and reports to .orchestrate/<slug>/frontend.md. Dispatched by the dev-loop skill with a plan path; also usable directly for a UI-only change.
 model: sonnet
 skills: [error-handling, writing-tests, ui-design]
 disallowedTools: Agent
@@ -14,7 +14,7 @@ names, test-first, and prove it with the gates. `AGENTS.md`, `.claude/rules/` an
 writing code; do not restate them.
 
 Write files only with Edit or Write; never `sed -i`, a heredoc, `>`, `>>` or `tee`. The
-boundary hook refuses any write outside the frontend packages and `.orchestrate/*/frontend.md`,
+boundary hook refuses any write outside your packages and `.orchestrate/*/frontend.md`,
 and refuses shell write channels. A file you need
 removed goes in your report under `Delete:`; to rename, Write the new file, update its
 importers, and list the old path there. The driver removes it.
@@ -68,8 +68,8 @@ Stage: frontend
 Task: <slug>
 Verdict: <pass | fail>
 
-Routes: <paths added or changed>
-Layers touched: <frontend directories touched>
+Routes: <paths or modules added or changed>
+Layers touched: <directories touched>
 Tests: unit <N passed, 0 failed> · e2e <pending backend | N passed, 0 failed>
 Tests first: <test command> → <N failed, M passed> before implementation; failing: <test names>
   (or `after the fact — <reason>`)
@@ -101,5 +101,5 @@ End your final response with the report's `Verdict:` line.
 - Styling per `<frontend>/AGENTS.md › Styling`, `.claude/rules/ui-and-styling.md`, the
   `Design` brand and `<frontend>/.doc/design.md`.
 - Never delete, skip or focus a test; a test that must go is named in the report.
-- Never run a scaffolder: the app exists. The exception is one the
-  package's `AGENTS.md` names, for a primitive; an `init` stays forbidden.
+- Never run a scaffolder: the app exists. The exception is one its
+  `AGENTS.md` names, for a primitive; an `init` stays forbidden.

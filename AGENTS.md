@@ -24,8 +24,8 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
   Edit/Write; shell write channels, deletions, inline interpreters and git commands changing
   the tree or history are refused. `orchestrator` and `reviewer` may run any
   runtime's inline code and stdin programs.
-- A role agent lists a file to remove under `Delete:` in its report; the driver removes it
-  inside its lane only.
+- A role agent's report lists a file to remove under `Delete:`; the driver removes it inside
+  its lane only.
 - Never route around a refusal; report it.
 - Lanes stop accidents; they are no sandbox (use Claude Code's or a container). Recovery:
   `.claude/README.md`.
@@ -35,7 +35,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 | Path | What it is | Who writes it |
 | --- | --- | --- |
 | `README.md` | The product's README | Setup, loop |
-| `AGENTS.md`, `CLAUDE.md` | These rules, and their loader | Harness |
+| `AGENTS.md`, `CLAUDE.md` | These rules, their loader | Harness |
 | `.claude/README.md` | The harness manual | Harness |
 | `.doc/`, `<package>/.doc/` | Product-wide docs; a package's own | Humans, bootstrap, driver; package agent |
 | `.plan/000-backlog.md` | The task queue | Humans, loop |
@@ -44,7 +44,7 @@ The source of truth for work here; a package's versions are in its `AGENTS.md`.
 | `catalog.lock` | The pinned catalog version; frozen in a project | Humans |
 | `.fullstack/` | `catalog.yaml` (stack, flags, commands, ports); `harness.json`, the harness version | The bootstrap |
 | `scripts/` | `verify.mjs`, `readme.mjs`, `guidance.mjs`, `harness-update.mjs`, `scaffold.mjs`, `catalog.mjs`; `bootstrap.mjs` in a fresh clone | Humans |
-| `<frontend>/`, `backend/` or `serverless/<provider>/` | Generated packages | Frontend, backend agent |
+| `<frontend>/`, `sdk-<name>/`, `backend/` or `serverless/<provider>/` | Generated packages | Frontend, backend agent |
 | `docker-compose.yml`, `db/` | Compose stack, database init | Backend agent |
 | `.orchestrate/<slug>/` | Per task: draft `plan.md`, reports, `ticket.md`, verify results, review diffs | The loop |
 
@@ -52,9 +52,9 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 
 ## Stack
 
-- Bun 1.4+, Node 24+ and git; a package's own tools (uv for Python) are checked at setup.
+- Bun 1.4+, Node 24+ and git; setup checks a package's own tools (uv for Python).
 - Docker Compose is the deployment target and hosts local infrastructure; a `serverless/`
-  package deploys to its provider instead (`deployment`).
+  package deploys to its provider (`deployment`).
 - The stack comes from the catalog (`https://github.com/EitanPano/fullstack-templates`)
   pinned in `catalog.lock`, recorded in `.fullstack/catalog.yaml`. Resolve a command per
   package there; never spell a package manager command.
@@ -63,25 +63,25 @@ Never create a `docs/` directory. `.orchestrate/` is git-ignored except its READ
 | --- | --- |
 | `install` | Dependencies from the lockfile. |
 | `dev` | Development server with reload. |
-| `start` | Run the server once, no watcher; a frontend's e2e starts the API with it. |
+| `start` | Run the server once, no watcher; e2e starts the API with it. |
 | `check` | Every gate, no Docker; exit 0 is done. |
 | `typecheck`, `lint`, `format` | One gate; the layer-boundary lint; rewrite files. |
 | `test`, `testDb`, `e2eDb`, `testE2e` | Unit; suite on the test database; prepare the e2e database; e2e with accessibility scan. |
 | `contract`, `migrate` | OpenAPI out, or types regenerated; apply the data model change. |
 
 `testDb`, `e2eDb` and `migrate` arrive with the database part.
-Never run a scaffolder inside an existing package, except one the package's `AGENTS.md` names.
+Never run a scaffolder inside an existing package, except one its `AGENTS.md` names.
 
 ## Architecture
 
-A package exists when the product needs it: the bootstrap creates the first, `scripts/scaffold.mjs`
-adds later ones.
+A package exists by need: the bootstrap creates the first, `scripts/scaffold.mjs` later ones.
 
 - Server: `config/`, `api/<entity>/` (`routes`, `controller`, `schema`, `service`), `models/`,
   `middleware/`, `services/`, `infra/`. Entities meet only through controllers; never import
   another entity's service.
 - Frontend: `<frontend>/` names its type: `site`, `platform`, `app` (`app-<tool>` when several)
-  or `admin`; older: `frontend`. Layers, import direction and where an addition goes: its
+  or `admin`; older: `frontend`. SDK: `sdk-<name>/`, a library other sites embed, on
+  `/api/sdk/v1/` only. Layers, import direction and where an addition goes: the package's
   `AGENTS.md`; lint enforces the direction.
 - The typed client comes from the contract into the agents file's directory; only the data
   layer it names imports the runtime; a model may import its types and `zod.gen` schemas.
@@ -109,7 +109,7 @@ Done means every item holds, with evidence.
 3. No test was deleted, skipped or focused. `verify` enforces focus and skip spellings;
    QA checks deleted tests and filtered gate commands. Justify each in a report.
 4. Errors follow `error-handling`. No secrets, stack traces or query text leave the server.
-5. A schema or endpoint change ran both `contract` commands and committed both results; a
+5. A schema or endpoint change ran each `contract` command and committed the results; a
    data-model change ships what `database` requires and passes `testDb`.
 6. UI changes meet the frontend's `AGENTS.md › Styling`; the frontend reports `UI pass:`,
    QA `UX:` (open rubric findings are P2); the accessibility scan passes.

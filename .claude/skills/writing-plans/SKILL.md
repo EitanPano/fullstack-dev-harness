@@ -6,8 +6,8 @@ description: Create, revise, or supersede an implementation plan in .plan/. Use 
 # Writing Plans
 
 `.plan/` at the repository root is the source of truth for plans. `000-backlog.md` is
-the task queue; every other file is a plan. Copy `template.md` from this directory and
-fill it; do not invent a different shape.
+the task queue; every other file is a plan. Copy this directory's `template.md` and
+fill it; invent no other shape.
 
 ## Before writing anything
 
@@ -21,7 +21,7 @@ fill it; do not invent a different shape.
 
 ## Filename
 
-`NNN-YYYY-MM-DD-<topic>.md` with a sequential numeric prefix: `001`, `002`, `003`.
+`NNN-YYYY-MM-DD-<topic>.md` with a sequential prefix: `001`, `002`, `003`.
 Example: `.plan/003-2026-08-03-comment-thread.md`.
 
 ## Required metadata
@@ -46,7 +46,8 @@ the line.
 
 `Scaffold:` names a part `.fullstack/catalog.yaml` lacks that the task needs (a server:
 `--stack <id> --flag auth=<true|false>` per the Auth answer, plus `--deploy <single|split>` with a
-frontend; a frontend: `--frontend <dir>=frontend/<id>` (`Frontends` row); a flag:
+frontend; a frontend: `--frontend <dir>=frontend/<id>` (`Frontends` row); an SDK:
+`--sdk sdk-<name>=sdk/browser`; a flag:
 `--flag <name>=true`; a capability: `--capability <kind>=<id>`); else `none`. Stack ids: the
 catalog's `index.yaml`.
 

@@ -57,7 +57,7 @@ One line per entity or feature; no copy strings, no code.
    contract registration.
 3. `backend/tests/` — <entity> tests, store-backed ones in the database block.
 
-### Frontend: `<frontend>/`, one block each
+### Frontend: `<frontend>/` or the SDK, one block each
 
 1. One line per step of `<frontend>/AGENTS.md › Adding a feature`, in its order,
    each naming its path. React: model, service endpoints, feature (routes, page, components),
@@ -82,4 +82,4 @@ data change is reversible. Delete this section otherwise.>
 
 ## Changes during the task
 
-<Empty at the start; the driver records a plan edit made during the task, with the date.>
+<Empty at the start; the driver records a plan edit, with the date.>
