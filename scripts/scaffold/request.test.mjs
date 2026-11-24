@@ -555,3 +555,122 @@ describe('catalogHint', () => {
     assert.equal(catalogHint(['tools/generate.ts'], 'unknown argument "--frontend"'), '')
   })
 })
+
+const sdkPackage = {
+  template: 'sdk/browser',
+  version: '1.0.0',
+  flags: {},
+  capabilities: {},
+  commands: { install: 'bun install' },
+}
+const withSdk = () => ({
+  stack: 'vue-bun-express',
+  deploy: 'split',
+  packages: { backend: server, frontend, 'sdk-widget': sdkPackage },
+  answers: { projectName: 'demo' },
+})
+
+describe('parseArgs: --sdk', () => {
+  it('reads a <dir>=<template> pair', () => {
+    const o = parseArgs(['--stack', 's', '--sdk', 'sdk-widget=sdk/browser'])
+    assert.deepEqual(o.sdks, [{ dir: 'sdk-widget', template: 'sdk/browser' }])
+    assert.deepEqual(parseArgs([]).sdks, [])
+  })
+  it('refuses a malformed pair, a non-sdk template, a wrong directory or a repeat', () => {
+    const bad = (value, pattern) => refuses(() => parseArgs(['--sdk', value]), pattern)
+    bad('sdk-widget', /--sdk needs <dir>=<template>, e\.g\. sdk-widget=sdk\/browser/)
+    bad('sdk-widget=sdk/browser=x', /--sdk needs/)
+    bad('sdk-widget=frontend/vue', /not an sdk template/)
+    bad('sdk-widget=sdk/Browser', /not an sdk template/)
+    bad('widget=sdk/browser', /an sdk directory is sdk-<name>/)
+    bad('sdk-=sdk/browser', /an sdk directory is sdk-<name>/)
+    refuses(
+      () => parseArgs(['--sdk', 'sdk-a=sdk/browser', '--sdk', 'sdk-a=sdk/browser']),
+      /names sdk-a twice/,
+    )
+  })
+  it('refuses --complete with --sdk, and shows --sdk in the usage', () => {
+    refuses(() => parseArgs(['--complete', '--sdk', 'sdk-a=sdk/browser']), /--complete takes only/)
+    refuses(() => parseArgs(['--nope']), /--sdk <dir>=<template>/)
+  })
+})
+
+describe('checkRequest: an SDK', () => {
+  const ok = (provenance, argv, stack) => checkRequest(provenance, parseArgs(argv), stack)
+  const SDK = ['--sdk', 'sdk-widget=sdk/browser']
+  it('accepts an SDK alone on a project with a stack', () => {
+    ok(stacked(), SDK)
+  })
+  it('accepts an SDK with a stack, though the stack lists none', () => {
+    const api = { stack: null, packages: { backend: server }, answers: { projectName: 'demo' } }
+    ok(api, ['--stack', 'x', ...SDK], stackPackages)
+  })
+  it('refuses an SDK with no stack, saying it needs the stack API', () => {
+    refuses(() => ok(lone(), SDK), /needs a stack.*API/)
+  })
+  it('refuses a second SDK: the project holds one, or the request names two', () => {
+    refuses(() => ok(withSdk(), ['--sdk', 'sdk-other=sdk/browser']), /one SDK per project/)
+    const two = [...SDK, '--sdk', 'sdk-other=sdk/browser']
+    refuses(() => ok(stacked(), two), /one SDK per project/)
+  })
+  it('refuses a taken, nested or enclosing directory', () => {
+    const taken = { ...stacked(), packages: { ...stacked().packages, 'sdk-widget': server } }
+    refuses(() => ok(taken, SDK), /already a package/)
+    const inner = { ...stacked(), packages: { ...stacked().packages, 'sdk-widget/x': server } }
+    refuses(() => ok(inner, SDK), /nested/)
+  })
+  it('does not count an SDK as a frontend beside a server', () => {
+    ok(stacked(), SDK)
+    refuses(() => ok(stacked(), ['--frontend', 'admin=frontend/vue']), /single.*one build/)
+    ok(withSdk(), ['--flag', 'auth=true'])
+  })
+  it('lets a per-package flag name the SDK directory', () => {
+    ok(stacked(), [...SDK, '--flag', 'sdk-widget:debug=true'])
+    refuses(() => ok(stacked(), ['--flag', 'sdk-widget:debug=true']), /not a package/)
+  })
+})
+
+describe('generator requests with an SDK', () => {
+  it('a project without an SDK keeps its argument lists', () => {
+    assert.deepEqual(baseArguments(stacked(), ioAll).includes('--sdk'), false)
+    const o = parseArgs(['--flag', 'auth=true'])
+    assert.equal(nextArguments(stacked(), o, ioAll).includes('--sdk'), false)
+  })
+  it('BASE passes a recorded SDK after the stack and frontends', () => {
+    const args = baseArguments(withSdk(), ioAll)
+    assert.deepEqual(args.slice(1, 5), ['--stack', 'vue-bun-express', '--sdk', 'sdk-widget=sdk/browser'])
+    assert.equal(args.includes('--frontend'), false)
+  })
+  it('NEXT adds the requested SDK and keeps a recorded one', () => {
+    const o = parseArgs(['--sdk', 'sdk-widget=sdk/browser'])
+    assert.deepEqual(nextArguments(stacked(), o, ioAll).slice(1, 5), [
+      '--stack',
+      'vue-bun-express',
+      '--sdk',
+      'sdk-widget=sdk/browser',
+    ])
+    const flag = parseArgs(['--flag', 'auth=true'])
+    assert.equal(nextArguments(withSdk(), flag, ioAll).slice(3, 5).join(' '), '--sdk sdk-widget=sdk/browser')
+  })
+  it('NEXT refuses an SDK request with no stack', () => {
+    const o = parseArgs(['--sdk', 'sdk-widget=sdk/browser'])
+    assert.throws(() => nextArguments(lone(), o, ioAll), /--sdk needs a stack/)
+  })
+  it("an SDK package is the frontend agent's; a server stays the backend's", () => {
+    assert.equal(ownerOf(withSdk(), 'sdk-widget'), 'frontend')
+    assert.equal(ownerOf(withSdk(), 'backend'), 'backend')
+  })
+  it('accepts a NEXT that adds an SDK and names it a part', () => {
+    compareProvenance(stacked(), withSdk())
+    assert.deepEqual(partsOf(stacked(), withSdk(), parseArgs([])), ['sdk-widget'])
+  })
+})
+
+describe('catalogHint for --sdk', () => {
+  it('names v1.18.0 when the generator did not know --sdk', () => {
+    const args = ['tools/generate.ts', '--stack', 's', '--sdk', 'sdk-widget=sdk/browser']
+    assert.match(catalogHint(args, 'generate: unknown argument "--sdk"'), /v1\.18\.0 or later to take --sdk/)
+    assert.equal(catalogHint(args, 'some other failure'), '')
+    assert.equal(catalogHint(['tools/generate.ts'], 'unknown argument "--sdk"'), '')
+  })
+})

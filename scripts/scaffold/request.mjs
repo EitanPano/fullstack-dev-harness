@@ -2,7 +2,7 @@
 // Pure functions plus one Bun child process for YAML; the harness stays dependency-free.
 import { spawnSync } from 'node:child_process'
 import { resolveCommand } from '../catalog.mjs'
-import { FRONTEND_DIRS, isFrontendDir, kindOf } from '../provenance.mjs'
+import { FRONTEND_DIRS, SDK_DIRS, isFrontendDir, isSdkDir, kindOf } from '../provenance.mjs'
 
 export class ScaffoldError extends Error {
   constructor(message, exit = 2) {
@@ -14,7 +14,7 @@ export class ScaffoldError extends Error {
 
 export const USAGE =
   'usage: node scripts/scaffold.mjs [--stack <id>] [--frontend <dir>=<template>]…\n' +
-  '         [--flag [<dir>:]<name>=<bool>]… [--capability <kind>=<id>]…\n' +
+  '         [--sdk <dir>=<template>] [--flag [<dir>:]<name>=<bool>]… [--capability <kind>=<id>]…\n' +
   '         [--deploy single|split] [--slug <slug>] [--templates <path>] [--root <dir>] ' +
   '[--dry-run]\n' +
   '       node scripts/scaffold.mjs --complete [--slug <slug>] [--templates <path>] ' +
@@ -61,6 +61,22 @@ export function parseFrontend(text) {
   return { dir, template }
 }
 
+// `--sdk <dir>=<template>`: the directory is `sdk-<name>`, the template an sdk one.
+export function parseSdk(text) {
+  const [dir, template, ...rest] = text.split('=')
+  if (!dir || !template || rest.length > 0) {
+    throw new ScaffoldError('--sdk needs <dir>=<template>, e.g. sdk-widget=sdk/browser')
+  }
+  // The value reaches the generator's command line: only a template id's letters pass.
+  if (!/^sdk\/[a-z0-9]+(-[a-z0-9]+)*$/.test(template)) {
+    throw new ScaffoldError(`--sdk ${dir}: ${template} is not an sdk template`)
+  }
+  if (!isSdkDir(dir)) {
+    throw new ScaffoldError(`--sdk ${dir}: an sdk directory is ${SDK_DIRS}`)
+  }
+  return { dir, template }
+}
+
 // `--flag [<dir>:]<name>=<bool>`; `dir` is set only for the per-package form.
 export function parseFlag(text) {
   const [left, v, ...rest] = text.split('=')
@@ -78,6 +94,7 @@ export function parseArgs(argv) {
   const o = {
     flags: [],
     frontends: [],
+    sdks: [],
     capabilities: [],
     slug: 'scaffold',
     dryRun: false,
@@ -117,6 +134,12 @@ export function parseArgs(argv) {
         throw new ScaffoldError(`--frontend names ${frontend.dir} twice`)
       }
       o.frontends.push(frontend)
+    } else if (arg === '--sdk') {
+      const sdk = parseSdk(value(arg, ++i))
+      if (o.sdks.some((s) => s.dir === sdk.dir)) {
+        throw new ScaffoldError(`--sdk names ${sdk.dir} twice`)
+      }
+      o.sdks.push(sdk)
     } else if (arg === '--capability') {
       const [kind, id, ...rest] = value(arg, ++i).split('=')
       if (!kind || !id || rest.length > 0) throw new ScaffoldError('--capability needs kind=id')
@@ -124,7 +147,12 @@ export function parseArgs(argv) {
     } else throw new ScaffoldError(`unknown argument ${arg}\n${USAGE}`)
   }
   const request =
-    o.stack || o.deploy || o.flags.length || o.frontends.length || o.capabilities.length
+    o.stack ||
+    o.deploy ||
+    o.flags.length ||
+    o.frontends.length ||
+    o.sdks.length ||
+    o.capabilities.length
   if (o.complete && (request || o.dryRun)) {
     throw new ScaffoldError('--complete takes only --slug, --root and --templates')
   }
@@ -133,6 +161,7 @@ export function parseArgs(argv) {
 
 const isServer = (template) => ['server', 'serverless'].includes(kindOf(template))
 const isFrontend = (template) => kindOf(template) === 'frontend'
+const isSdk = (template) => kindOf(template) === 'sdk'
 const entries = (provenance) => Object.entries(provenance.packages ?? {})
 const nests = (a, b) => a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
 
@@ -140,6 +169,7 @@ const nests = (a, b) => a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
 export function checkRequest(provenance, options, stackPackages) {
   const existing = entries(provenance)
   const added = options.frontends ?? []
+  const sdks = options.sdks ?? []
   const members = stackPackages ?? []
   if (options.deploy !== undefined && options.stack === undefined) {
     throw new ScaffoldError('--deploy needs --stack: a lone package has no deploy mode')
@@ -175,10 +205,27 @@ export function checkRequest(provenance, options, stackPackages) {
       '--frontend needs a stack that serves the frontends: the project has none; add --stack',
     )
   }
+  if (sdks.length > 0 && !provenance.stack && options.stack === undefined) {
+    throw new ScaffoldError(
+      "--sdk needs a stack: an SDK needs the stack's API, and the project has none; add --stack",
+    )
+  }
+  // One SDK per project; the template lists no SDK, so the stack is not asked for it.
+  if (existing.filter(([, pkg]) => isSdk(pkg.template)).length + sdks.length > 1) {
+    throw new ScaffoldError('--sdk: one SDK per project')
+  }
   const taken = [
     ...existing.map(([dir]) => dir),
     ...members.filter((s) => !isFrontend(s.template)).map((s) => s.dir),
   ]
+  for (const { dir } of sdks) {
+    if (existing.some(([d]) => d === dir)) {
+      throw new ScaffoldError(`--sdk ${dir}: ${dir} is already a package`)
+    }
+    if (taken.some((other) => nests(dir, other))) {
+      throw new ScaffoldError(`--sdk ${dir}: ${dir} is nested in or around another package`)
+    }
+  }
   for (const { dir, template } of added) {
     if (existing.some(([d]) => d === dir)) {
       throw new ScaffoldError(`--frontend ${dir}: ${dir} is already a package`)
@@ -207,6 +254,7 @@ export function checkRequest(provenance, options, stackPackages) {
   const known = new Set([
     ...existing.map(([dir]) => dir),
     ...added.map((f) => f.dir),
+    ...sdks.map((s) => s.dir),
     ...members.filter((s) => added.length === 0 || !isFrontend(s.template)).map((s) => s.dir),
   ])
   for (const { dir, name, value } of options.flags) {
@@ -239,9 +287,12 @@ export function checkRequest(provenance, options, stackPackages) {
     options.stack === undefined &&
     options.flags.length === 0 &&
     options.capabilities.length === 0 &&
-    added.length === 0
+    added.length === 0 &&
+    sdks.length === 0
   ) {
-    throw new ScaffoldError('nothing to add: pass --stack, --frontend, --flag or --capability')
+    throw new ScaffoldError(
+      'nothing to add: pass --stack, --frontend, --sdk, --flag or --capability',
+    )
   }
 }
 
@@ -277,6 +328,13 @@ const frontendsOf = (provenance) =>
     .filter(([, pkg]) => isFrontend(pkg.template))
     .map(([dir, pkg]) => ({ dir, template: pkg.template }))
 
+const sdksOf = (provenance) =>
+  entries(provenance)
+    .filter(([, pkg]) => isSdk(pkg.template))
+    .map(([dir, pkg]) => ({ dir, template: pkg.template }))
+
+const sdkArguments = (list) => list.flatMap(({ dir, template }) => ['--sdk', `${dir}=${template}`])
+
 // The generator builds a stack's own frontend at `frontend`; any other list is spelled out.
 function frontendArguments(list) {
   if (list.length === 0 || (list.length === 1 && list[0].dir === defaultDir(list[0].template))) {
@@ -295,7 +353,12 @@ function common(provenance, { out, answers, catalogVersion }) {
 
 export function baseArguments(provenance, io) {
   const head = provenance.stack
-    ? ['--stack', provenance.stack, ...frontendArguments(frontendsOf(provenance))]
+    ? [
+        '--stack',
+        provenance.stack,
+        ...frontendArguments(frontendsOf(provenance)),
+        ...sdkArguments(sdksOf(provenance)),
+      ]
     : loneTemplateArguments(provenance)
   return ['tools/generate.ts', ...head, ...common(provenance, io)]
 }
@@ -303,9 +366,16 @@ export function baseArguments(provenance, io) {
 export function nextArguments(provenance, options, io) {
   const stack = options.stack ?? provenance.stack
   const added = options.frontends ?? []
+  const sdks = options.sdks ?? []
   if (!stack && added.length > 0) throw new ScaffoldError('--frontend needs a stack', 3)
+  if (!stack && sdks.length > 0) throw new ScaffoldError('--sdk needs a stack', 3)
   const head = stack
-    ? ['--stack', stack, ...frontendArguments([...frontendsOf(provenance), ...added])]
+    ? [
+        '--stack',
+        stack,
+        ...frontendArguments([...frontendsOf(provenance), ...added]),
+        ...sdkArguments([...sdksOf(provenance), ...sdks]),
+      ]
     : loneTemplateArguments(provenance)
   // The catalog version goes after the shorthands, so it is added here and not by `common`.
   const tail = common(provenance, { ...io, catalogVersion: undefined })
@@ -363,16 +433,19 @@ export function partsOf(base, next, options) {
   return parts
 }
 
-// The role that owns a conflicting file: a frontend package is the frontend's, a server or
-// serverless package the backend's. Root files and unknown packages are the driver's.
+// The role that owns a conflicting file: a frontend or sdk package is the frontend's, a server
+// or serverless package the backend's. Root files and unknown packages are the driver's.
 export function ownerOf(provenance, dir) {
   const template = provenance.packages?.[dir]?.template
   if (template === undefined) return 'driver'
-  return kindOf(template) === 'frontend' ? 'frontend' : 'backend'
+  return isFrontend(template) || isSdk(template) ? 'frontend' : 'backend'
 }
 
-// An older catalog's generator does not know --frontend; say which catalog does.
+// An older catalog's generator does not know --frontend or --sdk; say which catalog does.
 export function catalogHint(args, stderr) {
+  if (args.includes('--sdk') && /unknown argument "--sdk"/.test(stderr)) {
+    return 'the catalog must be v1.18.0 or later to take --sdk'
+  }
   return args.includes('--frontend') && /unknown argument "--frontend"/.test(stderr)
     ? 'the catalog must be v1.15.0 or later to take --frontend'
     : ''

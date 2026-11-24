@@ -543,3 +543,44 @@ test('a per-package flag merges into a copy of the given answers file', () => {
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('an SDK beside a stack is forwarded and its playground port is printed', () => {
+  const record = [
+    'stack: x',
+    'packages:',
+    '  backend:',
+    '    template: server/fake',
+    '  sdk-widget:',
+    '    template: sdk/browser',
+    '    http: { port: 5180 }',
+    '',
+  ].join('\n')
+  const { result, forwarded } = runWithFakeGenerator(
+    ['--sdk', 'sdk-widget=sdk/browser'],
+    ['--stack', 'x'],
+    record,
+    STACK_API,
+  )
+  assert.equal(result.status, 0, result.stderr)
+  const at = forwarded.indexOf('--sdk')
+  assert.deepEqual(forwarded.slice(at, at + 2), ['--sdk', 'sdk-widget=sdk/browser'])
+  assert.match(result.stdout, /sdk-widget.*playground.*http:\/\/localhost:5180/)
+})
+
+test('--sdk needs --stack: beside --template or alone it is refused', () => {
+  const beside = runWithFakeGenerator(['--sdk', 'sdk-widget=sdk/browser'], ['--template', 'server/fake'])
+  assert.equal(beside.result.status, 1)
+  assert.match(beside.result.stderr, /--sdk needs --stack/)
+  const alone = runWithFakeGenerator(['--sdk', 'sdk-widget=sdk/browser'], [])
+  assert.equal(alone.result.status, 1)
+  assert.match(alone.result.stderr, /--sdk needs --stack/)
+  const bad = runWithFakeGenerator(['--sdk', 'widget=sdk/browser'], ['--stack', 'x'])
+  assert.equal(bad.result.status, 1)
+  assert.match(bad.result.stderr, /sdk-<name>/)
+  const twice = runWithFakeGenerator(
+    ['--sdk', 'sdk-widget=sdk/browser', '--sdk', 'sdk-widget=sdk/browser'],
+    ['--stack', 'x'],
+  )
+  assert.equal(twice.result.status, 1)
+  assert.match(twice.result.stderr, /twice/)
+})

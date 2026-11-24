@@ -132,6 +132,21 @@ test('a serverless package gets the serverless skeleton, with no auth text', () 
   assert.match(text, /<!-- FILL:/)
 })
 
+test('an sdk package gets the sdk skeleton, with no design file and no auth text', () => {
+  const root = project([
+    entry('backend', 'server/bun-express', 'auth: true'),
+    entry('sdk-widget', 'sdk/browser'),
+  ])
+  const { written } = seedPackageDocs(root, { dirs: ['sdk-widget'] })
+  assert.deepEqual(written, ['sdk-widget/.doc/architecture.md'])
+  const text = read(root, written[0])
+  assert.match(text, /^## Modules$/m)
+  assert.match(text, /^## Public API$/m)
+  assert.match(text, /<!-- FILL:/)
+  assert.doesNotMatch(text, MARKER)
+  assert.doesNotMatch(text, /^## Routes$/m)
+})
+
 test('a template kind with no skeleton is skipped without error', () => {
   const root = project([entry('tool', 'cli/thing'), entry('site', 'frontend/astro')])
   assert.deepEqual(seedPackageDocs(root).written.sort(), [

@@ -357,6 +357,39 @@ test('a lone serverless package prints its own port and one dev command', () => 
   assert.doesNotMatch(blocks.usage, /own terminal/)
 })
 
+test('an SDK: the usage notes name its playground and where the built file is served', () => {
+  const yaml =
+    NESTED_YAML +
+    [
+      '  sdk-widget:',
+      '    template: sdk/browser',
+      '    commands:',
+      '      install: bun install',
+      '      dev: bun run dev',
+      '      check: bun run check',
+      '    http: { port: 5180, health: / }',
+      '',
+    ].join('\n')
+  const root = repo({ '.fullstack/catalog.yaml': yaml })
+  const catalog = nestedCatalog()
+  mkdirSync(path.join(catalog, 'sdk/browser'), { recursive: true })
+  writeFileSync(
+    path.join(catalog, 'sdk/browser', 'template.yaml'),
+    "tools:\n  - { name: bun, min: '1.4' }\n",
+  )
+  const notes = renderPackageBlocks(root, catalog, { name: 'demo' })['usage-notes']
+  // The SDK is no app to open: the one frontend stays the address, with no per-package list.
+  assert.match(notes, /Open http:\/\/localhost:4321 once the dev servers are up\./)
+  assert.match(
+    notes,
+    /The SDK's playground \(sdk-widget\) is at http:\/\/localhost:5180; the API serves its built file under `\/api\/sdk\/dist\/`\./,
+  )
+  const without = renderPackageBlocks(repo({ '.fullstack/catalog.yaml': NESTED_YAML }), catalog, {
+    name: 'demo',
+  })
+  assert.doesNotMatch(without['usage-notes'], /SDK/)
+})
+
 test('several frontends: the usage notes name each with its port', () => {
   const yaml =
     NESTED_YAML.replace('  frontend:', '  site:') +

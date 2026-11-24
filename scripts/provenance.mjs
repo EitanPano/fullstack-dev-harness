@@ -1,8 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 
-// The template kind (`server`, `serverless`, `frontend`) is the part of the template id before
-// the slash; the scripts name a package's kind by it, never by which commands it happens to have.
+// The template kind (`server`, `serverless`, `frontend`, `sdk`) is the part of the template id
+// before the slash; the scripts name a package's kind by it, never by which commands it has.
 export const kindOf = (template) => template.split('/')[0]
+
+// An SDK package lives at `sdk-<name>`, <name> kebab-case; it is not a frontend directory.
+export const SDK_DIRS = 'sdk-<name>'
+export const isSdkDir = (dir) => /^sdk-[a-z0-9]+(-[a-z0-9]+)*$/.test(dir)
 
 // The directory names a frontend package may take; the one place the type names live in code.
 export const FRONTEND_DIRS = 'site, platform, app, app-<tool>, admin'
