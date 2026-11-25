@@ -132,11 +132,11 @@ and accept an override. Ask every flag the templates declare (show its `summary`
 `static`. Put the tradeoff in two lines and map the answer to `--deploy <single|split>`:
 
 - `single` (the default): one container and one port; the server serves the built frontend and
-  the API, so no CORS and no frontend container. It needs the Compose floor in the `deployment`
+  the API, so no CORS. It needs the Compose floor in the `deployment`
   skill (section 1): name it and run `docker compose version` before accepting `single`. On an
   older client, offer `split` or an upgrade; do not scaffold `single`.
 - `split`: a static-server image per frontend that proxies `/api` to the server, for separate
-  scaling or hosting of the frontend.
+  scaling or hosting.
 
 A frontend without `static` (Next) is always `split`: do not ask, pass no `--deploy`. The
 `deployment` skill moves the project between modes later.
@@ -155,10 +155,12 @@ missing or old tool, the version found and the minimum, and stop.
 
 ```bash
 node scripts/bootstrap.mjs --stack <id> --frontend <dir>=frontend/<id> --name <project-name> \
-  [--flag k=v]… [--capability k=v]… [--deploy single|split] [brand flags]…
+  [--sdk sdk-<name>=sdk/browser] [--flag k=v]… [--capability k=v]… [--deploy single|split] \
+  [brand flags]…
 ```
 
-`<dir>` is the row's directory; a lone frontend passes no `--stack`. Take the brand
+`<dir>` is the row's directory; a lone frontend passes no `--stack`. A row at `sdk-<name>`
+adds `--sdk`, beside a stack only. Take the brand
 flags from the `Design` form; pass only the fields that hold a value:
 
 | Design field | Flag |
@@ -187,7 +189,7 @@ flags from the `Design` form; pass only the fields that hold a value:
 
 The run:
 
-- Creates the packages the stack lists, under the directories it names, and seeds each one's
+- Creates the requested packages and seeds each one's
   `.doc/` (`node scripts/package-doc.mjs`); a merged
   `docker-compose.yml` (none for a lone frontend) and `.gitignore`; `.editorconfig` when absent; and
   `.fullstack/catalog.yaml`, the provenance file (per package: template, version, flags,

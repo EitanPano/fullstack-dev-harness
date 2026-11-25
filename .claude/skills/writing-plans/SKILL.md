@@ -6,8 +6,8 @@ description: Create, revise, or supersede an implementation plan in .plan/. Use 
 # Writing Plans
 
 `.plan/` at the repository root is the source of truth for plans. `000-backlog.md` is
-the task queue; every other file is a plan. Copy `template.md` from this directory and
-fill it; do not invent a different shape.
+the task queue; every other file is a plan. Copy this directory's `template.md` and
+fill it; invent no other shape.
 
 ## Before writing anything
 
@@ -21,7 +21,7 @@ fill it; do not invent a different shape.
 
 ## Filename
 
-`NNN-YYYY-MM-DD-<topic>.md` with a sequential numeric prefix: `001`, `002`, `003`.
+`NNN-YYYY-MM-DD-<topic>.md` with a sequential prefix: `001`, `002`, `003`.
 Example: `.plan/003-2026-08-03-comment-thread.md`.
 
 ## Required metadata
@@ -46,7 +46,8 @@ the line.
 
 `Scaffold:` names a part `.fullstack/catalog.yaml` lacks that the task needs (a server:
 `--stack <id> --flag auth=<true|false>` per the Auth answer, plus `--deploy <single|split>` with a
-frontend; a frontend: `--frontend <dir>=frontend/<id>` (`Frontends` row); a flag:
+frontend; a frontend: `--frontend <dir>=frontend/<id>` (`Frontends` row); an SDK:
+`--sdk sdk-<name>=sdk/browser`; a flag:
 `--flag <name>=true`; a capability: `--capability <kind>=<id>`); else `none`. Stack ids: the
 catalog's `index.yaml`.
 
@@ -72,14 +73,14 @@ In this order, with these exact headings:
 - `Contract`: each endpoint as `METHOD /api/<entity>[/{id}]`, its request fields, its response
   fields, and the error codes it can return. The backend agent implements exactly that list;
   the frontend agent consumes the generated types.
-- `UX`: one line per route, in this form (patterns and tones: the `ui-design` skill). No copy
-  strings.
+- `UX`: one line per route or SDK unit, in this form (patterns and tones: the `ui-design`
+  skill). No copy strings.
 
   `- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>`
 
-  The pattern is one of `list`, `detail`, `form`, `auth`, `dashboard` (a dashboard or a table
-  view), `workspace` (a board, canvas or editor), `confirm` (a destructive confirm), `landing`
-  (a home or content page). Empty, loading and error are states, not patterns.
+  The pattern is one of `list`, `detail`, `form`, `auth`, `dashboard`, `workspace`, `confirm`,
+  `landing`. An SDK unit's line starts `unit <module>` and its pattern is `inline` or `modal`.
+  Empty, loading and error are states, not patterns.
 
   A plan whose `UX` names a route opens it with the template's `shell` line
   (`ui-design › Shell`).

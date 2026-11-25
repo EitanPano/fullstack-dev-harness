@@ -8,6 +8,7 @@ import { after, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { renderConfiguration, replaceConfiguration } from './readme.mjs'
 import { parseArgs, runVerify } from './verify.mjs'
+import { processTable } from './verify/reap.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const bases = []
@@ -19,7 +20,7 @@ const test = (name, run) => tests.push([name, run])
 // child. It logs each run outside the repository so a test can count what verify executed.
 const STUB = `
 import { spawn } from 'node:child_process'
-import { appendFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 const [mode, file, text] = process.argv.slice(2)
 appendFileSync(path.resolve(import.meta.dirname, '..', 'runs.log'), mode + '\\n')
@@ -30,14 +31,18 @@ else if (mode === 'flaky') console.log('  3 passed (2s)\\n  1 flaky')
 else if (mode === 'stable') writeFileSync(file, text)
 else if (mode === 'write') writeFileSync(file, text + Date.now())
 else if (mode === 'orphan') {
-  // A detached grandchild that outlives this command, which lingers long enough to be seen.
+  // A detached grandchild that outlives this command, which lingers until the test has seen the
+  // grandchild in a process table (a minute at most).
   const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
     detached: true,
     stdio: 'ignore',
   })
   child.unref()
   writeFileSync(file, String(child.pid))
-  setTimeout(() => {}, 1500)
+  const until = Date.now() + 60_000
+  const wait = setInterval(() => {
+    if (existsSync(file + '.seen') || Date.now() > until) clearInterval(wait)
+  }, 100)
 } else if (mode === 'hang') {
   const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
   console.log('child ' + child.pid)
@@ -95,12 +100,13 @@ async function fixture({
   compose = false,
   nested = false,
   frontends = ['frontend'],
+  sdk,
 } = {}) {
   const base = mkdtempSync(path.join(tmpdir(), 'verify-'))
   bases.push(base)
   const root = path.join(base, 'repo')
   const api = nested ? 'serverless/cloudflare' : 'backend'
-  for (const dir of [api, ...frontends]) {
+  for (const dir of [api, ...frontends, ...(sdk ? [sdk] : [])]) {
     mkdirSync(path.join(root, dir), { recursive: true })
   }
   mkdirSync(path.join(root, '.fullstack'))
@@ -134,8 +140,10 @@ async function fixture({
   // frontend, no Compose file, no deploy mode.
   const lines = nested ? ['packages:'] : ['deploy: split', 'packages:']
   const frontendTemplate = nested ? 'frontend/astro' : 'frontend/react'
+  // An SDK is listed before the API, so the order the run takes is verify's, not the file's.
   const members = [
     ...frontends.map((dir, i) => [dir, frontendTemplate, frontendPorts[i]]),
+    ...(sdk ? [[sdk, 'sdk/browser', await freePort()]] : []),
     [api, nested ? 'serverless/cloudflare' : 'server/python-fastapi', backendPort],
   ]
   for (const [dir, template, port] of members) {
@@ -162,7 +170,7 @@ async function fixture({
   writeFileSync(path.join(root, 'README.md'), `# Fixture\n\n${none}\n`)
   writeFileSync(path.join(root, api, 'contract.json'), 'v1')
   writeFileSync(path.join(root, api, 'app.ts'), 'export const a = 1\n')
-  for (const dir of frontends) {
+  for (const dir of [...frontends, ...(sdk ? [sdk] : [])]) {
     writeFileSync(path.join(root, dir, 'app.ts'), 'export const b = 1\n')
   }
   if (noDb) writeFileSync(path.join(base, 'no-db'), '')
@@ -582,8 +590,18 @@ test('a grandchild left behind by a normal exit is reaped', async (t) => {
   })
   let pid
   try {
-    const { exit } = await runVerify(opts(fx, { reap: true, reapInterval: 300 }).options)
-    pid = Number(readFileSync(path.join(fx.base, 'orphan.pid'), 'utf8'))
+    // The step ends once a table has shown the grandchild, so a table that answers late on a
+    // loaded machine does not decide the test (the reaper's known limit, verify/reap.mjs).
+    const pidFile = path.join(fx.base, 'orphan.pid')
+    const reapQuery = async () => {
+      const table = await processTable()
+      if (existsSync(pidFile) && table.has(Number(readFileSync(pidFile, 'utf8')))) {
+        writeFileSync(`${pidFile}.seen`, '')
+      }
+      return table
+    }
+    const { exit } = await runVerify(opts(fx, { reap: true, reapInterval: 300, reapQuery }).options)
+    pid = Number(readFileSync(pidFile, 'utf8'))
     assert.equal(exit, 0)
     assert.throws(() => process.kill(pid, 0), /ESRCH/)
   } finally {
@@ -1400,6 +1418,31 @@ test('a Compose file without a database service fails testDb and starts nothing'
   assert.equal(read(fx).packages.backend.testDb.ok, false)
   assert.match(read(fx).packages.backend.testDb.reason, /no database service/)
   assert.doesNotMatch(docker, /up -d/)
+})
+
+test('an SDK package', async () => {
+  const commands = { 'sdk-widget': { contract: 'node ../stub.mjs marker' } }
+  const fx = await fixture({ sdk: 'sdk-widget', commands })
+  const run = await runVerify(opts(fx).options)
+  assert.equal(run.exit, 0, JSON.stringify(run.result.packages))
+  const result = read(fx)
+  assert.deepEqual(Object.keys(result.packages).sort(), ['backend', 'frontend', 'sdk-widget'])
+  assert.equal(result.packages['sdk-widget'].contract.exit, 0)
+  assert.equal(result.packages['sdk-widget'].check.exit, 0)
+  assert.equal(result.packages['sdk-widget'].testE2e.exit, 0)
+  // The server's contract is regenerated before the SDK's types are read from it.
+  const log = runs(fx)
+  assert.ok(log.indexOf('stable') < log.indexOf('marker'), log.join('|'))
+  const one = await fixture({ sdk: 'sdk-widget' })
+  const partial = await runVerify(opts(one, { packages: ['sdk-widget'] }).options)
+  assert.equal(partial.exit, 0, JSON.stringify(partial.result))
+  const only = read(one, 'verify-partial.json')
+  // As for a frontend, the server's dev migrate runs for the e2e; nothing else of it or of the
+  // other frontend.
+  assert.equal(only.packages.frontend, undefined)
+  assert.deepEqual(Object.keys(only.packages.backend ?? {}), ['migrate'])
+  assert.equal(only.packages['sdk-widget'].check.exit, 0)
+  assert.equal(only.packages['sdk-widget'].testE2e.exit, 0)
 })
 
 describe('verify', { concurrency: 6 }, () => {

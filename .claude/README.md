@@ -8,22 +8,22 @@ replaced on an update.
 
 1. A task is one line in `.plan/000-backlog.md`.
 2. The orchestrator drafts the plan into `.orchestrate/<slug>/plan.md`, with a `UX` line per
-   route (pattern, primary action, states, tone) and a `shell` line for the chrome. You approve the
+   route or SDK unit (pattern, action, states, tone) and a `shell` line for routes' chrome. You approve the
    draft; the driver then cuts the task's branch and promotes it to
    `.plan/NNN-YYYY-MM-DD-<slug>.md`. A plan whose `Scaffold:` line is not `none` first runs
    `scripts/scaffold.mjs` and commits its result as the task's `Base:`; from catalog v1.11.0 a
-   project may start as a frontend alone and gain a server later. Once a task's implementers are
-   running, the orchestrator plans the next backlog line in the background.
+   project may start as a frontend alone and gain a server later. While a task's implementers
+   run, the orchestrator plans the next backlog line in the background.
 3. The backend agent implements the plan's Contract and regenerates the server's contract (the
    contract stage); then the backend and frontend agents work in parallel, the frontend
    regenerating its types and implementing the feature. Both test first. After e2e has captured
-   the screens, the frontend agent runs a UI pass: it reads three screenshots per route against the `ui-design` rubric and fixes what fails.
+   the screens, the frontend agent runs a UI pass: it reads each one's three screenshots against the `ui-design` rubric and fixes what fails.
 4. `node scripts/verify.mjs --plan <plan> --reuse` runs the gates and writes
    `.orchestrate/<slug>/verify.json` (run in the background; it can outlive a foreground
    timeout).
 5. One reviewer (plus a security reviewer when `verify.json` says `security.triggered`) and QA
    run in parallel. P0 and P1 findings go back to the implementer, at most two fix rounds, each
-   re-reviewed on its own diff. QA adds adversarial tests, runs a UX pass over the same
+   re-reviewed on its own diff. QA adds adversarial tests, runs a UX pass over those
    screenshots, and checks each acceptance criterion with evidence.
 6. The driver updates the root `README.md` (Features, and the
    Configuration block with `node scripts/readme.mjs --configuration`), runs `verify` once more
@@ -89,7 +89,8 @@ Lanes stop accidents; they are not a sandbox. Use Claude Code's sandbox or a con
 React, Angular and Vue are the single-page frontends. Next is for products whose public pages
 must be found by search engines or show a rich preview when shared. Astro is for content sites:
 prerendered pages, alone or on a Cloudflare Worker in `serverless/cloudflare/`, which serves
-several frontends, each in a directory named for its type; one of them may be Angular. Report any gap you meet.
+several frontends, each in a directory named for its type; one of them may be Angular. A product
+may add an SDK other sites embed, at `sdk-<name>/`. Report any gap you meet.
 
 ## Updating the harness
 

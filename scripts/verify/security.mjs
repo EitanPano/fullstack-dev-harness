@@ -39,9 +39,21 @@ const GLOBS = [
   '**/models/user/**',
   // The admin namespace: every admin endpoint of every server template lives here (plan 030).
   '**/api/admin/**',
+  // The SDK namespace is the first cross-origin surface. In the SDK package the same risk sits
+  // in `transport/` (its network caller), `entries/` (what host pages load), `protocol/` (the
+  // channel to the frame), `frame/` (where a view is decided) and a module's frame half (it calls
+  // the API and draws server data) (plan 033).
+  '**/api/sdk/**',
+  '**/sdk-*/src/transport/**',
+  '**/sdk-*/src/entries/**',
+  '**/sdk-*/src/protocol/**',
+  '**/sdk-*/src/frame/**',
+  '**/sdk-*/src/modules/*/frame.*',
+  '**/sdk-*/src/modules/*/frame/**',
 ]
-// A login form is UI; it fires only by a gate line (plan 014, plan 016).
-const UI_ONLY = ['**/auth/ui/**']
+// A login form is UI; it fires only by a gate line (plan 014, plan 016). So is a stylesheet
+// of an SDK module's frame half (plan 034).
+const UI_ONLY = ['**/auth/ui/**', '**/sdk-*/src/modules/**/*.css']
 const CODE = /\.(?:[cm]?[jt]sx?|py)$/
 const GATE =
   /(?<![\w$])(?:requireAuth|requireRole|requireAccount|assertRole|require_auth|require_role|require_caller|_assert_role|roleAction|accountAction)(?![\w$])/

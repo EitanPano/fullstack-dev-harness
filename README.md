@@ -46,7 +46,7 @@ To add work later, write one line in `.plan/000-backlog.md` and run `/dev-loop` 
 
 | Piece | What it does |
 | --- | --- |
-| Your app | A React, Angular, Vue or Next frontend and an Express or FastAPI server; or Astro frontends, one per type (one may be Angular), on a Cloudflare Worker |
+| Your app | A React, Angular, Vue or Next frontend and an Express or FastAPI server; or Astro frontends, one per type (one may be Angular), on a Cloudflare Worker; beside either, an SDK other sites embed |
 | Five agents | Plan, build the server, build the frontend, test, review |
 | Guardrails | Block destructive commands and access to secret files |
 | Definition of done | A change is done only when its checks, tests and review pass |

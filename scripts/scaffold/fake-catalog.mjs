@@ -13,16 +13,21 @@ import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
 const argv = process.argv.slice(2)
-const o: any = { flags: [], caps: [], fronts: [] }
+const o: any = { flags: [], caps: [], fronts: [], sdks: [] }
 for (let i = 0; i < argv.length; i += 1) {
   const a = argv[i]
   if (a === '--flag') o.flags.push(argv[++i])
   else if (a === '--capability') o.caps.push(argv[++i])
   else if (a === '--frontend') o.fronts.push(argv[++i])
+  else if (a === '--sdk') o.sdks.push(argv[++i])
   else if (a.startsWith('--')) o[a.slice(2)] = argv[++i]
 }
 if (process.env.FAKE_OLD_GENERATOR && o.fronts.length) {
   console.error('generate: unknown argument "--frontend"')
+  process.exit(1)
+}
+if (process.env.FAKE_OLD_GENERATOR && o.sdks.length) {
+  console.error('generate: unknown argument "--sdk"')
   process.exit(1)
 }
 const SERVER = { template: 'server/fake-server', dir: 'backend' }
@@ -33,11 +38,16 @@ const listed = o.fronts.map((f: string) => {
   const [dir, template] = f.split('=')
   return { template, dir }
 })
+const sdkMembers = o.sdks.map((f: string) => {
+  const [dir, template] = f.split('=')
+  return { template, dir }
+})
 const stackApi = o.stack === 'astro-cf' ? [SERVERLESS] : o.stack ? [SERVER] : []
 // With a stack the listed frontends replace the stack's own frontend, in order.
 const members = o.stack
-  ? [...stackApi, ...(listed.length ? listed : [FE])]
+  ? [...stackApi, ...(listed.length ? listed : [FE]), ...sdkMembers]
   : listed.length ? listed : [FRONTEND]
+if (!o.stack && sdkMembers.length) throw new Error('an sdk needs a stack')
 if (!o.stack && listed.length > 1) throw new Error('several frontends need a stack')
 if (listed.length > 1 && stackApi[0] === SERVER) {
   throw new Error('a second frontend beside a server: single serves one build')
@@ -99,6 +109,8 @@ for (const p of Object.values(pkgs) as any[]) {
     const title = 'title: app\\n1\\n2\\n3\\n4\\n5\\napi: '
     put(p.dir + '/src/app.txt', title + api + '\\npwa: ' + p.flags.pwa + '\\n')
     if (!hasServer) put(p.dir + '/src/standalone.txt', 'standalone\\n')
+  } else if (p.kind === 'sdk') {
+    put(p.dir + '/src/index.txt', 'title: sdk\\napi: ' + (hasServer ? 'yes' : 'none') + '\\n')
   } else if (p.kind === 'serverless') {
     put(p.dir + '/functions/api.txt', 'jobs: ' + p.flags.jobs + '\\n')
     put(p.dir + '/' + '.env' + '.example', '# Port the functions listen on.\\nPORT=8788\\n')
@@ -123,7 +135,9 @@ if (deploy) y += 'deploy: ' + deploy + '\\n'
 y += 'packages:\\n'
 let fronts = 0
 for (const p of Object.values(pkgs) as any[]) {
-  const port = p.kind === 'server' ? 3000 : p.kind === 'frontend' ? 5173 + fronts++ : 5173
+  const ports: any = { server: 3000, frontend: 5173 + fronts, sdk: 5180 }
+  const port = ports[p.kind] ?? 5173
+  if (p.kind === 'frontend') fronts += 1
   y += '  ' + p.dir + ':\\n    template: ' + p.template + '\\n    version: 1.0.0\\n'
   const f = Object.entries(p.flags)
   const row = ([k, v]: any) => '      ' + k + ': ' + v + '\\n'

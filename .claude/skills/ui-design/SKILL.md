@@ -6,15 +6,14 @@ description: Turn a brief into page decisions and judge a screen against a rubri
 # UI design
 
 Composition only. Tokens, sizing, primitives, status badges and the pattern components'
-props are in the package's `<frontend>/AGENTS.md › Styling`; read it, do not restate it here.
+props are in the package's `AGENTS.md › Styling`; read it, do not restate it.
 `figma:<url>` on a backlog line overrides the brief.
 
 ## Inputs
 
 - `.doc/product-definition.md › Design`: Tone, Density; `<frontend>/.doc/design.md`: Reference
   apps, Primary viewport.
-- The plan's `UX` section, one line per route:
-  `- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>`
+- The plan's `UX` section: one line per route or SDK unit (its form: `writing-plans`).
 - `.doc/glossary.md` for every noun and action.
 
 ## Shell
@@ -44,7 +43,8 @@ Pattern components: `Page`, `PageHeader`, `Section`, `EmptyState`, `ErrorState`,
 `ListSkeleton`, `CardSkeleton`, `AuthCard`, `FormActions`, `ConfirmDialog`: use one before
 a hand-written layout. React and Next names; Angular's and Vue's are in their
 `AGENTS.md › Styling`. The frontend agent reads `platform-guidance.md` before hand-writing a
-control or its behaviour.
+control or its behaviour. An SDK unit's pattern is `inline` or `modal` (its `AGENTS.md ›
+Styling`): no `Page`, no `h1`.
 
 - **list**: `Page` > `PageHeader` (title, the create action) > `Section` with the rows in a
   48 rem column. Row: name, a status `Badge`, secondary text muted, row actions at the
@@ -89,19 +89,19 @@ control or its behaviour.
 
 ## Rubric
 
-Ten checks applied to three screenshots per route: `<frontend>/test-results/screens/<route>-phone-light.png`,
-`<route>-phone-dark.png` and `<route>-desktop-light.png` (`home` for `/`; a nested route is
-slugged, `/staff/class` is `staff-class`). Machine-checked ones are enforced by the screens spec
-and `verify`; the passes judge only the judged ones.
+Ten checks on three screenshots per route or unit: `<package>/test-results/screens/<name>-phone-light.png`,
+`<name>-phone-dark.png` and `<name>-desktop-light.png` (`home` for `/`, `staff-class` for
+`/staff/class`, a unit's name). The screens spec
+enforces the machine-checked ones; the passes judge the rest.
 
 1. One obvious primary action. Judged.
-2. A clear `h1` and visible grouping. Machine-checked: exactly one `h1`. Judged: the grouping.
+2. A clear `h1` and visible grouping. Machine-checked: exactly one `h1` (a unit: none, judged). Judged: the grouping.
 3. A consistent spacing rhythm. Judged.
 4. The brand accent used only for action and emphasis: one accent on calm neutrals. Judged.
 5. Status readable without colour. Judged.
 6. Empty, loading and error states designed, not left as defaults. Judged.
-7. The shell matches the plan's `shell` line: its regions and no others, laid out as the
-   its `from:` source does; a phone header that neither wraps nor cramps.
+7. The shell matches the plan's `shell` line: its regions and no others, laid out as
+   its `from:` source does; a phone header that neither wraps nor cramps. A unit instead fits its frame.
    Machine-checked: no horizontal overflow. Judged: the rest.
 8. Dark mode legible. Machine-checked: the WCAG AA contrast scan in both themes. Judged:
    surfaces, borders and images still read.
@@ -111,4 +111,4 @@ and `verify`; the passes judge only the judged ones.
 ## Severity
 
 A rubric failure is a P2. A broken journey or a WCAG AA failure is a P1. The frontend agent
-fixes once per route; the rest goes to `Handoff`. QA reports against the same numbers.
+fixes once each; the rest goes to `Handoff`. QA reports against the same numbers.

@@ -38,8 +38,9 @@ holds a marker. Delete a marker only by replacing it with a decision.
 
 One row per frontend package; a later frontend adds a row. The directory is its type: `site`
 (public pages, no sign-in), `platform` (a public product with optional sign-in), `app` (the
-signed-in product; `app-<tool>` each when there are several) or `admin` (the staff back-office,
-on `/api/admin/*`). A product with no frontend writes "none".
+signed-in product; `app-<tool>` each when several) or `admin` (the staff back-office, on
+`/api/admin/*`). An SDK other sites embed takes a row at `sdk-<name>`. A product with no
+frontend writes "none".
 
 | Directory | Host | Audience | Search and sharing | Sign-in | Offline |
 | --- | --- | --- | --- | --- | --- |

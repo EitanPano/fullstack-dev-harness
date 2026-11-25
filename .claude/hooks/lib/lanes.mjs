@@ -3,8 +3,8 @@
 // - It understands exactly one shape: a `packages:` map whose keys are one or two plain
 //   segments and whose entries carry `template: <kind>/<id>` (block, or inside `{ … }`).
 //   Anything else drops that package, never guesses. A `lanes:` map is ignored.
-// - The lane follows the template kind: server and serverless are the backend's, frontend the
-//   frontend's, and all three have a `tests/` folder for qa.
+// - The lane follows the template kind: server and serverless are the backend's, frontend and
+//   sdk the frontend's, and all four have a `tests/` folder for qa.
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -109,11 +109,12 @@ function isPackageKey(key) {
 export function lanesFor(packages, role) {
   if (!ROLES.has(role)) return []
   const backend = kind => kind === 'server' || kind === 'serverless'
+  const frontend = kind => kind === 'frontend' || kind === 'sdk'
   const out = []
   for (const { dir, kind } of packages) {
     if (role === 'backend' && backend(kind)) out.push(`${dir}/`)
-    else if (role === 'frontend' && kind === 'frontend') out.push(`${dir}/`)
-    else if (role === 'qa' && (backend(kind) || kind === 'frontend')) out.push(`${dir}/tests/`)
+    else if (role === 'frontend' && frontend(kind)) out.push(`${dir}/`)
+    else if (role === 'qa' && (backend(kind) || frontend(kind))) out.push(`${dir}/tests/`)
   }
   return out
 }
