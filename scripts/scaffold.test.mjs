@@ -477,3 +477,38 @@ describe('several frontends', () => {
     assert.equal(git(project, ['status', '--porcelain']), '')
   })
 })
+
+describe('an SDK', () => {
+  const SDK = ['--sdk', 'sdk-widget=sdk/browser']
+  it('adds an SDK', () => {
+    const project = makeProject(catalog, top, STACK)
+    rmSync(logFile, { force: true })
+    const result = scaffold(project, SDK)
+    assert.equal(result.status, 0, result.err + result.out)
+    assert.match(result.out, /chore\(scaffold\): add sdk-widget/)
+    const record = read(project, '.fullstack/catalog.yaml')
+    assert.match(record, /\n {2}sdk-widget:\n {4}template: sdk\/browser/)
+    assert.match(record, /\n {2}backend:\n {4}template: server\/fake-server/)
+    assert.match(read(project, 'sdk-widget/src/index.txt'), /api: yes/)
+    assert.match(read(project, '.gitignore'), /fullstack-templates: sdk-widget/)
+    assert.ok(log().includes('sdk-widget install'), log().join('|'))
+    assert.deepEqual(readdirSync(scratch), [], 'temp folders are removed')
+  })
+  it('refuses an SDK with no stack, and a second one', () => {
+    const lone = fresh()
+    const noStack = scaffold(lone, SDK)
+    assert.equal(noStack.status, 2, noStack.err)
+    assert.match(noStack.err, /needs a stack/)
+    const project = makeProject(catalog, top, [...STACK, ...SDK])
+    const second = scaffold(project, ['--sdk', 'sdk-other=sdk/browser'])
+    assert.equal(second.status, 2, second.err)
+    assert.match(second.err, /one SDK per project/)
+  })
+  it('names the catalog version an older generator needs', () => {
+    const project = makeProject(catalog, top, STACK)
+    const result = scaffold(project, SDK, { env: { FAKE_OLD_GENERATOR: '1' } })
+    assert.equal(result.status, 3, result.err + result.out)
+    assert.match(result.err, /catalog must be v1\.18\.0 or later to take --sdk/)
+    assert.equal(git(project, ['status', '--porcelain']), '')
+  })
+})

@@ -19,6 +19,7 @@ const FILES = {
   ],
   server: [['architecture.md', 'architecture-server.md']],
   serverless: [['architecture.md', 'architecture-serverless.md']],
+  sdk: [['architecture.md', 'architecture-sdk.md']],
 }
 
 const isDirectory = (dir) => existsSync(dir) && statSync(dir).isDirectory()

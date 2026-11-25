@@ -35,11 +35,13 @@ project); this skill is the procedure.
   parsing. Each endpoint has its own entry in the package's policy constants (never
   literals in a router) and so never shares another endpoint's bucket. The subject of the
   limit is hashed into the store key, never stored in clear.
-- Every endpoint's errors are declared in its OpenAPI registration, so the frontend's
-  generated types know them.
+- Every endpoint's errors are declared in its OpenAPI registration, so generated types know
+  them.
 - Admin endpoints live only under `/api/admin/`, in `api/admin/<entity>/`: a namespace, so the
   entity keeps its name (`/api/admin/lead`). One elevated gate on the mount, first in its chain,
-  the same in every environment, guards them; other frontends never call them.
+  the same in every environment, guards them; other frontends never call them. An SDK's
+  endpoints live the same way under `/api/sdk/v1/`, behind the gate the server package's
+  `AGENTS.md` names; `v1` only grows: a break is `v2` beside it.
 
 ## Entity shape
 
@@ -60,9 +62,6 @@ Order of work: types in `models/<name>/` → `schema` → test, red → `service
 → `routes` → the mount line and the registration line → `contract` → `check`. Copy
 the shipped reference entity and its `models/` directory and rename `entity` →
 `<name>`; drop the files the entity does not need.
-
-The file names, helpers and worked example are in `backend/AGENTS.md › Adding an
-entity`.
 
 ## Crossing an entity boundary
 
@@ -94,7 +93,7 @@ composes controllers.
 
 ## Auth and the caller
 
-A server template ships authentication behind its `auth` flag.
+Authentication ships behind the server's `auth` flag.
 `backend/.doc/architecture.md › Auth` (the root file where a package has none) states the model, `backend/AGENTS.md` (Authentication)
 its rules. When it says Auth: none, every endpoint is public, no
 caller or role exists, and the rules below apply once a plan adds accounts. The gate and
@@ -129,6 +128,6 @@ helper names are in `backend/AGENTS.md › Adding an entity`.
    paths `<frontend>/AGENTS.md › Adding a feature` names; both call the typed client through the
    helper `<frontend>/AGENTS.md › Errors` names, so the result is typed, including the error
    envelope. A form schema extends the generated zod schema (`zod.gen`); a limit is never
-   copied from the backend. The frontend never hand-writes an API type.
-4. Both generated files are committed in the same task. A breaking change to a response
+   copied from the backend.
+4. Generated files are committed in the same task. A breaking change to a response
    shape is a new plan, not a silent edit.

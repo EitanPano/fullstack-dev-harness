@@ -6,6 +6,7 @@
 // once they are resolved.
 //
 //   node scripts/scaffold.mjs [--stack <id>] [--frontend <dir>=<template>]…
+//     [--sdk <dir>=<template>]
 //     [--flag [<dir>:]<name>=<bool>]… [--capability <kind>=<id>]… [--deploy single|split]
 //     [--slug <slug>] [--templates <path>]
 //     [--root <dir>] [--dry-run]

@@ -7,7 +7,8 @@
 //
 //   node scripts/bootstrap.mjs --fetch [--templates <path>]
 //   node scripts/bootstrap.mjs (--stack <id> | --template <kind>/<id>) --name <name>
-//     [--frontend <dir>=<template>]… [--flag [<dir>:]k=v]… [--capability k=v]…
+//     [--frontend <dir>=<template>]… [--sdk <dir>=<template> (with --stack only)]
+//     [--flag [<dir>:]k=v]… [--capability k=v]…
 //     [--answers <file>] [--templates <path>]
 //     [--root <dir>] [--skip-install] [--deploy single|split (with --stack only)]
 //     [--display-name <text>] [--brand-primary <hex>]
@@ -23,6 +24,7 @@
 // commit: it records the harness version and removes the harness-development files.
 // `--template <kind>/<id>` generates one package alone, where a stack is several. A frontend is
 // always typed by its directory: `--frontend site=frontend/astro`, alone or beside a stack.
+// An SDK is `--sdk sdk-<name>=sdk/browser`, beside a stack only: it needs the stack's API.
 // `--skip-install` maps to the generator's `--skip-post-generate`. Environment:
 // FULLSTACK_TEMPLATES_DIR (same as `--templates`, the flag wins) and FULLSTACK_TEMPLATES_CACHE
 // (cache root, default ~/.cache/fullstack-templates).
@@ -52,7 +54,7 @@ import {
 } from './history.mjs'
 import { seedPackageDocs } from './package-doc.mjs'
 import { FRONTEND_DIRS, authFlagFrom, readProvenance } from './provenance.mjs'
-import { ScaffoldError, parseFlag, parseFrontend, readYaml } from './scaffold/request.mjs'
+import { ScaffoldError, parseFlag, parseFrontend, parseSdk, readYaml } from './scaffold/request.mjs'
 
 const README_TEMPLATE = ['.claude', 'skills', 'bootstrap-project', 'readme-template.md']
 
@@ -73,7 +75,8 @@ const USAGE =
   '         (a frontend takes --frontend <dir>=<template>, dir: ' +
   FRONTEND_DIRS +
   '; alone, it replaces --stack and --template)\n' +
-  '         [--frontend <dir>=<template>]… [--flag [<dir>:]k=v]… [--capability k=v]…\n' +
+  '         [--frontend <dir>=<template>]… [--sdk <dir>=<template> (with --stack only)]\n' +
+  '         [--flag [<dir>:]k=v]… [--capability k=v]…\n' +
   '         [--answers <file>] [--templates <path>]\n' +
   '         [--root <dir>] [--skip-install] [--deploy single|split (with --stack only)]\n' +
   '         [--display-name <text>] [--brand-primary <hex>]\n' +
@@ -280,6 +283,7 @@ function generatorArguments(catalogVersion, scratch) {
   if (args.stack !== undefined) {
     list.push('--stack', args.stack)
     for (const { dir, template } of args.frontends) list.push('--frontend', `${dir}=${template}`)
+    for (const { dir, template } of args.sdks) list.push('--sdk', `${dir}=${template}`)
   } else if (args.template !== undefined) list.push('--template', args.template)
   else list.push('--template', args.frontends[0].template, '--dir', args.frontends[0].dir)
   list.push('--out', root, '--name', args.name)
@@ -347,6 +351,7 @@ function checkStackFrontends(catalog) {
   }
   const known = new Set([
     ...args.frontends.map((f) => f.dir),
+    ...args.sdks.map((s) => s.dir),
     ...members.filter((m) => !m.template.startsWith('frontend/')).map((m) => m.dir),
   ])
   for (const { dir, name } of args.scopedFlags) {
@@ -408,6 +413,10 @@ function printDeploySteps({ deploy, packages }, withProvider, hasCompose) {
   } else if (frontend?.port !== undefined) {
     console.log(`  Once started, the frontend dev server is at http://localhost:${frontend.port}.`)
   }
+  const sdk = packages.find((pkg) => pkg.template.startsWith('sdk/'))
+  if (sdk?.port !== undefined) {
+    console.log(`  Once started, the ${sdk.dir} playground is at http://localhost:${sdk.port}.`)
+  }
   if (!hasCompose) return
   const compose = 'docker compose --profile app up --build'
   if (deploy === 'single') {
@@ -446,6 +455,7 @@ function parseArgs(argv) {
     flags: [],
     scopedFlags: [],
     frontends: [],
+    sdks: [],
     capabilities: [],
     brand: {},
   }
@@ -476,6 +486,10 @@ function parseArgs(argv) {
         die(`--frontend names ${frontend.dir} twice`)
       }
       parsed.frontends.push(frontend)
+    } else if (arg === '--sdk') {
+      const sdk = parsedBy(parseSdk, value(arg, ++i))
+      if (parsed.sdks.some((s) => s.dir === sdk.dir)) die(`--sdk names ${sdk.dir} twice`)
+      parsed.sdks.push(sdk)
     }
     else if (arg === '--capability') parsed.capabilities.push(value(arg, ++i))
     else if (arg === '--deploy') parsed.deploy = value(arg, ++i)
@@ -488,7 +502,7 @@ function parseArgs(argv) {
   }
   if (parsed.fetch) {
     // The list-valued keys are counted below; an empty list is not an argument.
-    const lists = ['flags', 'scopedFlags', 'frontends', 'capabilities', 'brand']
+    const lists = ['flags', 'scopedFlags', 'frontends', 'sdks', 'capabilities', 'brand']
     const others = Object.keys(parsed).filter(
       (key) =>
         !['fetch', 'templates', ...lists].includes(key) &&
@@ -498,13 +512,23 @@ function parseArgs(argv) {
     if (
       others.length > 0 ||
       parsed.flags.length + parsed.scopedFlags.length + parsed.frontends.length > 0 ||
+      parsed.sdks.length > 0 ||
       parsed.capabilities.length > 0 ||
       Object.keys(parsed.brand).length > 0
     ) {
       die('--fetch accepts only --templates')
     }
   } else if (parsed.finish) {
-    const allowed = ['finish', 'root', 'flags', 'scopedFlags', 'frontends', 'capabilities', 'brand']
+    const allowed = [
+      'finish',
+      'root',
+      'flags',
+      'scopedFlags',
+      'frontends',
+      'sdks',
+      'capabilities',
+      'brand',
+    ]
     const others = Object.keys(parsed).filter(
       (key) => !allowed.includes(key) && parsed[key] !== false && parsed[key] !== undefined,
     )
@@ -512,6 +536,7 @@ function parseArgs(argv) {
       parsed.flags.length +
       parsed.scopedFlags.length +
       parsed.frontends.length +
+      parsed.sdks.length +
       parsed.capabilities.length +
       Object.keys(parsed.brand).length
     if (others.length > 0 || extra > 0) die('--finish accepts only --root')
@@ -534,6 +559,9 @@ function parsedBy(parse, text) {
 // What a new project needs: a stack, a lone template, or one typed frontend; a frontend never
 // comes from a bare template, because its directory carries its type.
 function checkNewProject(parsed) {
+  if (parsed.sdks.length > 0 && parsed.stack === undefined) {
+    die("--sdk needs --stack: an SDK needs the stack's API; it does not go beside --template")
+  }
   const alone = parsed.stack === undefined && parsed.template === undefined
   if (alone && parsed.frontends.length > 0) {
     if (parsed.frontends.length > 1) {

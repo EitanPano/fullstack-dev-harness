@@ -203,6 +203,15 @@ function usageNotes(root, { deploy, packages }) {
     const servers = packages.length === 1 ? 'server is' : 'servers are'
     notes.push(`Open http://localhost:${port} once the dev ${servers} up.`)
   }
+  // An SDK is no app to open: its dev server is a playground page, and a host page loads the
+  // built file from the API (plan 033).
+  const sdk = packages.find((pkg) => kindOf(pkg.template) === 'sdk')
+  if (sdk?.port !== undefined) {
+    notes.push(
+      `The SDK's playground (${sdk.dir}) is at http://localhost:${sdk.port}; ` +
+        'the API serves its built file under `/api/sdk/dist/`.',
+    )
+  }
   if (existsSync(path.join(root, 'docker-compose.yml'))) {
     const composePort = (deploy === 'single' ? server : (frontend ?? server))?.port
     const where =

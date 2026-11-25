@@ -124,6 +124,7 @@ describe('scope', () => {
       'frontend/AGENTS.md',
       'site/AGENTS.md',
       'app-billing/AGENTS.md',
+      'sdk-widget/AGENTS.md',
       'serverless/x/AGENTS.md',
     ]
     assert.deepEqual(projectFiles.filter(isInstructionFile), [])

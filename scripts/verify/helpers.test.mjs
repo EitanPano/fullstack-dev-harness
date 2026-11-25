@@ -327,6 +327,30 @@ test('securityPaths matches the admin namespace in every server layout', () => {
   assert.deepEqual(securityPaths([...hit, ...miss]), hit)
 })
 
+test('securityPaths matches the SDK namespace and the SDK package network, entry and frame layers', () => {
+  const hit = [
+    'backend/src/api/sdk/config/routes.ts',
+    'backend/src/app/api/sdk/config/service.py',
+    'serverless/cloudflare/server/api/sdk/config/controller.ts',
+    'sdk-widget/src/transport/send.ts',
+    'sdk-widget/src/entries/cdn.ts',
+    'sdk-widget/src/entries/index.ts',
+    'sdk-widget/src/protocol/message.ts',
+    'sdk-widget/src/frame/meter.ts',
+  ]
+  const miss = [
+    'backend/src/api/lead/routes.ts',
+    'sdk-widget/src/core/kernel.ts',
+    'sdk-widget/src/modules/unit/render.ts',
+    'sdk-widget/src/ui/renderer.ts',
+    'frontend/src/transport/client.ts',
+    'frontend/src/frame/shell.ts',
+    'src/transport/send.ts',
+    'backend/src/api/sdkish/routes.ts',
+  ]
+  assert.deepEqual(securityPaths([...hit, ...miss]), hit)
+})
+
 test('securityPaths joins the files the line trigger names', () => {
   const files = ['backend/src/api/user/routes.ts', 'frontend/src/feature/auth/ui/login-form.tsx', 'x.ts']
   assert.deepEqual(securityPaths(files), [])
