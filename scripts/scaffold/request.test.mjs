@@ -584,6 +584,8 @@ describe('parseArgs: --sdk', () => {
     bad('sdk-widget=sdk/Browser', /not an sdk template/)
     bad('widget=sdk/browser', /an sdk directory is sdk-<name>/)
     bad('sdk-=sdk/browser', /an sdk directory is sdk-<name>/)
+    // The catalog names the SDK's global after it, so the name starts with a letter.
+    bad('sdk-2fa=sdk/browser', /an sdk directory is sdk-<name>/)
     refuses(
       () => parseArgs(['--sdk', 'sdk-a=sdk/browser', '--sdk', 'sdk-a=sdk/browser']),
       /names sdk-a twice/,
