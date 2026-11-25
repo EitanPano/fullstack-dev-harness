@@ -337,11 +337,15 @@ test('securityPaths matches the SDK namespace and the SDK package network, entry
     'sdk-widget/src/entries/index.ts',
     'sdk-widget/src/protocol/message.ts',
     'sdk-widget/src/frame/meter.ts',
+    'sdk-widget/src/modules/placement/frame.ts',
+    'sdk-widget/src/modules/placement/frame/draw.ts',
   ]
   const miss = [
     'backend/src/api/lead/routes.ts',
     'sdk-widget/src/core/kernel.ts',
     'sdk-widget/src/modules/unit/render.ts',
+    'sdk-widget/src/modules/placement/host.ts',
+    'sdk-widget/src/modules/placement/framer.ts',
     'sdk-widget/src/ui/renderer.ts',
     'frontend/src/transport/client.ts',
     'frontend/src/frame/shell.ts',
