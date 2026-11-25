@@ -8,6 +8,7 @@ import { after, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { renderConfiguration, replaceConfiguration } from './readme.mjs'
 import { parseArgs, runVerify } from './verify.mjs'
+import { processTable } from './verify/reap.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const bases = []
@@ -19,7 +20,7 @@ const test = (name, run) => tests.push([name, run])
 // child. It logs each run outside the repository so a test can count what verify executed.
 const STUB = `
 import { spawn } from 'node:child_process'
-import { appendFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 const [mode, file, text] = process.argv.slice(2)
 appendFileSync(path.resolve(import.meta.dirname, '..', 'runs.log'), mode + '\\n')
@@ -30,14 +31,18 @@ else if (mode === 'flaky') console.log('  3 passed (2s)\\n  1 flaky')
 else if (mode === 'stable') writeFileSync(file, text)
 else if (mode === 'write') writeFileSync(file, text + Date.now())
 else if (mode === 'orphan') {
-  // A detached grandchild that outlives this command, which lingers long enough to be seen.
+  // A detached grandchild that outlives this command, which lingers until the test has seen the
+  // grandchild in a process table (a minute at most).
   const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
     detached: true,
     stdio: 'ignore',
   })
   child.unref()
   writeFileSync(file, String(child.pid))
-  setTimeout(() => {}, 1500)
+  const until = Date.now() + 60_000
+  const wait = setInterval(() => {
+    if (existsSync(file + '.seen') || Date.now() > until) clearInterval(wait)
+  }, 100)
 } else if (mode === 'hang') {
   const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
   console.log('child ' + child.pid)
@@ -585,8 +590,18 @@ test('a grandchild left behind by a normal exit is reaped', async (t) => {
   })
   let pid
   try {
-    const { exit } = await runVerify(opts(fx, { reap: true, reapInterval: 300 }).options)
-    pid = Number(readFileSync(path.join(fx.base, 'orphan.pid'), 'utf8'))
+    // The step ends once a table has shown the grandchild, so a table that answers late on a
+    // loaded machine does not decide the test (the reaper's known limit, verify/reap.mjs).
+    const pidFile = path.join(fx.base, 'orphan.pid')
+    const reapQuery = async () => {
+      const table = await processTable()
+      if (existsSync(pidFile) && table.has(Number(readFileSync(pidFile, 'utf8')))) {
+        writeFileSync(`${pidFile}.seen`, '')
+      }
+      return table
+    }
+    const { exit } = await runVerify(opts(fx, { reap: true, reapInterval: 300, reapQuery }).options)
+    pid = Number(readFileSync(pidFile, 'utf8'))
     assert.equal(exit, 0)
     assert.throws(() => process.kill(pid, 0), /ESRCH/)
   } finally {

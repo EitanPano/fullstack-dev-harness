@@ -244,6 +244,7 @@ export async function runVerify(options) {
         timeout: limit,
         reap: options.reap,
         reapInterval: options.reapInterval,
+        reapQuery: options.reapQuery,
       })
       const outcome = stepOutcome(name, { ...run, limit })
       if (KEYED.includes(name)) outcome.key = startKey(pkg, name)
