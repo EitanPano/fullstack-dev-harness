@@ -38,13 +38,13 @@ acceptance criteria (AC numbers) it satisfies.>
 
 ## UX
 
-<Only when there is a frontend stage. Per route: its pattern (`list`, `detail`, `form`, `auth`,
-`dashboard`, `workspace`, `confirm`, `landing`), primary action, loading, empty and error
-states, tone and phone layout (`ui-design` skill). No copy strings. With a route, it opens with
-the `shell` line.>
+<With a frontend stage only. Per route or SDK unit: its pattern (`list`, `detail`, `form`,
+`auth`, `dashboard`, `workspace`, `confirm`, `landing`; a unit's: `inline`, `modal`), primary
+action, states, tone and phone layout (`ui-design` skill). A route opens it with the `shell`
+line.>
 
 - shell — <regions, each with its contents> — controls: <each ready-to-place control: its place> — from: <Reference app | brief>
-- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>
+- /<route> | unit <module> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>
 
 ## Steps
 

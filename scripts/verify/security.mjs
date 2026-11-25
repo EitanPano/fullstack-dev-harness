@@ -51,8 +51,9 @@ const GLOBS = [
   '**/sdk-*/src/modules/*/frame.*',
   '**/sdk-*/src/modules/*/frame/**',
 ]
-// A login form is UI; it fires only by a gate line (plan 014, plan 016).
-const UI_ONLY = ['**/auth/ui/**']
+// A login form is UI; it fires only by a gate line (plan 014, plan 016). So is a stylesheet
+// of an SDK module's frame half (plan 034).
+const UI_ONLY = ['**/auth/ui/**', '**/sdk-*/src/modules/**/*.css']
 const CODE = /\.(?:[cm]?[jt]sx?|py)$/
 const GATE =
   /(?<![\w$])(?:requireAuth|requireRole|requireAccount|assertRole|require_auth|require_role|require_caller|_assert_role|roleAction|accountAction)(?![\w$])/

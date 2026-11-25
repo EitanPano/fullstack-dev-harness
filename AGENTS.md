@@ -111,7 +111,7 @@ Done means every item holds, with evidence.
 4. Errors follow `error-handling`. No secrets, stack traces or query text leave the server.
 5. A schema or endpoint change ran each `contract` command and committed the results; a
    data-model change ships what `database` requires and passes `testDb`.
-6. UI changes meet the frontend's `AGENTS.md › Styling`; the frontend reports `UI pass:`,
+6. UI changes meet the package's `AGENTS.md › Styling`; the frontend reports `UI pass:`,
    QA `UX:` (open rubric findings are P2); the accessibility scan passes.
 7. `<package>/.doc/architecture.md` (the root file where a package has none) logs the
    change, one line citing its plan; new domain terms are in `.doc/glossary.md`.
@@ -127,7 +127,7 @@ Done means every item holds, with evidence.
 | `dev-loop` | A backlog task, plan to reviewed code |
 | `writing-plans` | Creating or revising a plan |
 | `writing-tests` | Adding or reviewing tests |
-| `ui-design` | Planning a route's UX, composing pages, judging screens |
+| `ui-design` | Planning a UX line, composing pages, judging screens |
 | `api-design` | Changing an endpoint, schemas or the contract |
 | `error-handling` | Error responses, status codes, retries, failure UX |
 | `database` | The engine; tables, indexes, migrations, data access |
