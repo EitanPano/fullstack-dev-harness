@@ -346,6 +346,8 @@ test('securityPaths matches the SDK namespace and the SDK package network, entry
     'sdk-widget/src/modules/unit/render.ts',
     'sdk-widget/src/modules/placement/host.ts',
     'sdk-widget/src/modules/placement/framer.ts',
+    'sdk-widget/src/modules/placement/frame.css',
+    'sdk-widget/src/modules/placement/frame/panel.css',
     'sdk-widget/src/ui/renderer.ts',
     'frontend/src/transport/client.ts',
     'frontend/src/frame/shell.ts',
