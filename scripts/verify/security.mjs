@@ -41,12 +41,15 @@ const GLOBS = [
   '**/api/admin/**',
   // The SDK namespace is the first cross-origin surface. In the SDK package the same risk sits
   // in `transport/` (its network caller), `entries/` (what host pages load), `protocol/` (the
-  // channel to the frame) and `frame/` (where a view is decided) (plan 033).
+  // channel to the frame), `frame/` (where a view is decided) and a module's frame half (it calls
+  // the API and draws server data) (plan 033).
   '**/api/sdk/**',
   '**/sdk-*/src/transport/**',
   '**/sdk-*/src/entries/**',
   '**/sdk-*/src/protocol/**',
   '**/sdk-*/src/frame/**',
+  '**/sdk-*/src/modules/*/frame.*',
+  '**/sdk-*/src/modules/*/frame/**',
 ]
 // A login form is UI; it fires only by a gate line (plan 014, plan 016).
 const UI_ONLY = ['**/auth/ui/**']
