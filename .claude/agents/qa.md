@@ -39,14 +39,14 @@ service: run against the services the repository defines.
    inconsistent line is a P1 finding owned by that stage. An `after the fact — <reason>` line
    is judged on its reason: one that holds is a PASS, an absent or hollow one is a P1.
 4. **UX pass** (`ui-design` skill), before any test run, because Playwright clears
-   `test-results/` at the start of every run: for each route in the plan's `UX` section, Read
+   `test-results/` at the start of every run: for each route or unit in the plan's `UX` section, Read
    the three screenshots `ui-design › Rubric` names (the frontend report's `Handoff` lists
-   them, with the checks it left open). Apply the rubric's judged checks against the route's
+   them, with the checks it left open). Apply the rubric's judged checks against its
    `UX` line, the plan's `shell` line (seen on every route) and
    `.doc/product-definition.md › Design` and `<frontend>/.doc/design.md`. A rubric failure is a P2 and opens no fix round; a
    broken journey or a WCAG AA failure is a P1. Each is a frontend finding. Record one
-   `UX:` line per route; a route the frontend report marks `not captured (<reason>)` is a P2,
-   any other route with no screenshot a P1.
+   `UX:` line each; one that the frontend report marks `not captured (<reason>)` is a P2,
+   any other with no screenshot a P1.
 5. **Adversarial pass**: add at least one test per stage that attacks the feature: empty
    state, missing or malformed input, boundary sizes, repeated rapid submission, another
    tenant's id, an unauthenticated call. Put them under `backend/tests/` or
@@ -69,7 +69,7 @@ Verdict: <pass | fail>
 
 Gates: verify.json tree <hash> <ok|fail|missing> · e2e <N passed, M failed>
 Adversarial tests added: <file: test name, one per line>
-UX: <route> — PASS|P2|P1 — <check numbers> — <path>, one per route
+UX: <route or unit> — PASS|P2|P1 — <check numbers> — <path>, one each
 Refusals: <command — the hook's reason, one per line | none>
 
 Validation:

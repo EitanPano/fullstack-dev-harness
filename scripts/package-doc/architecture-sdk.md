@@ -7,7 +7,7 @@ this SDK.
 
 ## Modules
 
-None yet. One line per module: what it does on a host page, and the events it sends or hears.
+None yet. One line per module: what it does on a host page, its display and the events it sends.
 
 ## Public API
 

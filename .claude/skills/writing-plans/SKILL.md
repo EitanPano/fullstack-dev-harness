@@ -73,14 +73,14 @@ In this order, with these exact headings:
 - `Contract`: each endpoint as `METHOD /api/<entity>[/{id}]`, its request fields, its response
   fields, and the error codes it can return. The backend agent implements exactly that list;
   the frontend agent consumes the generated types.
-- `UX`: one line per route, in this form (patterns and tones: the `ui-design` skill). No copy
-  strings.
+- `UX`: one line per route or SDK unit, in this form (patterns and tones: the `ui-design`
+  skill). No copy strings.
 
   `- /<route> — <pattern> — <primary action> — states: loading <…> · empty <…> · error <…> — tone: <…> — phone: <…>`
 
-  The pattern is one of `list`, `detail`, `form`, `auth`, `dashboard` (a dashboard or a table
-  view), `workspace` (a board, canvas or editor), `confirm` (a destructive confirm), `landing`
-  (a home or content page). Empty, loading and error are states, not patterns.
+  The pattern is one of `list`, `detail`, `form`, `auth`, `dashboard`, `workspace`, `confirm`,
+  `landing`. An SDK unit's line starts `unit <module>` and its pattern is `inline` or `modal`.
+  Empty, loading and error are states, not patterns.
 
   A plan whose `UX` names a route opens it with the template's `shell` line
   (`ui-design › Shell`).
